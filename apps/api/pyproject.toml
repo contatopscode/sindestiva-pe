@@ -20,6 +20,7 @@ dependencies = [
     "redis>=5.2.1",
     "python-jose[cryptography]>=3.3.0",
     "bcrypt>=4.2.0",
+    "apscheduler>=3.10.4",
     "python-multipart>=0.0.20",
     "httpx>=0.28.1",
     "resend>=2.13.0",

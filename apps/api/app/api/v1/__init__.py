@@ -13,12 +13,14 @@ Routers expostos:
   - /ogmo           → POST envio de notificação, GET status
   - /auditoria      → GET eventos, POST verificar-hash-chain
   - /lgpd           → termo de consentimento + Art. 18 (T1-10 Sprint 1)
+  - /dpo            → dashboard DPO + export Art. 18 (Sprint 6 T6-10/12)
 """
 from fastapi import APIRouter
 
 from app.api.v1 import (
     auditoria,
     auth,
+    dpo,
     health,
     lgpd,
     lousa,
@@ -40,5 +42,6 @@ api_v1_router.include_router(remanejamentos.router)
 api_v1_router.include_router(ogmo.router)
 api_v1_router.include_router(auditoria.router)
 api_v1_router.include_router(lgpd.router)
+api_v1_router.include_router(dpo.router)
 
 __all__ = ["api_v1_router"]

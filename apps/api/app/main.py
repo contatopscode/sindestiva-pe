@@ -24,7 +24,9 @@ from app.api.v1 import api_v1_router
 from app.core.config import settings
 from app.core.database import engine
 from app.core.logging import configure_logging, get_logger
-from app.jobs.scraping_job import get_scheduler
+from app.jobs.scheduler import start_scheduler as start_s6_scheduler, stop_scheduler as stop_s6_scheduler
+from app.jobs.scraping_job import get_scheduler as get_scraping_scheduler
+from app.middleware.access_log import AccessLogMiddleware
 
 configure_logging()
 log = get_logger("sindestiva.api")
@@ -40,23 +42,27 @@ async def lifespan(app: FastAPI):
     do engine (que tem métodos nativos async).
 
     Sprint 2: inicia o `ScrapingScheduler` em background via
-    `asyncio.create_task`. Sprint 4: adiciona o scheduler de
-    notificações OGMO (a cada 5min).
+    `asyncio.create_task`.
+    Sprint 6: adiciona scheduler de jobs (hash_chain_verifier 03:00,
+    lgpd_purge 04:00).
     """
     log.info(
         "api.startup",
         env=settings.app_env,
         db_schema=settings.db_schema,
     )
+    # Sprint 6: inicia scheduler de jobs LGPD/auditoria
+    await start_s6_scheduler()
     # Sprint 2: inicia o scheduler de scraping (interval = 15min).
     # Desabilitado em test environment para não interferir com pytest.
     if settings.app_env != "test":
-        scheduler = get_scheduler()
+        scheduler = get_scraping_scheduler()
         app.state.scraping_task = scheduler.start()
     yield
     # Shutdown: para o scheduler antes de dispose do engine.
     if getattr(app.state, "scraping_task", None) is not None:
-        await get_scheduler().stop()
+        await get_scraping_scheduler().stop()
+    await stop_s6_scheduler()
     await engine.dispose()
     log.info("api.shutdown")
 
@@ -84,11 +90,19 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
+        "http://localhost:3010",  # SINDESTIVA web (sindestiva-bot Sprint 4)
+        "http://127.0.0.1:3010",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Middleware (Sprint 6 T6-09 — access_log Art. 37 LGPD)
+# ---------------------------------------------------------------------------
+app.add_middleware(AccessLogMiddleware)
 
 
 # ---------------------------------------------------------------------------

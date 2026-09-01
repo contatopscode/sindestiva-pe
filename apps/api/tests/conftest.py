@@ -43,6 +43,7 @@ import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import session_scope
 from app.core.security import hash_password
 from app.models import (
@@ -122,14 +123,15 @@ SEED_USERS = [
 # Tabelas tocadas pelos testes do Sprint 1.
 # NÃO limpamos: `remanejamentos`, `remanejamento_historico` (append-only),
 # `tpas` (FK reversa de remanejamentos), `fiscais` (FK reversa de
-# remanejamentos + FK a users com RESTRICT).
-# Limpamos: tabelas LGPD + dirigentes + users seed (exceto Manoel,
-# que tem fiscais+remanejamentos linkados — Manoel é preservado).
-# Paulo, Josias e qualquer user DIRIGENTE extra são deletados.
+# remanejamentos + FK a users com RESTRICT), `lgpd_purge_log`
+# (trigger `tg_purge_log_block_update/delete`), `audit_events`
+# (append-only via `tg_audit_block_update/delete`).
+# Limpamos: termos_consentimento, lgpd_solicitacoes, dirigentes,
+# users DIRIGENTE (Paulo/Josias). Manoel (FISCAL) e os 2 TPAs
+# permanecem — Manoel tem fiscais+remanejamentos linkados.
 TABLES_TO_CLEAN = [
     "termos_consentimento",
     "lgpd_solicitacoes",
-    "lgpd_purge_log",
     "dirigentes",
 ]
 
@@ -139,30 +141,35 @@ TABLES_TO_CLEAN = [
 # ---------------------------------------------------------------------------
 
 async def _clean_db() -> None:
-    """DELETE em todas as tabelas tocadas (FK-safe + scoped).
+    """DELETE nas tabelas que PODEM ser limpas (LGPD + dirigentes).
 
-    Estratégia:
-    1. Apaga LGPD (termos, solicitacoes, purge_log) — sem FK cruzada.
-    2. Apaga dirigentes (sem FK de remanejamentos).
-    3. Apaga users DIRIGENTE seed (Paulo/Josias) — Manoel fica
-       porque tem fiscais+remanejamentos linkados.
-    4. Se precisar criar users no test, o fixture reusa o existente
-       ou insere (idempotência por `ON CONFLICT`).
+    Não apagamos `users` porque `access_log` (append-only) tem FK
+    RESTRICT pra `users.id`. O fixture `seed_users` faz upsert por
+    email — Paulo/Manoel/Josias existentes são ATUALIZADOS (password
+    reset, status ATIVO, failed_login_count=0, blocked_until=NULL)
+    ao invés de duplicados. Idempotente.
 
-    Os 2 TPAs (`joao.tpa`, `maria.tpa`) e Manoel (FISCAL) ficam
-    intocados — não interferem nos testes e preservar evita FK
-    violation com remanejamentos existentes.
+    Outras tabelas append-only (audit_events, remanejamentos,
+    remanejamento_historico, lgpd_purge_log, tpas) também ficam
+    intocadas — ver TABLES_TO_CLEAN.
+
+    Usa um engine isolado (NullPool) pra evitar deadlock com o engine
+    global que a API live também usa — em testes integrados, o
+    scheduler de scraping da API está escrevendo em paralelo.
     """
-    async with session_scope() as session:
-        for table in TABLES_TO_CLEAN:
-            await session.execute(text(f"DELETE FROM lousa_main.{table}"))
-        # Manoel Costa é FISCAL e tem fiscais+remanejamentos linkados.
-        # Não deletamos ele. Paulo e Josias (DIRIGENTE) não têm FK
-        # cruzada — delete direto.
-        await session.execute(
-            text("DELETE FROM lousa_main.users WHERE role = 'DIRIGENTE'"),
-        )
-        await session.commit()
+    from sqlalchemy.ext.asyncio import create_async_engine  # noqa: PLC0415
+    from sqlalchemy.ext.asyncio import async_sessionmaker  # noqa: PLC0415
+    from sqlalchemy.pool import NullPool  # noqa: PLC0415
+
+    engine = create_async_engine(settings.database_url_async, poolclass=NullPool)
+    Session = async_sessionmaker(bind=engine, expire_on_commit=False, autoflush=False)
+    try:
+        async with Session() as session:
+            for table in TABLES_TO_CLEAN:
+                await session.execute(text(f"DELETE FROM lousa_main.{table}"))
+            await session.commit()
+    finally:
+        await engine.dispose()
 
 
 # ---------------------------------------------------------------------------
