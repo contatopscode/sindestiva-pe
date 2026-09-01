@@ -95,12 +95,16 @@ class User(Base, TimestampMixin, SoftDeleteMixin):
         lazy="selectin",
         cascade="save-update, merge",
     )
+    # `foreign_keys=` é necessário porque `fiscais` tem 2 FKs pra `users`:
+    # `user_id` (próprio fiscal) e `aprovador_id` (quem aprovou). Sem
+    # isso, o SQLAlchemy não sabe qual usar pro relationship.
     fiscal: Mapped["Fiscal | None"] = relationship(
         "Fiscal",
         back_populates="user",
         uselist=False,
         lazy="selectin",
         cascade="save-update, merge",
+        foreign_keys="Fiscal.user_id",
     )
     dirigente: Mapped["Dirigente | None"] = relationship(
         "Dirigente",

@@ -33,6 +33,13 @@ def pg_enum(python_enum: type[enum.Enum]) -> SAEnum:
       - `schema=lousa_main` (single-schema do MVP)
       - `create_type=False` (a migration já cria; evita conflito em
         autogenerate)
+      - `values_callable` pra mapear `RoleEnum.FISCAL` → "FISCAL" (value),
+        não "FISCAL" via name (que também daria "FISCAL" mas é confuso
+        em outros enums)
+      - **Passa a classe do enum** (não os values) pra que o SQLAlchemy
+        wrappar o valor lido do banco de volta no enum Python.
+        Sem isso, `.role` retorna `str` em vez de `RoleEnum` e quebra
+        `user.status.value`.
 
     Uso:
         role: Mapped[RoleEnum] = mapped_column(
@@ -47,11 +54,12 @@ def pg_enum(python_enum: type[enum.Enum]) -> SAEnum:
     parts = name.split("_")
     normalized = "_".join(parts[:-1] + ["enum"]) if parts[-1] != "enum" else name
     return postgresql.ENUM(
-        *[m.value for m in python_enum],
+        python_enum,  # passar a CLASSE (não os values) é o que faz o wrap
         name=normalized,
         schema=SCHEMA,
         create_type=False,
         native_enum=True,
+        values_callable=lambda enum_cls: [m.value for m in enum_cls],
     )
 
 

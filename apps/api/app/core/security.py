@@ -1,29 +1,30 @@
 """SINDESTIVA-PE · Segurança (hash de senha, JWT, dependências de auth).
 
-Stack: passlib[bcrypt] para hash de senha (T1-08 do plano) +
+Stack: bcrypt 4.x direto (passlib tem bug com bcrypt 4.x em detect_wrap_bug) +
        python-jose para JWT. NextAuth v5 (Sprint 1 T1-04) é o issuer
        primário no frontend; este módulo valida tokens emitidos por lá.
 
 Decisão D1 (DD v1): TPA pode ter `password_hash`? Recomendação
 SINDESTIVA Bot = (a) só OTP. A constraint `ck_users_password_for_non_tpa`
 foi incluída no DD mas pode ser removida se o Paulo confirmar D1.
+
+Pega-dica (cross-projeto, MEMORY): passlib 1.7.4 + bcrypt 4.x tem bug
+no `detect_wrap_bug` (testa senha > 72 bytes que bcrypt não aceita).
+Solução: usar `bcrypt` direto (não passlib). Funciona em Docker Alpine
+e no Mac M1. Argon2id preferido em prod (DD v1 menciona) — trocar
+no Sprint 8 quando auditarmos segurança.
 """
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 
+import bcrypt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 
 from app.core.config import settings
-
-# Esquema de hash (bcrypt padrão mercado). Argon2id preferido (DD v1
-# fala em Argon2id) mas bcrypt é mais portátil no Docker Alpine. Trocar
-# em Sprint 0 se o Paulo pedir.
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # NextAuth v5 emite JWT com `alg: HS256` e `NEXTAUTH_SECRET`. Em S1
 # validamos esse token no backend; em produção migrar para RS256 com
@@ -35,19 +36,32 @@ JWT_ALGORITHM = "HS256"
 # frontend.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
 
+# Bcrypt tem limite de 72 bytes na senha. Truncar manualmente (docs oficiais).
+_BCRYPT_MAX_BYTES = 72
+
 
 # ---------------------------------------------------------------------------
 # Hash / verificação de senha
 # ---------------------------------------------------------------------------
 
+def _to_bcrypt_bytes(plain: str) -> bytes:
+    """Converte senha pra bytes, truncada em 72 bytes se necessário."""
+    raw = plain.encode("utf-8")
+    return raw[:_BCRYPT_MAX_BYTES] if len(raw) > _BCRYPT_MAX_BYTES else raw
+
+
 def hash_password(plain: str) -> str:
-    """Gera hash bcrypt da senha em texto plano."""
-    return pwd_context.hash(plain)
+    """Gera hash bcrypt (12 rounds) da senha em texto plano."""
+    salt = bcrypt.gensalt(rounds=12)
+    return bcrypt.hashpw(_to_bcrypt_bytes(plain), salt).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     """Verifica senha em texto plano contra hash bcrypt."""
-    return pwd_context.verify(plain, hashed)
+    try:
+        return bcrypt.checkpw(_to_bcrypt_bytes(plain), hashed.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -106,16 +120,15 @@ def decode_token(token: str) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Dependências de auth (placeholders Sprint 0)
+# Dependências de auth (Sprint 1 T1-08)
 # ---------------------------------------------------------------------------
 
-async def get_current_user_id(
+def get_current_user_id(
     token: Annotated[str | None, Depends(oauth2_scheme)],
 ) -> str | None:
     """Extrai `sub` (user_id) do JWT. Retorna None se token ausente.
 
-    Sprint 1 (T1-08): trocar para buscar User real no DB e retornar
-    instância `User` (lazy-load). Sprint 0 retorna só o id.
+    Sprint 1: retorna só o id; o caller faz SELECT real no DB.
     """
     if token is None:
         return None
@@ -124,7 +137,7 @@ async def get_current_user_id(
     return sub
 
 
-async def require_user(
+def require_user(
     user_id: Annotated[str | None, Depends(get_current_user_id)],
 ) -> str:
     """Dependency que exige user autenticado. Levanta 401 caso contrário."""

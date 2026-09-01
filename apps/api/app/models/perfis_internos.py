@@ -81,7 +81,14 @@ class Fiscal(Base, TimestampMixin, SoftDeleteMixin):
         nullable=True,
     )
 
-    user: Mapped[object] = relationship("User", back_populates="fiscal", lazy="joined")
+    user: Mapped[object] = relationship(
+        "User",
+        back_populates="fiscal",
+        lazy="joined",
+        # `fiscais` tem 2 FKs pra `users` (`user_id` e `aprovador_id`).
+        # Sem `foreign_keys`, o SQLAlchemy não sabe qual usar.
+        foreign_keys=[user_id],
+    )
 
     # Retenção específica: 5 anos (D2) — sobrescreve o default do mixin
     # (que é 24m). O DDL da migration 0001 já reflete isso via

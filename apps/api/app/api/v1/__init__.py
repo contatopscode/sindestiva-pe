@@ -3,13 +3,14 @@
 Aggregate router montado em app.main.
 
 Routers expostos:
-  - /auth         → login, refresh, me
-  - /users        → CRUD users (admin)
-  - /lousa        → GET lousa atual, por porto/turno
+  - /health         → health check (sem DB) + DB ping
+  - /auth           → login, me, config (T1-08 Sprint 1)
+  - /users          → CRUD users (admin)
+  - /lousa          → GET lousa atual, por porto/turno
   - /remanejamentos → POST/GET/PATCH
-  - /ogmo         → POST envio de notificação, GET status
-  - /auditoria    → GET eventos, POST verificar-hash-chain
-  - /health       → health check
+  - /ogmo           → POST envio de notificação, GET status
+  - /auditoria      → GET eventos, POST verificar-hash-chain
+  - /lgpd           → termo de consentimento + Art. 18 (T1-10 Sprint 1)
 """
 from fastapi import APIRouter
 
@@ -17,6 +18,7 @@ from app.api.v1 import (
     auditoria,
     auth,
     health,
+    lgpd,
     lousa,
     ogmo,
     remanejamentos,
@@ -31,5 +33,6 @@ api_v1_router.include_router(lousa.router)
 api_v1_router.include_router(remanejamentos.router)
 api_v1_router.include_router(ogmo.router)
 api_v1_router.include_router(auditoria.router)
+api_v1_router.include_router(lgpd.router)
 
 __all__ = ["api_v1_router"]

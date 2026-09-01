@@ -1,70 +1,89 @@
-"""SINDESTIVA-PE · /auth (login mock + me).
+"""SINDESTIVA-PE · /auth (login real + me).
 
-Sprint 0: skeleton. Sprint 1 T1-08: implementar fluxo real
-(NextAuth v5 valida no backend, este endpoint só reflete).
+Sprint 1 T1-08: implementação real do fluxo de auth, com:
+- Verificação de credencial no DB (bcrypt)
+- Bloqueio após 5 tentativas (15min)
+- JWT com claims de role + fiscal_id
+- Auditoria (last_login_at, IP, user agent)
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_db, require_user
+from app.api.deps import get_db
 from app.core.config import settings
-from app.core.security import create_access_token
+from app.core.security import get_current_user_id, oauth2_scheme
+from app.models import User
 from app.schemas.user import LoginRequest, LoginResponse, UserRead
+from app.services.auth_service import AuthError, authenticate
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=LoginResponse, summary="Login stub (Sprint 0)")
+def _client_ip(request: Request) -> str | None:
+    """Extrai IP do request (com fallback X-Forwarded-For se vier proxy)."""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
+@router.post("/login", response_model=LoginResponse, summary="Login com email+senha (T1-08)")
 async def login(
     payload: LoginRequest,
-    db: AsyncSession = Depends(get_db),  # noqa: ARG001
+    request: Request,
+    db: AsyncSession = Depends(get_db),
 ) -> LoginResponse:
-    """Sprint 0: devolve JWT mock sem checar credenciais.
+    """Sprint 1: verifica credenciais reais no DB.
 
-    Sprint 1 T1-08: implementar verificação real (NextAuth v5).
+    Returns:
+        LoginResponse com access_token JWT, expires_in (8h), user.
     """
-    token = create_access_token(
-        subject="00000000-0000-0000-0000-000000000000",
-        extra_claims={"role": "FISCAL", "stub": True},
-    )
+    try:
+        user, token = await authenticate(
+            db,
+            email=payload.email,
+            password=payload.password,
+            ip=_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
+        )
+    except AuthError as e:
+        raise HTTPException(status_code=e.status, detail={"code": e.code, "message": e.message})
+
     return LoginResponse(
         access_token=token,
+        token_type="bearer",
         expires_in=8 * 3600,
-        user=UserRead(
-            id="00000000-0000-0000-0000-000000000000",
-            email=payload.email,
-            telefone=None,
-            role="FISCAL",
-            status="ATIVO",
-            failed_login_count=0,
-            last_login_at=None,
-            accepted_terms_at=None,
-            created_at="2026-09-01T00:00:00Z",
-            updated_at="2026-09-01T00:00:00Z",
-        ),
+        user=UserRead.model_validate(user),
     )
 
 
 @router.get("/me", response_model=UserRead, summary="Quem sou eu (do JWT)")
-async def me(user_id: str = Depends(require_user)) -> UserRead:  # noqa: ARG001
-    """Sprint 0: devolve placeholder a partir do `sub` do JWT.
+async def me(
+    token: Annotated[str | None, Depends(oauth2_scheme)],
+    db: AsyncSession = Depends(get_db),
+) -> UserRead:
+    """Sprint 1: SELECT real em users (lazy-load perfis)."""
+    user_id = get_current_user_id(token=token)
+    if user_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "AUTH_REQUIRED", "message": "Token ausente ou inválido."},
+        )
 
-    Sprint 1: SELECT real em `users` (Sprint 1 T1-08).
-    """
-    return UserRead(
-        id=user_id,
-        email=None,
-        telefone=None,
-        role="FISCAL",
-        status="ATIVO",
-        failed_login_count=0,
-        last_login_at=None,
-        accepted_terms_at=None,
-        created_at="2026-09-01T00:00:00Z",
-        updated_at="2026-09-01T00:00:00Z",
-    )
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    if user is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"code": "USER_NOT_FOUND", "message": "Usuário não encontrado."},
+        )
+    return UserRead.model_validate(user)
 
 
 @router.get("/config", summary="Config pública do front (NEXTAUTH_URL etc)")
