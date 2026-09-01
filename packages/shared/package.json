@@ -1,0 +1,20 @@
+{
+  "name": "@sindestiva/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tipos TypeScript compartilhados (RBAC, hash chain, enums de domínio)",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "eslint . --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf .turbo dist"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "eslint": "^9.17.0"
+  }
+}

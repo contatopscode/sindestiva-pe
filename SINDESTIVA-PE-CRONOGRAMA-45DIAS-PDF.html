@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>SINDESTIVA-PE · Cronograma 45 dias</title>
+<style>
+/* ============================================
+   SINDESTIVA-PE · CRONOGRAMA 45 DIAS
+   PDF Executivo para Diretoria
+   ============================================ */
+
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink-deep: #0B1929;
+  --ink-base: #122841;
+  --ink-raised: #1B3556;
+  --gold: #C9A45C;
+  --gold-soft: #E2C887;
+  --teal: #3D8FA8;
+  --green: #5FA37D;
+  --red: #B84A4A;
+  --amber: #D4923F;
+  --paper: #FAF8F3;
+  --paper-warm: #F2EEE3;
+  --line: #C8C0AA;
+  --text: #1A1A1A;
+  --text-soft: #4A4A4A;
+  --text-mute: #7A7A7A;
+}
+
+html, body {
+  font-family: 'Helvetica', 'Arial', sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.55;
+  color: var(--text);
+  background: white;
+  -webkit-font-smoothing: antialiased;
+}
+
+.page {
+  width: 210mm;
+  min-height: 297mm;
+  padding: 14mm 16mm 14mm 16mm;
+  position: relative;
+  page-break-after: always;
+  background: white;
+  page-break-inside: avoid;
+}
+
+.page:last-child { page-break-after: auto; }
+
+/* ============================================
+   HEADER DE PÁGINA
+   ============================================ */
+
+.page-header {
+  position: absolute;
+  top: 6mm;
+  left: 16mm;
+  right: 16mm;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 4mm;
+  border-bottom: 1px solid var(--line);
+  font-size: 8pt;
+  color: var(--text-mute);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.page-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-deep);
+}
+
+.page-header .brand-mark {
+  width: 14px;
+  height: 14px;
+  background: var(--gold);
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.page-header .doc-title {
+  font-size: 8pt;
+  letter-spacing: 0.8px;
+}
+
+.page-footer {
+  position: absolute;
+  bottom: 6mm;
+  left: 16mm;
+  right: 16mm;
+  display: flex;
+  justify-content: space-between;
+  font-size: 7.5pt;
+  color: var(--text-mute);
+  border-top: 1px solid var(--line);
+  padding-top: 3mm;
+}
+
+/* ============================================
+   CAPA
+   ============================================ */
+
+.cover {
+  width: 210mm;
+  height: 297mm;
+  background: linear-gradient(135deg, var(--ink-deep) 0%, var(--ink-base) 60%, var(--ink-raised) 100%);
+  color: white;
+  position: relative;
+  page-break-after: always;
+  padding: 30mm 18mm;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cover-mark {
+  width: 50px;
+  height: 50px;
+  background: var(--gold);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink-deep);
+  letter-spacing: -0.5px;
+}
+
+.cover-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 9pt;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--gold-soft);
+  font-weight: 600;
+  margin-top: 30mm;
+}
+
+.cover-meta .accent-bar {
+  width: 60px;
+  height: 2px;
+  background: var(--gold);
+}
+
+.cover-title {
+  margin-top: 16mm;
+}
+
+.cover-title h1 {
+  font-size: 36pt;
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: -1px;
+  margin-bottom: 8mm;
+}
+
+.cover-title h2 {
+  font-size: 14pt;
+  font-weight: 400;
+  color: var(--gold-soft);
+  line-height: 1.4;
+  letter-spacing: 0.3px;
+}
+
+.cover-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-top: 14mm;
+  border-top: 1px solid rgba(255,255,255,0.15);
+}
+
+.cover-bottom .left {
+  font-size: 9pt;
+  color: rgba(255,255,255,0.7);
+  line-height: 1.6;
+}
+
+.cover-bottom .left strong {
+  color: white;
+  font-weight: 600;
+  display: block;
+  font-size: 10pt;
+  margin-bottom: 2px;
+}
+
+.cover-bottom .right {
+  text-align: right;
+  font-size: 8pt;
+  color: rgba(255,255,255,0.6);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  line-height: 1.8;
+}
+
+.cover-bottom .right .doc-num {
+  color: var(--gold);
+  font-weight: 700;
+  font-size: 9pt;
+}
+
+/* ============================================
+   TÍTULOS DE SEÇÃO
+   ============================================ */
+
+.section-num {
+  display: inline-block;
+  background: var(--ink-deep);
+  color: var(--gold);
+  font-size: 9pt;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 2px;
+  letter-spacing: 1.5px;
+  margin-bottom: 4mm;
+}
+
+.section-title {
+  font-size: 19pt;
+  font-weight: 800;
+  color: var(--ink-deep);
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  margin-bottom: 2mm;
+}
+
+.section-sub {
+  font-size: 10.5pt;
+  color: var(--text-soft);
+  line-height: 1.4;
+  margin-bottom: 5mm;
+  border-bottom: 2px solid var(--gold);
+  padding-bottom: 3mm;
+}
+
+h3 {
+  font-size: 11.5pt;
+  font-weight: 700;
+  color: var(--ink-deep);
+  margin: 3mm 0 2mm 0;
+  letter-spacing: -0.2px;
+  page-break-after: avoid;
+}
+
+h4 {
+  font-size: 10pt;
+  font-weight: 700;
+  color: var(--ink-base);
+  margin: 3mm 0 1.5mm 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  page-break-after: avoid;
+}
+
+p { margin-bottom: 2.5mm; }
+
+strong { color: var(--ink-deep); font-weight: 700; }
+em { color: var(--ink-base); font-style: italic; }
+
+/* ============================================
+   TABELAS
+   ============================================ */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 3mm 0 4mm 0;
+  font-size: 9.5pt;
+  page-break-inside: avoid;
+}
+
+table thead th {
+  background: var(--ink-deep);
+  color: white;
+  padding: 3mm 3mm;
+  text-align: left;
+  font-weight: 700;
+  font-size: 8.5pt;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  border-right: 1px solid rgba(255,255,255,0.15);
+}
+
+table thead th:last-child { border-right: none; }
+
+table tbody td {
+  padding: 2.5mm 3mm;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+table tbody tr:nth-child(even) td {
+  background: var(--paper);
+}
+
+table tbody tr:hover td {
+  background: var(--paper-warm);
+}
+
+table.compact tbody td {
+  padding: 1.8mm 3mm;
+}
+
+/* ============================================
+   HIGHLIGHTS / CALLOUTS
+   ============================================ */
+
+.callout {
+  background: var(--paper);
+  border-left: 3px solid var(--gold);
+  padding: 3mm 4mm;
+  margin: 3mm 0;
+  font-size: 9pt;
+  line-height: 1.5;
+  page-break-inside: avoid;
+}
+
+.callout.success { border-left-color: var(--green); }
+.callout.warn { border-left-color: var(--amber); }
+.callout.danger { border-left-color: var(--red); }
+
+.callout-title {
+  font-weight: 800;
+  color: var(--ink-deep);
+  font-size: 8.5pt;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  margin-bottom: 1.5mm;
+}
+
+/* ============================================
+   STATS
+   ============================================ */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3mm;
+  margin: 3mm 0 4mm 0;
+}
+
+.stat-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--gold);
+  padding: 2.5mm 3mm;
+  border-radius: 1px;
+}
+
+.stat-card.gold { border-top-color: var(--gold); }
+.stat-card.teal { border-top-color: var(--teal); }
+.stat-card.green { border-top-color: var(--green); }
+.stat-card.red { border-top-color: var(--red); }
+
+.stat-label {
+  font-size: 7.5pt;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-mute);
+  font-weight: 700;
+  margin-bottom: 1.5mm;
+}
+
+.stat-value {
+  font-size: 16pt;
+  font-weight: 800;
+  color: var(--ink-deep);
+  line-height: 1;
+  letter-spacing: -0.5px;
+  margin-bottom: 1mm;
+}
+
+.stat-sub {
+  font-size: 8pt;
+  color: var(--text-soft);
+  line-height: 1.3;
+}
+
+/* ============================================
+   GANTT — DIAGRAMA PRINCIPAL
+   ============================================ */
+
+.gantt-wrap {
+  margin: 4mm 0 6mm 0;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 1px;
+  padding: 4mm 3mm;
+}
+
+.gantt-title {
+  font-size: 10pt;
+  font-weight: 800;
+  color: var(--ink-deep);
+  margin-bottom: 3mm;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.gantt {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 1px;
+  font-size: 8pt;
+  font-family: 'Helvetica', 'Arial', sans-serif;
+}
+
+.gantt th,
+.gantt td {
+  padding: 2mm 1.5mm;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.gantt thead th {
+  background: var(--ink-deep);
+  color: white;
+  font-weight: 700;
+  font-size: 7.5pt;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  padding: 1.5mm 1.5mm;
+  border-right: 1px solid rgba(255,255,255,0.1);
+}
+
+.gantt thead th.sprint-header {
+  background: var(--ink-base);
+  font-size: 8pt;
+  color: var(--gold-soft);
+  border-bottom: 2px solid var(--gold);
+}
+
+.gantt thead th.task-label { text-align: left; padding-left: 3mm; }
+
+.gantt tbody th.task-label {
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink-deep);
+  background: var(--paper);
+  padding: 1mm 3mm;
+  font-size: 7.5pt;
+  white-space: nowrap;
+  border-right: 2px solid var(--ink-base);
+}
+
+.gantt tbody td {
+  background: white;
+  height: 3.5mm;
+  position: relative;
+}
+
+.gantt tbody td.weekend {
+  background: var(--paper-warm);
+}
+
+.gantt-bar {
+  position: absolute;
+  inset: 0.5mm 0.5mm;
+  background: var(--ink-base);
+  border-radius: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 7pt;
+  letter-spacing: 0.3px;
+}
+
+.gantt-bar.gold { background: var(--gold); color: var(--ink-deep); }
+.gantt-bar.teal { background: var(--teal); }
+.gantt-bar.green { background: var(--green); }
+.gantt-bar.amber { background: var(--amber); }
+.gantt-bar.red { background: var(--red); }
+
+.gantt-marker {
+  position: absolute;
+  top: -2mm;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 7mm;
+  height: 7mm;
+  border-radius: 50%;
+  background: var(--red);
+  border: 2px solid white;
+  box-shadow: 0 0 0 1px var(--red);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  font-size: 6.5pt;
+  z-index: 5;
+}
+
+.gantt-marker.gold { background: var(--gold); color: var(--ink-deep); box-shadow: 0 0 0 1px var(--gold); }
+.gantt-marker.green { background: var(--green); }
+.gantt-marker.teal { background: var(--teal); }
+
+/* ============================================
+   LEGEND
+   ============================================ */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4mm 6mm;
+  margin-top: 3mm;
+  font-size: 7.5pt;
+  color: var(--text-soft);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+}
+
+.legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 1px;
+}
+
+/* ============================================
+   UTILITIES
+   ============================================ */
+
+.muted { color: var(--text-mute); }
+.italic { font-style: italic; }
+.center { text-align: center; }
+.right { text-align: right; }
+.spacer-sm { height: 3mm; }
+.spacer-md { height: 6mm; }
+.spacer-lg { height: 10mm; }
+
+ul, ol {
+  margin: 2mm 0 3mm 6mm;
+}
+
+li { margin-bottom: 1.5mm; }
+
+hr.divider {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: 6mm 0;
+}
+
+.page-num {
+  font-weight: 700;
+  color: var(--ink-deep);
+}
+
+/* Highlight inline */
+.highlight {
+  background: linear-gradient(180deg, transparent 60%, rgba(201,164,92,0.25) 60%);
+  padding: 0 1mm;
+  font-weight: 600;
+}
+
+/* TOC / Sumário */
+.toc {
+  margin: 4mm 0;
+  font-size: 10pt;
+}
+
+.toc-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 1.5mm 0;
+  border-bottom: 1px dotted var(--line);
+}
+
+.toc-item .toc-label {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.toc-item .toc-num {
+  color: var(--text-mute);
+  font-size: 8.5pt;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+</style>
+</head>
+<body>
+
+<!-- ============================================
+     PÁGINA 1 — CAPA
+     ============================================ -->
+
+<div class="cover">
+
+  <div>
+    <div class="cover-mark">SG</div>
+    <div class="cover-meta">
+      <div class="accent-bar"></div>
+      <div>Suporte Gerencial · Tecnologia & Consultoria</div>
+    </div>
+
+    <div class="cover-title">
+      <h1>Cronograma<br>Gerencial</h1>
+      <h2>Sistema Lousa Digital —<br>implantação em 45 dias</h2>
+    </div>
+  </div>
+
+  <div class="cover-bottom">
+    <div class="left">
+      <strong>SINDESTIVA-PE</strong>
+      Sindicato dos Estivadores nos Portos de Pernambuco<br>
+      <span style="opacity: 0.7;">Recife · Suape · desde 19/03/1891</span>
+    </div>
+    <div class="right">
+      <div class="doc-num">CRON-45D · v1.0</div>
+      <div>01 set 2026</div>
+      <div>Confidencial · Cliente</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============================================
+     PÁGINA 2 — SUMÁRIO + VISÃO CONSOLIDADA
+     ============================================ -->
+
+<div class="page">
+
+  <div class="page-header">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>SINDESTIVA-PE · Lousa Digital</span>
+    </div>
+    <div class="doc-title">Cronograma 45 dias · Apresentação à Diretoria</div>
+  </div>
+
+  <div class="section-num">Documento</div>
+  <h1 class="section-title" style="font-size: 18pt; margin-top: 2mm;">Sumário executivo</h1>
+  <p class="section-sub" style="margin-bottom: 6mm;">Visão consolidada do plano de implantação de 45 dias corridos, preparado para a reunião de apresentação à Diretoria do SINDESTIVA-PE em setembro de 2026.</p>
+
+  <div class="toc">
+    <div class="toc-item">
+      <span class="toc-label">1. Visão consolidada</span>
+      <span class="toc-num">PÁG. 3</span>
+    </div>
+    <div class="toc-item">
+      <span class="toc-label">2. Premissas do cronograma</span>
+      <span class="toc-num">PÁG. 4</span>
+    </div>
+    <div class="toc-item">
+      <span class="toc-label">3. Marcos com datas fixas</span>
+      <span class="toc-num">PÁG. 5</span>
+    </div>
+    <div class="toc-item">
+      <span class="toc-label">4. Visão Gantt — 7 sprints semanais</span>
+      <span class="toc-num">PÁG. 6</span>
+    </div>
+    <div class="toc-item">
+      <span class="toc-label">5. Recomendações finais &amp; próximos passos</span>
+      <span class="toc-num">PÁG. 7</span>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="callout">
+    <div class="callout-title">Por que este documento</div>
+    <p>Este cronograma é o resumo executivo do <strong>Plano de Implementação v1.0</strong> (67KB, 16 seções, disponível na íntegra). Foi ajustado para a janela de <strong>45 dias</strong> solicitada pela Diretoria, com cortes de escopo conscientes e dedicação integral do sponsor técnico. O objetivo é apresentar, de forma visual e direta, <strong>quando</strong> o sistema fica pronto, <strong>o que</strong> é entregue em cada marco, e <strong>quanto</strong> custa.</p>
+  </div>
+
+  <h3>Conteúdo deste documento</h3>
+  <ul>
+    <li><strong>1. Visão consolidada</strong> — datas, investimento, horas dedicadas</li>
+    <li><strong>2. Premissas</strong> — o que mudou em relação ao plano original de 18 semanas para caber em 45 dias</li>
+    <li><strong>3. Marcos</strong> — 5 entregas formais com datas fixas, validadores e critérios Go/No-Go</li>
+    <li><strong>4. Visão Gantt</strong> — diagrama visual de 7 sprints semanais com atividades paralelas</li>
+  </ul>
+
+  <div class="spacer-md"></div>
+
+  <p class="muted italic" style="font-size: 9pt;">Para o plano completo (16 seções, WBS com 86 HUs, matriz de 15 riscos, orçamento detalhado, KPIs por trimestre, governança contratual), consulte o documento <strong>SINDESTIVA-PE-PLANO-IMPLEMENTACAO-2026-09-01.md</strong>.</p>
+
+  <div class="page-footer">
+    <div>SINDESTIVA-PE · Lousa Digital</div>
+    <div><span class="page-num">2</span> / 8</div>
+  </div>
+</div>
+
+<!-- ============================================
+     PÁGINA 3 — VISÃO CONSOLIDADA
+     ============================================ -->
+
+<div class="page">
+
+  <div class="page-header">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>SINDESTIVA-PE · Lousa Digital</span>
+    </div>
+    <div class="doc-title">Cronograma 45 dias · Apresentação à Diretoria</div>
+  </div>
+
+  <div class="section-num">01 · Visão consolidada</div>
+  <h1 class="section-title">O plano em 1 página</h1>
+  <p class="section-sub">O sistema Lousa Digital entra em operação em 45 dias corridos, com investimento de R$ 2.805, dedicação integral do sponsor técnico e piloto de 1 fiscal no Porto de Suape.</p>
+
+  <h3>Indicadores-chave do plano</h3>
+
+  <div class="stat-grid">
+    <div class="stat-card gold">
+      <div class="stat-label">Duração</div>
+      <div class="stat-value">45 dias</div>
+      <div class="stat-sub">~32 dias úteis<br>14/09 → 28/10/2026</div>
+    </div>
+    <div class="stat-card teal">
+      <div class="stat-label">Investimento</div>
+      <div class="stat-value">R$ 2.805</div>
+      <div class="stat-sub">Cash ano 1<br>infra + jurídico + viagem</div>
+    </div>
+    <div class="stat-card green">
+      <div class="stat-label">Horas técnicas</div>
+      <div class="stat-value">256h</div>
+      <div class="stat-sub">~40h/sem · 100% exclusivo<br>7 sprints semanais</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-label">Marcos</div>
+      <div class="stat-value">5</div>
+      <div class="stat-sub">M0 a M4<br>Go-Live 28/10/26</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Os 5 marcos na linha do tempo</h3>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th style="width: 12%;">Marco</th>
+        <th style="width: 18%;">Data</th>
+        <th style="width: 12%;">Dias</th>
+        <th>Entregável</th>
+        <th style="width: 18%;">Validador</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>M0</strong></td>
+        <td>18/09/2026 · sex</td>
+        <td>D+4</td>
+        <td>Kickoff, CCT obtida, advogado contratado, infra pronta</td>
+        <td>Josias + Paulo</td>
+      </tr>
+      <tr>
+        <td><strong>M1</strong></td>
+        <td>25/09/2026 · sex</td>
+        <td>D+11</td>
+        <td><span class="highlight">Centro de Comando com Lousa oficial de Suape espelhada</span></td>
+        <td>Manoel Costa</td>
+      </tr>
+      <tr>
+        <td><strong>M2</strong></td>
+        <td>05/10/2026 · seg</td>
+        <td>D+21</td>
+        <td><span class="highlight">Demo executiva — sistema completo (Lousa + Remanejamento + PWA + Auditoria)</span></td>
+        <td>Josias + Diretoria</td>
+      </tr>
+      <tr>
+        <td><strong>M3</strong></td>
+        <td>19/10/2026 · seg</td>
+        <td>D+35</td>
+        <td>Homologação — Manoel opera 100% por 3 dias consecutivos</td>
+        <td>Manoel Costa</td>
+      </tr>
+      <tr>
+        <td><strong style="color: var(--red);">M4</strong></td>
+        <td><strong>28/10/2026 · ter</strong></td>
+        <td><strong>D+45</strong></td>
+        <td><strong>GO-LIVE</strong> — Sistema em produção, Manoel operando, OGMO notificado</td>
+        <td><strong>Josias (assinatura)</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout success">
+    <div class="callout-title">Demo executiva no D+21 · 05/10/2026</div>
+    <p>A Diretoria acompanha o sistema funcionando <strong>ao vivo</strong> no meio do cronograma — não espera o fim. Nesse ponto, a Lousa oficial de Suape já está espelhada, o remanejamento digital dispara e-mail formal ao OGMO em menos de 2 minutos, e o PWA do TPA está instalável.</p>
+  </div>
+
+  <div class="page-footer">
+    <div>SINDESTIVA-PE · Lousa Digital</div>
+    <div><span class="page-num">3</span> / 8</div>
+  </div>
+</div>
+
+<!-- ============================================
+     PÁGINA 4 — PREMISSAS
+     ============================================ -->
+
+<div class="page">
+
+  <div class="page-header">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>SINDESTIVA-PE · Lousa Digital</span>
+    </div>
+    <div class="doc-title">Cronograma 45 dias · Apresentação à Diretoria</div>
+  </div>
+
+  <div class="section-num">02 · Premissas</div>
+  <h1 class="section-title">O que mudou pra caber em 45 dias</h1>
+  <p class="section-sub">O plano original previa 18 semanas (126 dias) com dedicação parcial de 50-60%. Para a janela de 45 dias, 4 premissas mudam conscientemente — assumindo risco calculado e trade-offs explícitos.</p>
+
+  <div class="callout warn">
+    <div class="callout-title">Trade-off consciente: escopo reduzido, dedicação integral</div>
+    <p>Para entregar o MVP em 45 dias, <strong>o sponsor técnico (Paulo) dedicará 100% do seu tempo</strong> ao projeto, com Becker/Córtex/Sinapse/FaceGate entrando em modo manutenção. Em paralelo, <strong>cerca de 40% das features</strong> originalmente planejadas vão para a Fase 2 (BI avançado, Recife/EscalaNet, hardening pesado).</p>
+  </div>
+
+  <h3>As 4 premissas do cronograma de 45 dias</h3>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 8%;">#</th>
+        <th style="width: 32%;">Premissa</th>
+        <th>Implicação</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>1</strong></td>
+        <td><strong>100% do tempo do Paulo</strong> durante 45 dias</td>
+        <td>Becker, Córtex, Sinapse e FaceGate entram em modo manutenção com aviso prévio de 2 semanas. Recuperação depois do D+45.</td>
+      </tr>
+      <tr>
+        <td><strong>2</strong></td>
+        <td><strong>Escopo reduzido em ~40%</strong></td>
+        <td>BI mínimo (4 KPIs), sem hardening pesado, sem load test k6 exaustivo, sem apresentação formal ao MPT no MVP. Tudo vai pra Fase 2.</td>
+      </tr>
+      <tr>
+        <td><strong>3</strong></td>
+        <td><strong>Paralelismo agressivo</strong> entre atividades</td>
+        <td>2-3 frentes em paralelo (back, front, infra) — sempre que possível, sem dependência bloqueante.</td>
+      </tr>
+      <tr>
+        <td><strong>4</strong></td>
+        <td><strong>Homologação curta</strong> (3 dias, não 2 semanas)</td>
+        <td>1 fiscal-piloto (Manoel Costa) usa o sistema em 3 turnos consecutivos. Mais arriscado — se aparecer bug em produção, pega o Josias e Manoel de surpresa.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr class="divider">
+
+  <h3>Gatilhos Go/No-Go (D+11, D+21, D+35)</h3>
+
+  <p>Para mitigar o risco do prazo curto, definimos <strong>3 checkpoints</strong> com decisões binárias:</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 18%;">Checkpoint</th>
+        <th style="width: 25%;">O que validamos</th>
+        <th>Se não passar</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>D+11 (M1)</strong></td>
+        <td>Lousa oficial do OGMO/PE espelhada em tempo real</td>
+        <td>Reavaliar escopo · se scraping bloqueado, prorrogar 2 semanas</td>
+      </tr>
+      <tr>
+        <td><strong>D+21 (M2)</strong></td>
+        <td>Remanejamento digital + PWA do TPA funcionando</td>
+        <td>Esticar prazo em 15 dias (D+60) · reduzir escopo Fase 2</td>
+      </tr>
+      <tr>
+        <td><strong>D+35 (M3)</strong></td>
+        <td>Manoel Costa homologando 100% por 3 turnos reais</td>
+        <td>Esticar prazo em 10 dias (D+55) · 2º fiscal-piloto entra</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <div>SINDESTIVA-PE · Lousa Digital</div>
+    <div><span class="page-num">4</span> / 8</div>
+  </div>
+</div>
+
+<!-- ============================================
+     PÁGINA 5 — PRÓXIMOS PASSOS + ENCERRAMENTO
+     ============================================ -->
+
+<div class="page">
+
+  <div class="page-header">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>SINDESTIVA-PE · Lousa Digital</span>
+    </div>
+    <div class="doc-title">Cronograma 45 dias · Apresentação à Diretoria</div>
+  </div>
+
+  <div class="section-num">Recomendações finais</div>
+  <h1 class="section-title">Próximos passos e decisão da Diretoria</h1>
+  <p class="section-sub">Para iniciar a Sprint 0 em 14/09/2026, a Diretoria precisa aprovar o plano e indicar os pontos focais internos do Sindicato.</p>
+
+  <h3>O que pedimos à Diretoria nesta reunião</h3>
+
+  <ol style="margin: 3mm 0 5mm 6mm; font-size: 10pt; line-height: 1.7;">
+    <li><strong>Aprovação formal do plano de 45 dias</strong> — assinatura do termo de aprovação (última página).</li>
+    <li><strong>Confirmação de Manoel Costa</strong> como fiscal-piloto (ou indicação de substituto) — ele é o usuário-chave do MVP.</li>
+    <li><strong>Indicação de advogado trabalhista</strong> (Cristiano Oliveira, Nathalia Santos ou equivalente) para o parecer LGPD — necessário na Sprint 1.</li>
+    <li><strong>Fornecimento da CCT 2024-2026 vigente</strong> — base para o módulo de remanejamento digital.</li>
+    <li><strong>Reserva da agenda do Paulo 100%</strong> entre 14/09 e 28/10/2026 — Becker/Córtex/Sinapse/FaceGate em modo manutenção.</li>
+    <li><strong>Aprovação do orçamento de R$ 2.805</strong> (modelo Patrocínio: Sindicato paga infra + viagem + jurídico; Suporte Gerencial investe as 256h técnicas).</li>
+  </ol>
+
+  <h3>Cronograma de aprovação</h3>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th style="width: 8%;">Data</th>
+        <th style="width: 22%;">Ação</th>
+        <th>Responsável</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>02/09</strong></td>
+        <td>Envio deste documento à Diretoria</td>
+        <td>Paulo</td>
+      </tr>
+      <tr>
+        <td><strong>até 09/09</strong></td>
+        <td>Indicação de Manoel Costa + advogado + CCT</td>
+        <td>Josias + Diretoria</td>
+      </tr>
+      <tr>
+        <td><strong>10/09</strong></td>
+        <td>Aprovação formal e assinatura do termo</td>
+        <td>Josias</td>
+      </tr>
+      <tr>
+        <td><strong>14/09</strong></td>
+        <td><strong>Kickoff Sprint 0</strong> — início do projeto</td>
+        <td>Todos</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout" style="margin-top: 6mm;">
+    <div class="callout-title">Recomendação final</div>
+    <p>45 dias é viável, mas <strong>apertado</strong>. Recomendamos à Diretoria aprovar o cronograma <strong>com colchão de 7 a 10 dias</strong> (D+45 a D+55) para imprevistos. Caso a janela de 45 dias precise ser cumprida a todo custo, o trade-off adicional será cortar mais features de BI/auditoria e adiar o PWA do TPA para a Fase 2.</p>
+  </div>
+
+  <div class="callout success" style="margin-top: 4mm;">
+    <div class="callout-title">Próximo documento: termo de aprovação formal</div>
+    <p>Para formalizar a aprovação, o documento <strong>SINDESTIVA-PE-PLANO-IMPLEMENTACAO-2026-09-01.md</strong> (16 seções, 67KB) contém o termo de aprovação completo, com espaço para assinaturas do Presidente, do Sponsor técnico e do Fiscal-chave. Será enviado em conjunto com este cronograma.</p>
+  </div>
+
+  <div class="page-footer">
+    <div>SINDESTIVA-PE · Lousa Digital</div>
+    <div><span class="page-num">5</span> / 8</div>
+  </div>
+</div>
+
+<!-- ============================================
+     PÁGINA 6 — MARCOS
+     ============================================ -->
+
+<div class="page">
+
+  <div class="page-header">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>SINDESTIVA-PE · Lousa Digital</span>
+    </div>
+    <div class="doc-title">Cronograma 45 dias · Apresentação à Diretoria</div>
+  </div>
+
+  <div class="section-num">03 · Marcos</div>
+  <h1 class="section-title">Datas fixas e entregas formais</h1>
+  <p class="section-sub">Cinco marcos com datas e entregáveis imutáveis. O M2 (05/10) é o ponto de controle da Diretoria — onde o sistema é apresentado ao vivo, com dados reais do Porto de Suape.</p>
+
+  <h3>Linha do tempo visual</h3>
+
+  <div style="position: relative; margin: 8mm 0 6mm 0; padding: 6mm 0;">
+    <div style="position: absolute; top: 50%; left: 0; right: 0; height: 2px; background: var(--line);"></div>
+    <table style="width: 100%; border-collapse: separate; border-spacing: 0; position: relative; z-index: 2;">
+      <tr>
+        <td style="text-align: center; width: 20%; vertical-align: top;">
+          <div style="width: 14mm; height: 14mm; margin: 0 auto; background: var(--ink-base); border: 2px solid white; box-shadow: 0 0 0 1px var(--ink-base); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--gold); font-weight: 800; font-size: 9pt;">M0</div>
+          <div style="margin-top: 2mm; font-size: 8.5pt; color: var(--text-mute); font-weight: 600;">D+4</div>
+          <div style="font-size: 9.5pt; color: var(--ink-deep); font-weight: 700; margin-top: 1mm;">18/09 · sex</div>
+          <div style="font-size: 8pt; color: var(--text-soft); margin-top: 2mm; line-height: 1.3;">Kickoff +<br>advogado +<br>infra</div>
+        </td>
+        <td style="text-align: center; width: 20%; vertical-align: top;">
+          <div style="width: 14mm; height: 14mm; margin: 0 auto; background: var(--gold); border: 2px solid white; box-shadow: 0 0 0 1px var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--ink-deep); font-weight: 800; font-size: 9pt;">M1</div>
+          <div style="margin-top: 2mm; font-size: 8.5pt; color: var(--text-mute); font-weight: 600;">D+11</div>
+          <div style="font-size: 9.5pt; color: var(--ink-deep); font-weight: 700; margin-top: 1mm;">25/09 · sex</div>
+          <div style="font-size: 8pt; color: var(--text-soft); margin-top: 2mm; line-height: 1.3;">Lousa oficial<br>espelhada ao vivo</div>
+        </td>
+        <td style="text-align: center; width: 20%; vertical-align: top;">
+          <div style="width: 16mm; height: 16mm; margin: 0 auto; background: var(--teal); border: 2px solid white; box-shadow: 0 0 0 1px var(--teal); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 10pt;">M2</div>
+          <div style="margin-top: 2mm; font-size: 8.5pt; color: var(--text-mute); font-weight: 600;">D+21</div>
+          <div style="font-size: 9.5pt; color: var(--teal); font-weight: 800; margin-top: 1mm;">05/10 · seg</div>
+          <div style="font-size: 8pt; color: var(--text-soft); margin-top: 2mm; line-height: 1.3;"><strong>Demo executiva</strong><br>Josias + Diretoria</div>
+        </td>
+        <td style="text-align: center; width: 20%; vertical-align: top;">
+          <div style="width: 14mm; height: 14mm; margin: 0 auto; background: var(--green); border: 2px solid white; box-shadow: 0 0 0 1px var(--green); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 9pt;">M3</div>
+          <div style="margin-top: 2mm; font-size: 8.5pt; color: var(--text-mute); font-weight: 600;">D+35</div>
+          <div style="font-size: 9.5pt; color: var(--ink-deep); font-weight: 700; margin-top: 1mm;">19/10 · seg</div>
+          <div style="font-size: 8pt; color: var(--text-soft); margin-top: 2mm; line-height: 1.3;">Homologação<br>3 turnos reais</div>
+        </td>
+        <td style="text-align: center; width: 20%; vertical-align: top;">
+          <div style="width: 18mm; height: 18mm; margin: 0 auto; background: var(--red); border: 2px solid white; box-shadow: 0 0 0 2px var(--red); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 11pt;">M4</div>
+          <div style="margin-top: 2mm; font-size: 8.5pt; color: var(--red); font-weight: 700;">D+45 · GO!</div>
+          <div style="font-size: 9.5pt; color: var(--red); font-weight: 800; margin-top: 1mm;">28/10 · ter</div>
+          <div style="font-size: 8pt; color: var(--text-soft); margin-top: 2mm; line-height: 1.3;"><strong>GO-LIVE</strong><br>Produção aberta<br>Josias assina</div>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Detalhamento dos marcos</h3>
+
+  <table class="compact">
+    <thead>
+      <tr>
+        <th style="width: 8%;">Marco</th>
+        <th style="width: 16%;">Data</th>
+        <th>Entregável</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>M0</strong></td>
+        <td>18/09 · D+4</td>
+        <td><strong>Setup e alinhamento.</strong> Kickoff com Josias e Manoel · CCT obtida · advogado contratado · VPS provisionado · repo criado · carta formal ao OGMO/PE enviada.</td>
+      </tr>
+      <tr>
+        <td><strong>M1</strong></td>
+        <td>25/09 · D+11</td>
+        <td><strong>Centro de Comando com Lousa oficial espelhada.</strong> Scraper TPA rodando a cada 60s · dados de Suape em tempo real · Manoel valida ao vivo.</td>
+      </tr>
+      <tr>
+        <td><strong style="color: var(--teal);">M2 ★</strong></td>
+        <td style="color: var(--teal); font-weight: 700;">05/10 · D+21</td>
+        <td><strong>Demo executiva com a Diretoria.</strong> Sistema completo: Lousa + remanejamento (e-mail OGMO &lt; 2 min) + PWA do TPA + auditoria com hash chain. 5 TPAs-piloto demonstram o app.</td>
+      </tr>
+      <tr>
+        <td><strong>M3</strong></td>
+        <td>19/10 · D+35</td>
+        <td><strong>Homologação Manoel Costa.</strong> 3 turnos consecutivos 100% no sistema · NPS ≥ 7 · bugs P0 zerados.</td>
+      </tr>
+      <tr>
+        <td><strong style="color: var(--red);">M4</strong></td>
+        <td style="color: var(--red); font-weight: 700;">28/10 · D+45</td>
+        <td><strong>GO-LIVE.</strong> Produção aberta · Manoel operando · OGMO notificado · Josias assina termo de aceite · monitoramento 24/7 ativo.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-footer">
+    <div>SINDESTIVA-PE · Lousa Digital</div>
+    <div><span class="page-num">6</span> / 8</div>
+  </div>
+</div>
+
+<!-- ============================================
+     PÁGINA 6 — VISÃO GANTT
+     ============================================ -->
+
+<div class="page">
+
+  <div class="page-header">
+    <div class="brand">
+      <span class="brand-mark"></span>
+      <span>SINDESTIVA-PE · Lousa Digital</span>
+    </div>
+    <div class="doc-title">Cronograma 45 dias · Apresentação à Diretoria</div>
+  </div>
+
+  <div class="section-num">04 · Visão Gantt</div>
+  <h1 class="section-title">7 sprints semanais · 45 dias</h1>
+  <p class="section-sub">Diagrama de Gantt com as 12 macro-atividades distribuídas ao longo dos 7 sprints. Barras coloridas indicam a janela de execução de cada frente; círculos numerados marcam os 5 marcos do projeto.</p>
+
+  <div class="gantt-wrap">
+    <div class="gantt-title">Cronograma macro · 14/09/2026 → 28/10/2026</div>
+
+    <table class="gantt">
+      <thead>
+        <tr>
+          <th rowspan="2" class="task-label" style="width: 28%;">Atividade</th>
+          <th colspan="7" style="background: var(--ink-deep); color: var(--gold); border-bottom: 2px solid var(--gold);">Semanas · 7 sprints</th>
+        </tr>
+        <tr>
+          <th class="sprint-header" style="width: 10.3%;">S1<br><span style="font-size: 6.5pt; font-weight: 400;">14–20/09</span></th>
+          <th class="sprint-header" style="width: 10.3%;">S2<br><span style="font-size: 6.5pt; font-weight: 400;">21–27/09</span></th>
+          <th class="sprint-header" style="width: 10.3%;">S3<br><span style="font-size: 6.5pt; font-weight: 400;">28/09–04/10</span></th>
+          <th class="sprint-header" style="width: 10.3%;">S4<br><span style="font-size: 6.5pt; font-weight: 400;">05–11/10</span></th>
+          <th class="sprint-header" style="width: 10.3%;">S5<br><span style="font-size: 6.5pt; font-weight: 400;">12–18/10</span></th>
+          <th class="sprint-header" style="width: 10.3%;">S6<br><span style="font-size: 6.5pt; font-weight: 400;">19–25/10</span></th>
+          <th class="sprint-header" style="width: 10.3%;">S7<br><span style="font-size: 6.5pt; font-weight: 400;">26–28/10</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th class="task-label">KICKOFF</th>
+          <td><div class="gantt-bar gold">100%</div></td>
+          <td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+          <th class="task-label">CCT · Advogado · Carta OGMO</th>
+          <td><div class="gantt-bar gold">S1</div></td>
+          <td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+          <th class="task-label">Repo · Auth · RBAC · LGPD base</th>
+          <td><div class="gantt-bar" style="background: var(--ink-raised);">S1</div></td>
+          <td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+          <th class="task-label">Scraping TPA/Suape + EscalaNet</th>
+          <td></td>
+          <td><div class="gantt-bar teal">S2</div></td>
+          <td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+          <th class="task-label">Lousa espelhada (Centro de Comando)</th>
+          <td></td>
+          <td><div class="gantt-bar teal">S2</div></td>
+          <td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+          <th class="task-label">Remanejamento digital + notif. OGMO</th>
+          <td></td>
+          <td></td>
+          <td><div class="gantt-bar green">S3</div></td>
+          <td></td><td></td><td></td><td></td>
+        </tr>
+        <tr>
+          <th class="task-label">PWA do TPA (escala, presença, push)</th>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td><div class="gantt-bar green">S4</div></td>
+          <td></td><td></td><td></td>
+        </tr>
+        <tr>
+          <th class="task-label">Auditoria hash chain · LGPD</th>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td><div class="gantt-bar amber">S5</div></td>
+          <td></td><td></td>
+        </tr>
+        <tr>
+          <th class="task-label">BI mínimo · Hardening básico</th>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td><div class="gantt-bar amber">S5</div></td>
+          <td></td><td></td>
+        </tr>
+        <tr>
+          <th class="task-label">Homologação Manoel (3 turnos)</th>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td><div class="gantt-bar red">S6</div></td>
+          <td></td>
+        </tr>
+        <tr>
+          <th class="task-label">GO-LIVE · Aceite</th>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td><div class="gantt-bar red">S7 ●</div></td>
+        </tr>
+        <tr style="height: 9mm;">
+          <th class="task-label" style="background: white; border-right: none; color: var(--teal); font-weight: 800;">MARCO</th>
+          <td><div class="gantt-marker gold">M0</div></td>
+          <td><div class="gantt-marker gold">M1</div></td>
+          <td><div class="gantt-marker teal" style="width: 9mm; height: 9mm;">M2</div></td>
+          <td></td>
+          <td></td>
+          <td><div class="gantt-marker green">M3</div></td>
+          <td><div class="gantt-marker" style="width: 11mm; height: 11mm;">M4</div></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-swatch" style="background: var(--gold);"></div>Kickoff / setup inicial</div>
+      <div class="legend-item"><div class="legend-swatch" style="background: var(--ink-raised);"></div>Fundação técnica</div>
+      <div class="legend-item"><div class="legend-swatch" style="background: var(--teal);"></div>Scraping + Lousa</div>
+      <div class="legend-item"><div class="legend-swatch" style="background: var(--green);"></div>Core (Remanejamento + PWA)</div>
+      <div class="legend-item"><div class="legend-swatch" style="background: var(--amber);"></div>Auditoria + LGPD + BI</div>
+      <div class="legend-item"><div class="legend-swatch" style="background: var(--red);"></div>Homologação + Go-Live</div>
+      <div class="legend-item"><div class="legend-swatch" style="background: var(--red); border-radius: 50%;"></div>Marco do projeto (M0–M4)</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3>Como ler o diagrama</h3>
+  <ul style="font-size: 9pt; line-height: 1.4;">
+    <li><strong>Eixo vertical:</strong> 12 macro-atividades do projeto, agrupadas por sprint temática.</li>
+    <li><strong>Eixo horizontal:</strong> 7 sprints semanais (S1 a S7), com datas no cabeçalho.</li>
+    <li><strong>Barras coloridas:</strong> janela de execução de cada atividade (cor indica a frente de trabalho).</li>
+    <li><strong>Círculos numerados (M0–M4):</strong> marcos formais. <span style="color: var(--teal); font-weight: 700;">M2</span> = demo executiva · <span style="color: var(--red); font-weight: 700;">M4</span> = GO-LIVE.</li>
+  </ul>
+
+  <div class="callout success" style="margin-top: 3mm;">
+    <div class="callout-title">Atividades paralelas</div>
+    <p>O cronograma aproveita paralelismo sempre que possível. Em S3, a Lousa do Centro de Comando (S2) já está rodando com dados reais <strong>enquanto</strong> o remanejamento digital é construído — valor incremental a cada semana, sem bloquear o sponsor técnico.</p>
+  </div>
+
+  <div class="page-footer">
+    <div>SINDESTIVA-PE · Lousa Digital</div>
+    <div><span class="page-num">7</span> / 8</div>
+  </div>
+</div>
+
+</body>
+</html>

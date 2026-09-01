@@ -1,0 +1,117 @@
+# =============================================================================
+# SINDESTIVA-PE · Docker Compose (dev local)
+# Levanta Postgres 17 + Redis 7 + Traefik numa network compartilhada.
+#
+# Uso:
+#   cp .env.example .env  # preencher
+#   pnpm db:up           # sobe só postgres + redis
+#   pnpm infra:up        # sobe tudo (incl. traefik)
+#
+# Notas de porta (Mac do Paulo):
+#   - Postgres: 5433 no host (5432 ocupado por Postgres@18 do Homebrew)
+#   - Redis:    6380 no host (6379 ocupado por Redis do Homebrew)
+#   - Conexão SEMPRE via 127.0.0.1 pra forçar IPv4 (localhost às vezes resolve IPv6)
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 17 — banco principal (schema: lousa_main, ADR-002 schema único)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    container_name: sindestiva-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"   # 5433 no host → 5432 no container
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sindestiva}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sindestiva}
+      POSTGRES_DB: ${POSTGRES_DB:-sindestiva}
+      TZ: ${TZ:-America/Recife}
+      # Otimizado para dev (em prod ajustar shared_buffers, work_mem, etc.)
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=pt_BR.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sindestiva} -d ${POSTGRES_DB:-sindestiva}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - sindestiva-net
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 — cache, pub/sub para WebSocket, filas leves
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: sindestiva-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    environment:
+      TZ: ${TZ:-America/Recife}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - sindestiva-net
+
+  # ---------------------------------------------------------------------------
+  # Traefik v3 — reverse proxy (dev). Em prod, TLS via Let's Encrypt.
+  # Dashboard em http://localhost:8080 (só dev)
+  # ---------------------------------------------------------------------------
+  traefik:
+    image: traefik:v3
+    container_name: sindestiva-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"   # dashboard (dev only)
+    command:
+      - "--api.dashboard=true"
+      - "--api.insecure=true"        # dev only
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--log.level=INFO"
+      - "--accesslog=true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./docker/traefik/letsencrypt:/letsencrypt
+    networks:
+      - sindestiva-net
+
+  # ---------------------------------------------------------------------------
+  # MailHog — SMTP fake pra dev (evita mandar e-mail de verdade pro OGMO)
+  # UI em http://localhost:8025
+  # ---------------------------------------------------------------------------
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: sindestiva-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # Web UI
+    networks:
+      - sindestiva-net
+
+volumes:
+  postgres_data:
+    name: sindestiva_postgres_data
+  redis_data:
+    name: sindestiva_redis_data
+
+networks:
+  sindestiva-net:
+    name: sindestiva-net
+    driver: bridge

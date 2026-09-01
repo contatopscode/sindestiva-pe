@@ -1,0 +1,2295 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SINDESTIVA-PE · Centro de Comando da Lousa Digital</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ============================================
+   SINDESTIVA-PE · CENTRO DE COMANDO
+   Identidade: Portuário-Industrial
+   ============================================ */
+
+:root {
+  --bg-deep: #061321;
+  --bg-base: #0A1929;
+  --bg-raised: #0F2438;
+  --bg-card: #122E47;
+  --bg-hover: #163554;
+  --border-soft: #1E3A52;
+  --border-strong: #2A5070;
+
+  --text-primary: #E8EEF4;
+  --text-secondary: #94A8BD;
+  --text-muted: #5F7A92;
+  --text-inverse: #0A1929;
+
+  --accent-gold: #D4A574;
+  --accent-gold-soft: #E8C49A;
+  --accent-cyan: #4FB8C9;
+  --accent-green: #5DBB7D;
+  --accent-amber: #E8A33D;
+  --accent-red: #E04A4A;
+  --accent-purple: #9B7EC4;
+
+  --cat-mando: #2C5C8E;
+  --cat-terno: #3A7CB0;
+  --cat-tecnica: #5A9BC9;
+  --cat-vigia: #C4924A;
+
+  --fainas-producao: #4A6B8A;
+  --fainas-salario: #5A7B9A;
+  --fainas-sacaria: #6A8BAA;
+  --fainas-veiculo: #7A9BBA;
+  --fainas-diversos: #4FB8C9;
+  --fainas-cadastro: #2C5C8E;
+  --fainas-suplementar: #9B7EC4;
+  --fainas-altura: #E04A4A;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.5);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,.6);
+  --shadow-glow: 0 0 32px rgba(212,165,116,.15);
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  font-family: var(--font-sans);
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+input, select, textarea { font-family: inherit; }
+
+/* ============================================
+   LAYOUT GLOBAL
+   ============================================ */
+
+.app {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  grid-template-rows: 60px 1fr;
+  grid-template-areas:
+    "header header"
+    "sidebar main";
+  min-height: 100vh;
+}
+
+.header {
+  grid-area: header;
+  background: var(--bg-base);
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 24px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 216px;
+}
+
+.brand-mark {
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, var(--accent-gold) 0%, #B8884F 100%);
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  color: var(--text-inverse);
+  font-size: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.brand-text { line-height: 1.2; }
+.brand-text .name {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.3px;
+}
+.brand-text .sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  flex: 1;
+}
+.breadcrumb .sep { color: var(--text-muted); }
+.breadcrumb .current { color: var(--text-primary); font-weight: 500; }
+
+.header-actions { display: flex; align-items: center; gap: 12px; }
+
+.live-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(93,187,125,.12);
+  color: var(--accent-green);
+  padding: 5px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border: 1px solid rgba(93,187,125,.25);
+}
+.live-dot {
+  width: 6px; height: 6px;
+  background: var(--accent-green);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent-green);
+  animation: pulse 1.5s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.icon-btn {
+  width: 36px; height: 36px;
+  border-radius: var(--radius-md);
+  display: grid; place-items: center;
+  color: var(--text-secondary);
+  position: relative;
+  transition: all 0.15s;
+}
+.icon-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
+.icon-btn .notif {
+  position: absolute;
+  top: 6px; right: 6px;
+  width: 8px; height: 8px;
+  background: var(--accent-red);
+  border-radius: 50%;
+  border: 2px solid var(--bg-base);
+}
+
+.avatar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 24px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+}
+.avatar-img {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+  border-radius: 50%;
+  display: grid; place-items: center;
+  color: white;
+  font-weight: 700;
+  font-size: 11px;
+}
+.avatar-text { font-size: 13px; font-weight: 500; }
+.avatar-text .role { display: block; font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* ============================================
+   SIDEBAR
+   ============================================ */
+
+.sidebar {
+  grid-area: sidebar;
+  background: var(--bg-base);
+  border-right: 1px solid var(--border-soft);
+  padding: 16px 12px;
+  overflow-y: auto;
+}
+
+.nav-section { margin-bottom: 24px; }
+.nav-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 0 12px 8px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  width: 100%;
+  text-align: left;
+  position: relative;
+}
+.nav-item:hover { background: var(--bg-hover); color: var(--text-primary); }
+.nav-item.active {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: inset 3px 0 0 var(--accent-gold);
+}
+.nav-item .badge {
+  margin-left: auto;
+  background: var(--accent-red);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 8px;
+  min-width: 18px;
+  text-align: center;
+}
+.nav-icon { width: 18px; height: 18px; opacity: 0.7; }
+
+/* ============================================
+   MAIN
+   ============================================ */
+
+.main {
+  grid-area: main;
+  padding: 24px;
+  overflow-x: auto;
+  background: var(--bg-deep);
+}
+
+.section { display: none; }
+.section.active { display: block; }
+
+.section-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.section-title {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.section-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+/* ============================================
+   CONTROLS / CHIPS / BUTTONS
+   ============================================ */
+
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.chip-group {
+  display: inline-flex;
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 3px;
+  gap: 2px;
+}
+.chip {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+  letter-spacing: 0.3px;
+}
+.chip:hover { color: var(--text-primary); }
+.chip.active {
+  background: var(--accent-gold);
+  color: var(--text-inverse);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: var(--accent-gold);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover { background: var(--accent-gold-soft); box-shadow: var(--shadow-glow); }
+.btn-secondary {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+}
+.btn-secondary:hover { background: var(--bg-hover); }
+.btn-ghost {
+  color: var(--text-secondary);
+  border: 1px solid var(--border-soft);
+}
+.btn-ghost:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+/* ============================================
+   KPI CARDS
+   ============================================ */
+
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.kpi-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+}
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 3px; height: 100%;
+  background: var(--accent-gold);
+}
+.kpi-card.green::before { background: var(--accent-green); }
+.kpi-card.amber::before { background: var(--accent-amber); }
+.kpi-card.red::before { background: var(--accent-red); }
+.kpi-card.cyan::before { background: var(--accent-cyan); }
+
+.kpi-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.kpi-value {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.kpi-delta {
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.kpi-delta.up { color: var(--accent-green); }
+.kpi-delta.down { color: var(--accent-red); }
+.kpi-delta.neutral { color: var(--text-secondary); }
+
+/* ============================================
+   LOUSA — matriz
+   ============================================ */
+
+.lousa-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.lousa-board {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 0;
+  overflow: hidden;
+}
+
+.lousa-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border-soft);
+}
+.lousa-meta-left { display: flex; align-items: center; gap: 12px; }
+.lousa-meta-right { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--text-secondary); }
+
+.turno-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  background: var(--bg-base);
+  border-radius: var(--radius-sm);
+  color: var(--accent-gold);
+  border: 1px solid var(--border-soft);
+}
+
+.lousa-table-wrap { overflow-x: auto; padding: 16px; }
+
+.lousa-table {
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  width: 100%;
+  min-width: 1400px;
+}
+
+.lousa-table th, .lousa-table td {
+  padding: 4px 2px;
+  text-align: center;
+  vertical-align: middle;
+  min-width: 38px;
+  height: 28px;
+}
+
+.lousa-table thead th {
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  padding: 6px 4px;
+  position: sticky;
+  top: 0;
+}
+.lousa-table thead th.cat-mando { background: var(--cat-mando); color: white; }
+.lousa-table thead th.cat-terno { background: var(--cat-terno); color: white; }
+.lousa-table thead th.cat-tecnica { background: var(--cat-tecnica); color: white; }
+.lousa-table thead th.cat-vigia { background: var(--cat-vigia); color: white; }
+.lousa-table thead th.th-cais { background: var(--bg-raised); }
+
+.lousa-table tbody th {
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-size: 9px;
+  text-align: left;
+  padding: 4px 8px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  position: sticky;
+  left: 0;
+}
+.lousa-table tbody th.faina-producao { color: var(--fainas-producao); }
+.lousa-table tbody th.faina-salario { color: var(--fainas-salario); }
+.lousa-table tbody th.faina-sacaria { color: var(--fainas-sacaria); }
+.lousa-table tbody th.faina-veiculo { color: var(--fainas-veiculo); }
+.lousa-table tbody th.faina-diversos { color: var(--fainas-diversos); }
+.lousa-table tbody th.faina-cadastro { color: var(--fainas-cadastro); }
+.lousa-table tbody th.faina-suplementar { color: var(--fainas-suplementar); }
+.lousa-table tbody th.faina-altura { color: var(--fainas-altura); }
+
+.ponteiro {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: 3px;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.1s;
+  position: relative;
+}
+.ponteiro:hover { transform: scale(1.15); z-index: 5; box-shadow: 0 0 0 2px var(--accent-gold); }
+.ponteiro.vazio {
+  color: var(--text-muted);
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+}
+.ponteiro.vazio:hover { transform: none; box-shadow: none; }
+.ponteiro.ausente { background: rgba(224,74,74,.15); border-color: var(--accent-red); color: var(--accent-red); }
+.ponteiro.remanejado { background: rgba(232,163,61,.2); border-color: var(--accent-amber); color: var(--accent-amber); }
+.ponteiro.confirmado { background: rgba(93,187,125,.15); border-color: rgba(93,187,125,.4); }
+
+.ponteiro.revealing { animation: flash 0.4s ease; }
+@keyframes flash {
+  0% { background: var(--accent-gold); color: var(--text-inverse); transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+.lousa-legend {
+  display: flex;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border-soft);
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border-soft); }
+
+/* ============================================
+   PAINEL LATERAL — detalhes / fila OGMO
+   ============================================ */
+
+.split-view {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.panel-header {
+  padding: 14px 18px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.panel-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+.panel-body { padding: 12px; }
+
+.remanejamento-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: 6px;
+  background: var(--bg-raised);
+  border-left: 3px solid var(--accent-amber);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.remanejamento-item:hover { background: var(--bg-hover); }
+.remanejamento-item.priority-high { border-left-color: var(--accent-red); }
+.remanejamento-item.priority-done { border-left-color: var(--accent-green); opacity: 0.6; }
+
+.remanejamento-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  padding-top: 2px;
+}
+.remanejamento-info .name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.remanejamento-info .meta { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+.remanejamento-info .reason { font-size: 11px; color: var(--accent-amber); margin-top: 4px; font-style: italic; }
+.remanejamento-status {
+  align-self: center;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 8px;
+}
+.status-pending { background: rgba(232,163,61,.2); color: var(--accent-amber); }
+.status-sent { background: rgba(79,184,201,.2); color: var(--accent-cyan); }
+.status-done { background: rgba(93,187,125,.2); color: var(--accent-green); }
+
+/* ============================================
+   MODAL
+   ============================================ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.7);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal-backdrop.active { display: flex; animation: fadeIn 0.2s; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  width: 540px;
+  max-width: 90vw;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+  animation: slideUp 0.3s;
+}
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.modal-header {
+  padding: 18px 24px;
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.modal-title { font-size: 16px; font-weight: 700; }
+.modal-close { color: var(--text-secondary); font-size: 20px; padding: 4px 8px; border-radius: 4px; }
+.modal-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.modal-body { padding: 24px; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--border-soft); display: flex; justify-content: flex-end; gap: 8px; }
+
+.form-group { margin-bottom: 16px; }
+.form-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg-base);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: all 0.15s;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none;
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 0 3px rgba(212,165,116,.15);
+}
+.form-textarea { resize: vertical; min-height: 80px; }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.remanejamento-contexto {
+  background: var(--bg-base);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.remanejamento-contexto strong { color: var(--text-primary); }
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 8px 0;
+}
+
+/* ============================================
+   PWA / MOBILE PREVIEW
+   ============================================ */
+
+.pwa-showcase {
+  display: grid;
+  grid-template-columns: 1fr 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.pwa-info { padding-top: 40px; }
+.pwa-info h2 { font-size: 28px; font-weight: 700; margin-bottom: 12px; letter-spacing: -0.5px; }
+.pwa-info p { color: var(--text-secondary); margin-bottom: 20px; line-height: 1.6; }
+.pwa-features { list-style: none; }
+.pwa-features li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.pwa-features li::before {
+  content: '✓';
+  color: var(--accent-green);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.phone-frame {
+  width: 340px;
+  background: #000;
+  border-radius: 36px;
+  padding: 10px;
+  box-shadow: var(--shadow-lg), 0 0 0 1px var(--border-strong);
+  margin: 0 auto;
+}
+.phone-screen {
+  background: var(--bg-base);
+  border-radius: 28px;
+  overflow: hidden;
+  height: 640px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.phone-statusbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 24px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.phone-header {
+  background: linear-gradient(135deg, var(--accent-gold) 0%, #B8884F 100%);
+  color: var(--text-inverse);
+  padding: 16px 20px 24px;
+  position: relative;
+}
+.phone-greeting { font-size: 12px; opacity: 0.85; font-weight: 500; }
+.phone-name { font-size: 20px; font-weight: 700; margin-top: 2px; }
+.phone-balance {
+  display: inline-block;
+  background: rgba(0,0,0,.2);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+.phone-body { flex: 1; padding: 16px 16px 80px; overflow-y: auto; }
+.phone-nav {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border-soft);
+  display: flex;
+  justify-content: space-around;
+  padding: 8px 0 12px;
+}
+.phone-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 9px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 4px 12px;
+}
+.phone-nav-item.active { color: var(--accent-gold); }
+
+.tpa-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.tpa-card.highlight {
+  border-color: var(--accent-gold);
+  background: linear-gradient(135deg, rgba(212,165,116,.1) 0%, var(--bg-card) 100%);
+}
+.tpa-card-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-secondary);
+  font-weight: 700;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tpa-card-title .pulse {
+  width: 6px; height: 6px;
+  background: var(--accent-green);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent-green);
+}
+.tpa-card-value {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.tpa-card-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+.tpa-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 12px;
+}
+.tpa-row:last-child { border-bottom: none; }
+.tpa-row .label { color: var(--text-secondary); }
+.tpa-row .value { color: var(--text-primary); font-weight: 600; }
+
+.tpa-btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  background: var(--accent-gold);
+  color: var(--text-inverse);
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  font-size: 14px;
+  margin-top: 8px;
+  text-align: center;
+}
+.tpa-btn.ghost {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  margin-top: 8px;
+}
+
+.pwa-extra {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-top: 24px;
+}
+.pwa-extra h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.code-block {
+  background: var(--bg-deep);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  overflow-x: auto;
+  line-height: 1.6;
+  white-space: pre;
+}
+.code-block .key { color: var(--accent-cyan); }
+.code-block .str { color: var(--accent-green); }
+.code-block .num { color: var(--accent-gold); }
+.code-block .com { color: var(--text-muted); font-style: italic; }
+
+/* ============================================
+   OGMO NOTIFICAÇÃO
+   ============================================ */
+
+.ogmo-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.email-preview {
+  background: #fff;
+  color: #1a1a1a;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  font-family: var(--font-sans);
+}
+.email-header {
+  background: #f3f4f6;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 16px 20px;
+  font-size: 12px;
+}
+.email-header-row { display: flex; gap: 8px; margin-bottom: 4px; }
+.email-header-label { color: #6b7280; min-width: 60px; }
+.email-header-value { color: #1f2937; font-weight: 500; }
+.email-body { padding: 20px; font-size: 13px; line-height: 1.6; }
+.email-body h2 { font-size: 16px; margin-bottom: 12px; color: #111827; }
+.email-body p { margin-bottom: 10px; color: #374151; }
+.email-body table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 12px; }
+.email-body th, .email-body td { padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+.email-body th { background: #f9fafb; color: #6b7280; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.5px; }
+.email-footer { background: #f9fafb; padding: 12px 20px; font-size: 11px; color: #6b7280; border-top: 1px solid #e5e7eb; }
+
+.ogmo-channels { display: flex; flex-direction: column; gap: 8px; }
+.channel-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+}
+.channel-icon {
+  width: 32px; height: 32px;
+  border-radius: var(--radius-sm);
+  display: grid; place-items: center;
+  background: var(--bg-card);
+}
+.channel-info { flex: 1; }
+.channel-name { font-size: 12px; font-weight: 600; }
+.channel-status { font-size: 11px; color: var(--text-secondary); }
+.channel-status .ok { color: var(--accent-green); }
+.channel-status .err { color: var(--accent-red); }
+
+/* ============================================
+   AUDITORIA
+   ============================================ */
+
+.audit-timeline { position: relative; padding-left: 32px; }
+.audit-timeline::before {
+  content: '';
+  position: absolute;
+  left: 14px; top: 8px; bottom: 8px;
+  width: 2px;
+  background: var(--border-strong);
+}
+.audit-item {
+  position: relative;
+  padding: 16px 16px 16px 20px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  margin-bottom: 12px;
+}
+.audit-item::before {
+  content: '';
+  position: absolute;
+  left: -24px; top: 20px;
+  width: 12px; height: 12px;
+  background: var(--accent-gold);
+  border: 2px solid var(--bg-deep);
+  border-radius: 50%;
+}
+.audit-item.kind-create::before { background: var(--accent-green); }
+.audit-item.kind-update::before { background: var(--accent-amber); }
+.audit-item.kind-notify::before { background: var(--accent-cyan); }
+.audit-item.kind-system::before { background: var(--accent-purple); }
+
+.audit-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+.audit-title { font-size: 13px; font-weight: 600; margin-top: 4px; }
+.audit-detail { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
+.audit-hash {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 8px;
+  padding: 4px 8px;
+  background: var(--bg-deep);
+  border-radius: 4px;
+  display: inline-block;
+  border: 1px solid var(--border-soft);
+}
+
+/* ============================================
+   BI / CHARTS
+   ============================================ */
+
+.bi-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 220px;
+  padding: 28px 0 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+.bar-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+.bar {
+  width: 100%;
+  background: linear-gradient(180deg, var(--accent-gold) 0%, #B8884F 100%);
+  border-radius: 4px 4px 0 0;
+  min-height: 6px;
+  position: relative;
+  transition: all 0.3s;
+}
+.bar:hover { filter: brightness(1.2); }
+.bar-label { font-size: 10px; color: var(--text-secondary); font-family: var(--font-mono); margin-top: 4px; }
+.bar-value {
+  font-size: 11px;
+  color: var(--text-primary);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  position: absolute;
+  top: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-deep);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-soft);
+  white-space: nowrap;
+}
+
+.ranking-list { display: flex; flex-direction: column; gap: 6px; }
+.ranking-item {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-raised);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}
+.ranking-pos { font-family: var(--font-mono); font-weight: 700; color: var(--accent-gold); }
+.ranking-name { font-weight: 500; }
+.ranking-value { font-family: var(--font-mono); color: var(--text-secondary); font-weight: 600; }
+
+/* ============================================
+   TOAST
+   ============================================ */
+
+.toast-container {
+  position: fixed;
+  bottom: 20px; right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 200;
+}
+.toast {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent-green);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  min-width: 280px;
+  box-shadow: var(--shadow-md);
+  animation: slideInRight 0.3s;
+}
+@keyframes slideInRight { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.toast.kind-amber { border-left-color: var(--accent-amber); }
+.toast.kind-red { border-left-color: var(--accent-red); }
+.toast.kind-cyan { border-left-color: var(--accent-cyan); }
+.toast-title { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.toast-msg { font-size: 11px; color: var(--text-secondary); }
+
+/* ============================================
+   UTILITÁRIOS
+   ============================================ */
+
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-soft);
+}
+.tag.gold { background: rgba(212,165,116,.15); color: var(--accent-gold); border-color: rgba(212,165,116,.3); }
+.tag.green { background: rgba(93,187,125,.15); color: var(--accent-green); border-color: rgba(93,187,125,.3); }
+.tag.amber { background: rgba(232,163,61,.15); color: var(--accent-amber); border-color: rgba(232,163,61,.3); }
+.tag.red { background: rgba(224,74,74,.15); color: var(--accent-red); border-color: rgba(224,74,74,.3); }
+.tag.cyan { background: rgba(79,184,201,.15); color: var(--accent-cyan); border-color: rgba(79,184,201,.3); }
+
+.empty { padding: 40px 20px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.empty-icon { font-size: 32px; margin-bottom: 8px; opacity: 0.5; }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-mark">SE</div>
+      <div class="brand-text">
+        <div class="name">SINDESTIVA-PE</div>
+        <div class="sub">Centro de Comando · v0.1</div>
+      </div>
+    </div>
+    <div class="breadcrumb">
+      <span>Operação Portuária</span>
+      <span class="sep">›</span>
+      <span class="current" id="crumb-current">Lousa Espelhada</span>
+    </div>
+    <div class="header-actions">
+      <div class="live-badge">
+        <span class="live-dot"></span>
+        <span>OGMO/PE Sync · OK</span>
+      </div>
+      <button class="icon-btn" title="Notificações">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+        <span class="notif"></span>
+      </button>
+      <div class="avatar">
+        <div class="avatar-img">MC</div>
+        <div class="avatar-text">
+          Manoel Costa
+          <span class="role">Fiscal · Suape</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="nav-section">
+      <div class="nav-section-title">Operação</div>
+      <button class="nav-item active" data-section="lousa">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h18"/></svg>
+        Lousa Espelhada
+      </button>
+      <button class="nav-item" data-section="remanejamentos">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h12"/></svg>
+        Remanejamentos
+        <span class="badge">3</span>
+      </button>
+      <button class="nav-item" data-section="tpa">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 18h.01"/></svg>
+        PWA · TPA
+      </button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-title">Integração</div>
+      <button class="nav-item" data-section="ogmo">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Notificação OGMO
+      </button>
+      <button class="nav-item" data-section="auditoria">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Auditoria
+      </button>
+    </div>
+
+    <div class="nav-section">
+      <div class="nav-section-title">Inteligência</div>
+      <button class="nav-item" data-section="bi">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M9 17V9m4 8v-5m4 5v-3"/></svg>
+        BI & Relatórios
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- ============================================
+         SEÇÃO 1: LOUSA ESPELHADA
+         ============================================ -->
+    <section class="section active" id="sec-lousa">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Lousa Espelhada — Porto de <span id="lousa-porto">SUAPE</span></h1>
+          <p class="section-subtitle">Réplica do TPA/OGMO/PE · Atualização contínua · Turno <span id="lousa-turno">Diurno 08-16</span></p>
+        </div>
+        <div class="controls">
+          <div class="chip-group" id="porto-switcher">
+            <button class="chip active" data-porto="SUAPE">SUAPE</button>
+            <button class="chip" data-porto="RECIFE">RECIFE</button>
+          </div>
+          <div class="chip-group" id="turno-switcher">
+            <button class="chip active" data-turno="diurno">DIURNO</button>
+            <button class="chip" data-turno="noturno">NOTURNO</button>
+          </div>
+          <button class="btn btn-primary" id="btn-remanejar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            Remanejar TPA
+          </button>
+        </div>
+      </div>
+
+      <!-- KPIs operacionais -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">TPAs Escalados</div>
+          <div class="kpi-value">142</div>
+          <div class="kpi-delta up">▲ 12 vs ontem</div>
+        </div>
+        <div class="kpi-card green">
+          <div class="kpi-label">Presença Confirmada</div>
+          <div class="kpi-value">87%</div>
+          <div class="kpi-delta up">▲ 4% meta atingida</div>
+        </div>
+        <div class="kpi-card amber">
+          <div class="kpi-label">Remanejamentos Hoje</div>
+          <div class="kpi-value">7</div>
+          <div class="kpi-delta down">▲ 2 vs média 7d</div>
+        </div>
+        <div class="kpi-card cyan">
+          <div class="kpi-label">Sync OGMO</div>
+          <div class="kpi-value">12s</div>
+          <div class="kpi-delta neutral">Última há 12s</div>
+        </div>
+      </div>
+
+      <div class="lousa-toolbar">
+        <div class="controls">
+          <span class="tag gold">CLIQUE NUM PONTEIRO PRA REMANEJAR</span>
+          <span class="tag">VERMELHO = AUSENTE</span>
+          <span class="tag amber">AMARELO = REMANEJADO</span>
+        </div>
+        <div class="controls">
+          <span style="font-size: 11px; color: var(--text-secondary);">Atualizado <strong style="color: var(--accent-gold);" id="last-update">agora mesmo</strong></span>
+        </div>
+      </div>
+
+      <!-- LOUSA -->
+      <div class="lousa-board">
+        <div class="lousa-meta">
+          <div class="lousa-meta-left">
+            <span class="turno-label" id="turno-label">TURNO 08-16</span>
+            <span class="tag green">● LIVE</span>
+            <span style="font-size: 12px; color: var(--text-secondary);">12/08/2026</span>
+          </div>
+          <div class="lousa-meta-right">
+            <span>Fonte: <strong style="color: var(--text-primary);">tpa.ogmosuape.com.br</strong></span>
+          </div>
+        </div>
+
+        <div class="lousa-table-wrap">
+          <table class="lousa-table" id="lousa-table">
+            <!-- gerado via JS -->
+          </table>
+        </div>
+
+        <div class="lousa-legend">
+          <div class="legend-item"><div class="legend-swatch" style="background: var(--cat-mando);"></div>Funções de Mando (6)</div>
+          <div class="legend-item"><div class="legend-swatch" style="background: var(--cat-terno);"></div>Terno (6)</div>
+          <div class="legend-item"><div class="legend-swatch" style="background: var(--cat-tecnica);"></div>Funções Técnicas (12)</div>
+          <div class="legend-item"><div class="legend-swatch" style="background: var(--cat-vigia);"></div>Vigia (2)</div>
+          <div class="legend-item" style="margin-left: auto;"><div class="legend-swatch" style="background: var(--accent-gold);"></div>26 colunas × 10 fainas</div>
+        </div>
+      </div>
+
+      <!-- SPLIT: detalhes / fila OGMO -->
+      <div class="split-view">
+        <div></div>
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">📡 Fila de Notificação OGMO</div>
+            <span class="tag gold">3 pendentes</span>
+          </div>
+          <div class="panel-body">
+            <div class="remanejamento-item priority-high">
+              <div class="remanejamento-time">07:14</div>
+              <div class="remanejamento-info">
+                <div class="name">José Bezerra da Silva</div>
+                <div class="meta">012 · Guincho A · Cais 3</div>
+                <div class="reason">"Atestado médico — NR-7"</div>
+              </div>
+              <div class="remanejamento-status status-pending">PEND</div>
+            </div>
+            <div class="remanejamento-item">
+              <div class="remanejamento-time">06:58</div>
+              <div class="remanejamento-info">
+                <div class="name">Manoel Florêncio</div>
+                <div class="meta">247 · Empilhador GP · Cais 1</div>
+                <div class="reason">"Trocou p/ turno noturno"</div>
+              </div>
+              <div class="remanejamento-status status-sent">SENT</div>
+            </div>
+            <div class="remanejamento-item">
+              <div class="remanejamento-time">06:42</div>
+              <div class="remanejamento-info">
+                <div class="name">Antônio José da Silva</div>
+                <div class="meta">058 · C/M Geral · Cais 2</div>
+                <div class="reason">"Reforço de terno — navio extra"</div>
+              </div>
+              <div class="remanejamento-status status-sent">SENT</div>
+            </div>
+            <div class="remanejamento-item">
+              <div class="remanejamento-time">06:30</div>
+              <div class="remanejamento-info">
+                <div class="name">Severino Ramos</div>
+                <div class="meta">163 · Sinaleiro · Cais 1</div>
+                <div class="reason">"Substituição rotina"</div>
+              </div>
+              <div class="remanejamento-status status-done">ACK</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================
+         SEÇÃO 2: REMANEJAMENTOS
+         ============================================ -->
+    <section class="section" id="sec-remanejamentos">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Remanejamentos</h1>
+          <p class="section-subtitle">Histórico do turno · 12/08/2026 · Diurno 08-16</p>
+        </div>
+        <div class="controls">
+          <button class="btn btn-secondary">⤓ Exportar PDF</button>
+          <button class="btn btn-primary" id="btn-remanejar-2">+ Novo Remanejamento</button>
+        </div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Total Hoje</div><div class="kpi-value">7</div><div class="kpi-delta neutral">média 5/dia</div></div>
+        <div class="kpi-card green"><div class="kpi-label">Aceitos OGMO</div><div class="kpi-value">4</div><div class="kpi-delta up">57% taxa</div></div>
+        <div class="kpi-card amber"><div class="kpi-label">Pendentes</div><div class="kpi-value">2</div><div class="kpi-delta neutral">SLA 5min</div></div>
+        <div class="kpi-card red"><div class="kpi-label">Recusados</div><div class="kpi-value">1</div><div class="kpi-delta down">justificativa OK</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Histórico do turno</div>
+          <span class="tag">7 eventos</span>
+        </div>
+        <div class="panel-body">
+          <div class="remanejamento-item priority-high">
+            <div class="remanejamento-time">07:14</div>
+            <div class="remanejamento-info">
+              <div class="name">José Bezerra da Silva · 012 · Guincho A</div>
+              <div class="meta">Por Manoel Costa · Cais 3 · Substituição por atest. médico</div>
+              <div class="reason">Hash: 9a4f2c8e1b3d...</div>
+            </div>
+            <div class="remanejamento-status status-pending">PEND</div>
+          </div>
+          <div class="remanejamento-item">
+            <div class="remanejamento-time">06:58</div>
+            <div class="remanejamento-info">
+              <div class="name">Manoel Florêncio · 247 · Empilhador GP</div>
+              <div class="meta">Por Manoel Costa · Cais 1 · Troca de turno (noturno)</div>
+              <div class="reason">Hash: 7c1d9b4a2e5f...</div>
+            </div>
+            <div class="remanejamento-status status-sent">SENT</div>
+          </div>
+          <div class="remanejamento-item">
+            <div class="remanejamento-time">06:42</div>
+            <div class="remanejamento-info">
+              <div class="name">Antônio José da Silva · 058 · C/M Geral</div>
+              <div class="meta">Por Manoel Costa · Cais 2 · Reforço de terno</div>
+              <div class="reason">Hash: 4b8e2a3f9c1d...</div>
+            </div>
+            <div class="remanejamento-status status-sent">SENT</div>
+          </div>
+          <div class="remanejamento-item">
+            <div class="remanejamento-time">06:30</div>
+            <div class="remanejamento-info">
+              <div class="name">Severino Ramos · 163 · Sinaleiro</div>
+              <div class="meta">Por Manoel Costa · Cais 1 · Substituição rotina</div>
+              <div class="reason">Hash: 2f5a8c1b7e3d...</div>
+            </div>
+            <div class="remanejamento-status status-done">ACK</div>
+          </div>
+          <div class="remanejamento-item priority-high">
+            <div class="remanejamento-time">05:55</div>
+            <div class="remanejamento-info">
+              <div class="name">José Carlos · 099 · Contra Bordo</div>
+              <div class="meta">Por Manoel Costa · Cais 4 · Recusado pelo OGMO (fora CCT)</div>
+              <div class="reason">Hash: 8d3b6e0a4c9f...</div>
+            </div>
+            <div class="remanejamento-status" style="background: rgba(224,74,74,.2); color: var(--accent-red);">NACK</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================
+         SEÇÃO 3: PWA DO TPA
+         ============================================ -->
+    <section class="section" id="sec-tpa">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">PWA do Trabalhador Portuário Avulso</h1>
+          <p class="section-subtitle">App mobile-first · Funciona offline · Push notification · WhatsApp integrado</p>
+        </div>
+        <div class="controls">
+          <span class="tag green">✓ Instalável</span>
+          <span class="tag gold">✓ Offline-first</span>
+          <span class="tag cyan">✓ LGPD-safe</span>
+        </div>
+      </div>
+
+      <div class="pwa-showcase">
+        <div class="pwa-info">
+          <h2>Seu TPA no bolso</h2>
+          <p>O estivador abre o app, vê se está escalado hoje, quanto tempo até a próxima chamada, fala com o Fiscal sem ligar, e recebe push quando há remanejamento.</p>
+          <ul class="pwa-features">
+            <li>Login com CPF + matrícula OGMO (sem senha — OTP via WhatsApp)</li>
+            <li>"Minha escala hoje" com ponteiro, função, cais e navio</li>
+            <li>Countdown da próxima chamada por função</li>
+            <li>Botão "Estou no porto" / "Não vou" — informa o Fiscal</li>
+            <li>Push notification de remanejamentos em < 30s</li>
+            <li>Funciona offline (lê último snapshot, sincroniza quando volta 4G)</li>
+            <li>Canal direto com Fiscal via WhatsApp (deep link)</li>
+            <li>Histórico de engajamentos dos últimos 12 meses</li>
+            <li>Recebimentos (sem expor valores dos outros)</li>
+            <li>CCT e convenção em PDF dentro do app</li>
+          </ul>
+        </div>
+
+        <div class="phone-frame">
+          <div class="phone-screen">
+            <div class="phone-statusbar">
+              <span>07:16</span>
+              <span>📶 4G · 100%</span>
+            </div>
+            <div class="phone-header">
+              <div class="phone-greeting">Bom dia,</div>
+              <div class="phone-name">José Bezerra ⚓</div>
+              <span class="phone-balance">Matrícula 012 · Estivador</span>
+            </div>
+            <div class="phone-body">
+
+              <div class="tpa-card highlight">
+                <div class="tpa-card-title">
+                  <span class="pulse"></span>
+                  VOCÊ ESTÁ ESCALADO HOJE
+                </div>
+                <div class="tpa-card-value">Guincho A</div>
+                <div class="tpa-card-sub">Cais 3 · Navio MSC Aurora · Turno 08-16</div>
+                <button class="tpa-btn" style="margin-top: 12px;">✓ Confirmar Presença</button>
+              </div>
+
+              <div class="tpa-card">
+                <div class="tpa-card-title">⏱ PRÓXIMA CHAMADA</div>
+                <div class="tpa-card-value">14:00</div>
+                <div class="tpa-card-sub">6h 44min restantes · Empilhador PP</div>
+              </div>
+
+              <div class="tpa-card">
+                <div class="tpa-card-title">📊 SEUS ÚLTIMOS 7 DIAS</div>
+                <div class="tpa-row"><span class="label">Engajamentos</span><span class="value">5/7</span></div>
+                <div class="tpa-row"><span class="label">Faltas</span><span class="value">1</span></div>
+                <div class="tpa-row"><span class="label">Recebimentos</span><span class="value">R$ 2.847,30</span></div>
+                <div class="tpa-row"><span class="label">Posição rodízio</span><span class="value">14º</span></div>
+              </div>
+
+              <button class="tpa-btn ghost">💬 Falar com o Fiscal</button>
+              <button class="tpa-btn ghost">📜 Ver CCT completa</button>
+
+            </div>
+            <div class="phone-nav">
+              <button class="phone-nav-item active">Início</button>
+              <button class="phone-nav-item">Escala</button>
+              <button class="phone-nav-item">Histórico</button>
+              <button class="phone-nav-item">Perfil</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pwa-info">
+          <h2>Impacto real</h2>
+          <p>O PWA resolve 30% da dor sozinha. Mas combinado com a lousa espelhada, fecha o ciclo completo: <strong style="color: var(--accent-gold);">Fiscal remaneja no Sindicato → OGMO recebe em segundos → TPA recebe push no celular</strong>.</p>
+          <div class="pwa-extra">
+            <h3>📊 Métricas de adoção (estimativa)</h3>
+            <div class="tpa-row"><span class="label">TPAs alcançados</span><span class="value">~2.000</span></div>
+            <div class="tpa-row"><span class="label">Instalação esperada (3 meses)</span><span class="value">60%</span></div>
+            <div class="tpa-row"><span class="label">Redução de ligações p/ Fiscal</span><span class="value">~70%</span></div>
+            <div class="tpa-row"><span class="label">Custo por TPA/mês</span><span class="value">R$ 0,03</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================
+         SEÇÃO 4: NOTIFICAÇÃO OGMO
+         ============================================ -->
+    <section class="section" id="sec-ogmo">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Notificação ao OGMO/PE</h1>
+          <p class="section-subtitle">3 caminhos paralelos · SLA 5min · Hash de integridade</p>
+        </div>
+        <div class="controls">
+          <span class="tag green">● TODOS OS CANAIS OK</span>
+        </div>
+      </div>
+
+      <div class="ogmo-grid">
+        <!-- E-MAIL PREVIEW -->
+        <div class="panel" style="overflow: hidden;">
+          <div class="panel-header">
+            <div class="panel-title">📧 E-mail formal enviado ao OGMO</div>
+            <span class="tag green">Entregue · 07:14:23</span>
+          </div>
+          <div class="email-preview">
+            <div class="email-header">
+              <div class="email-header-row"><span class="email-header-label">De:</span><span class="email-header-value">fiscal@sindestiva-pe.org.br</span></div>
+              <div class="email-header-row"><span class="email-header-label">Para:</span><span class="email-header-value">escalacao@ogmosuape.com.br · cc: operacao@ogmorecife.org.br</span></div>
+              <div class="email-header-row"><span class="email-header-label">Assunto:</span><span class="email-header-value">[REMANEJAMENTO #SE-2026-0812-014] José Bezerra · Guincho A · 12/08 07:14</span></div>
+            </div>
+            <div class="email-body">
+              <h2>Remanejamento Operacional — Porto de Suape</h2>
+              <p>Prezada equipe do OGMO/PE,</p>
+              <p>O SINDESTIVA-PE comunica o seguinte remanejamento para o turno atual, nos termos do art. 18 da Lei 8.630/93 e CCT 2024-2026 cláusula 12ª:</p>
+              <table>
+                <tr><th>Campo</th><th>Valor</th></tr>
+                <tr><td>ID do remanejamento</td><td>SE-2026-0812-014</td></tr>
+                <tr><td>Porto</td><td>Suape</td></tr>
+                <tr><td>Turno</td><td>08-16 (Diurno)</td></tr>
+                <tr><td>TPA substituído</td><td>José Bezerra da Silva (mat. 012)</td></tr>
+                <tr><td>Função original</td><td>Guincho A — Cais 3</td></tr>
+                <tr><td>Motivo</td><td>Atestado médico (NR-7)</td></tr>
+                <tr><td>Base legal</td><td>CCT 2024-2026, cl. 12ª, §3º</td></tr>
+                <tr><td>Fiscal responsável</td><td>Manoel Costa (mat. 087-F)</td></tr>
+                <tr><td>Hash do registro</td><td><code>SHA-256: 9a4f2c8e1b3d7f4a2c8e...</code></td></tr>
+              </table>
+              <p>Solicitamos confirmação de recebimento em até 5 minutos. A nova escala já está refletida em nosso painel espelhado e pode ser consultada no link abaixo.</p>
+              <p style="text-align: center; margin: 16px 0;"><a href="#" style="background: #0A1929; color: #D4A574; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600;">Ver remanejamento no painel →</a></p>
+              <p>Atenciosamente,<br><strong>Manoel Costa</strong><br>Fiscal · SINDESTIVA-PE<br>(81) 9 9999-0001</p>
+            </div>
+            <div class="email-footer">
+              Mensagem gerada automaticamente pelo Centro de Comando do SINDESTIVA-PE · Assinada digitalmente (ICP-Brasil A1) · Hash de integridade: 9a4f2c8e1b3d7f4a2c8e5b9d3f1a7c4e2b8d5f9a3c7e1b4d8f2a6c9e3b5d7f1
+            </div>
+          </div>
+        </div>
+
+        <!-- CANAIS + WEBHOOK -->
+        <div>
+          <div class="panel" style="margin-bottom: 12px;">
+            <div class="panel-header">
+              <div class="panel-title">🔌 Status dos canais</div>
+            </div>
+            <div class="panel-body ogmo-channels">
+              <div class="channel-card">
+                <div class="channel-icon">📧</div>
+                <div class="channel-info">
+                  <div class="channel-name">E-mail (escalacao@ogmosuape.com.br)</div>
+                  <div class="channel-status"><span class="ok">● OK</span> · 3 entregues hoje</div>
+                </div>
+                <span class="tag green">ATIVO</span>
+              </div>
+              <div class="channel-card">
+                <div class="channel-icon">📡</div>
+                <div class="channel-info">
+                  <div class="channel-name">Webhook (HMAC-SHA256)</div>
+                  <div class="channel-status"><span class="ok">● OK</span> · aguardando endpoint OGMO</div>
+                </div>
+                <span class="tag amber">PREPARADO</span>
+              </div>
+              <div class="channel-card">
+                <div class="channel-icon">🖥️</div>
+                <div class="channel-info">
+                  <div class="channel-name">Painel OGMO (read-only)</div>
+                  <div class="channel-status"><span class="ok">● OK</span> · token de leitura ativo</div>
+                </div>
+                <span class="tag green">ATIVO</span>
+              </div>
+              <div class="channel-card">
+                <div class="channel-icon">📱</div>
+                <div class="channel-info">
+                  <div class="channel-name">WhatsApp Fiscal OGMO</div>
+                  <div class="channel-status"><span class="ok">● OK</span> · +55 81 9999-0000</div>
+                </div>
+                <span class="tag green">ATIVO</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div class="panel-title">🛰 Payload do Webhook (JSON)</div>
+              <span class="tag">POST · /v1/remanejamentos</span>
+            </div>
+            <div class="code-block" style="margin: 12px; border-radius: 8px;">{
+<span class="key">"id"</span>: <span class="str">"SE-2026-0812-014"</span>,
+<span class="key">"timestamp"</span>: <span class="str">"2026-08-12T07:14:18-03:00"</span>,
+<span class="key">"porto"</span>: <span class="str">"SUAPE"</span>,
+<span class="key">"turno"</span>: <span class="str">"08-16"</span>,
+<span class="key">"tpa_out"</span>: {
+  <span class="key">"matricula"</span>: <span class="str">"012"</span>,
+  <span class="key">"nome"</span>: <span class="str">"José Bezerra da Silva"</span>,
+  <span class="key">"funcao"</span>: <span class="str">"GUINCHO_A"</span>,
+  <span class="key">"cais"</span>: <span class="num">3</span>
+},
+<span class="key">"tpa_in"</span>: <span class="str">null</span>,  <span class="com">// OGMO decide</span>
+<span class="key">"motivo"</span>: {
+  <span class="key">"codigo"</span>: <span class="str">"ATESTADO_MEDICO"</span>,
+  <span class="key">"base_legal"</span>: <span class="str">"CCT 2024-26, cl. 12, §3"</span>,
+  <span class="key">"documento_url"</span>: <span class="str">"https://..."</span>
+},
+<span class="key">"fiscal"</span>: {
+  <span class="key">"matricula"</span>: <span class="str">"087-F"</span>,
+  <span class="key">"nome"</span>: <span class="str">"Manoel Costa"</span>
+},
+<span class="key">"hash_sha256"</span>: <span class="str">"9a4f2c8e..."</span>,
+<span class="key">"signature_hmac"</span>: <span class="str">"a7f3b9c2..."</span>
+}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================
+         SEÇÃO 5: AUDITORIA
+         ============================================ -->
+    <section class="section" id="sec-auditoria">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">Trilha de Auditoria</h1>
+          <p class="section-subtitle">Append-only · Hash chain · LGPD-compliant · Disponível para MPT e ANTAQ</p>
+        </div>
+        <div class="controls">
+          <button class="btn btn-secondary">⤓ Exportar (PDF assinado)</button>
+          <button class="btn btn-ghost">⤓ CSV</button>
+        </div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Eventos hoje</div><div class="kpi-value">147</div><div class="kpi-delta up">Sistema + remanejamentos</div></div>
+        <div class="kpi-card green"><div class="kpi-label">Hash chain</div><div class="kpi-value">✓ ÍNTEGRO</div><div class="kpi-delta up">Verificado agora</div></div>
+        <div class="kpi-card amber"><div class="kpi-label">Retenção</div><div class="kpi-value">24m</div><div class="kpi-delta neutral">LGPD + portaria 1.224/18</div></div>
+        <div class="kpi-card cyan"><div class="kpi-label">Acessos externos</div><div class="kpi-value">0</div><div class="kpi-delta neutral">MPT não acessou ainda</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Eventos recentes</div>
+          <span class="tag">Filtro: Hoje · 12/08</span>
+        </div>
+        <div class="panel-body">
+          <div class="audit-timeline">
+
+            <div class="audit-item kind-create">
+              <div class="audit-time">07:14:18 · há 2 min</div>
+              <div class="audit-title">REMANEJAMENTO CRIADO · #SE-2026-0812-014</div>
+              <div class="audit-detail">
+                José Bezerra (012) removido de Guincho A · Cais 3<br>
+                Motivo: Atestado médico (NR-7) · Base: CCT cl. 12ª, §3º<br>
+                Por Manoel Costa (087-F) · IP 200.123.45.67 · 4G Vivo
+              </div>
+              <div class="audit-hash">SHA-256: 9a4f2c8e1b3d7f4a2c8e5b9d3f1a7c4e2b8d5f9a3c7e1b4d8f2a6c9e3b5d7f1</div>
+            </div>
+
+            <div class="audit-item kind-notify">
+              <div class="audit-time">07:14:23 · há 2 min</div>
+              <div class="audit-title">NOTIFICAÇÃO ENVIADA · OGMO/PE</div>
+              <div class="audit-detail">
+                E-mail entregue a escalacao@ogmosuape.com.br · 0.234s de latência<br>
+                Webhook: pendente (OGMO não disponibilizou endpoint ainda)
+              </div>
+              <div class="audit-hash">SHA-256: 7c1d9b4a2e5f3a8c6b9d4e1f2a7c8b5d9e3f4a6c1b7d2e8f5a3c9b4d6e1f2a8c</div>
+            </div>
+
+            <div class="audit-item kind-update">
+              <div class="audit-time">06:58:11 · há 18 min</div>
+              <div class="audit-title">REMANEJAMENTO EXECUTADO · #SE-2026-0812-013</div>
+              <div class="audit-detail">
+                Manoel Florêncio (247) trocado: Empilhador GP → Empilhador PP · Cais 1<br>
+                Motivo: Troca de turno (noturno) · Base: CCT cl. 8ª<br>
+                OGMO confirmou ACK em 1m 12s
+              </div>
+              <div class="audit-hash">SHA-256: 4b8e2a3f9c1d6e5a8b3f7c2d4e9a1b6f3c8d5e2a7f4b9c1d6e3a8f5b2c7d4e9a</div>
+            </div>
+
+            <div class="audit-item kind-notify">
+              <div class="audit-time">06:58:42 · há 17 min</div>
+              <div class="audit-title">PUSH TPA ENVIADO · José Bezerra</div>
+              <div class="audit-detail">
+                Notificação PWA entregue · Device: SM-A546E · matrícula 012<br>
+                Mensagem: "Sua função de hoje mudou p/ Guincho A. Confirme presença."
+              </div>
+              <div class="audit-hash">SHA-256: 2f5a8c1b7e3d9a4c6f2b5e8d1a7c4b9f3e6d2a5c8b4f7e1d9a3c6b5f2e8d4a7c</div>
+            </div>
+
+            <div class="audit-item kind-create">
+              <div class="audit-time">06:42:08 · há 33 min</div>
+              <div class="audit-title">REMANEJAMENTO CRIADO · #SE-2026-0812-012</div>
+              <div class="audit-detail">
+                Antônio José (058) adicionado: C/M Geral · Cais 2<br>
+                Motivo: Reforço de terno — navio extra (MSC Aurora)<br>
+                OGMO confirmou ACK em 0m 48s
+              </div>
+              <div class="audit-hash">SHA-256: 8d3b6e0a4c9f1a5b7e2d6f3a9c4b8e1d5f7a2c6b9e3d4f8a1c5b7e2d6f3a9c4b</div>
+            </div>
+
+            <div class="audit-item kind-system">
+              <div class="audit-time">06:00:00 · há 1h 15min</div>
+              <div class="audit-title">SINCRONIZAÇÃO INICIAL · TPA → SINDESTIVA</div>
+              <div class="audit-detail">
+                Snapshot da Lousa OGMO importado · 142 TPAs escalados<br>
+                Hash chain reiniciado · 26 colunas × 10 fainas × 2 turnos validados
+              </div>
+              <div class="audit-hash">SHA-256: 1c4b7e2d5f8a3c6b9e2d5f8a1c4b7e2d5f8a3c6b9e2d5f8a1c4b7e2d5f8a3c6b</div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================
+         SEÇÃO 6: BI
+         ============================================ -->
+    <section class="section" id="sec-bi">
+      <div class="section-header">
+        <div>
+          <h1 class="section-title">BI · Inteligência para CCT</h1>
+          <p class="section-subtitle">Dados reais para negociar com OGMO e Operadores · Última atualização há 12s</p>
+        </div>
+        <div class="controls">
+          <div class="chip-group">
+            <button class="chip active">7 dias</button>
+            <button class="chip">30 dias</button>
+            <button class="chip">3 meses</button>
+            <button class="chip">12 meses</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Taxa comparecimento</div><div class="kpi-value">87%</div><div class="kpi-delta up">▲ 4% vs 7d</div></div>
+        <div class="kpi-card green"><div class="kpi-value" style="font-size: 22px;">R$ 487k</div><div class="kpi-delta up">Folha paga 7d · 1.142 TPAs</div></div>
+        <div class="kpi-card amber"><div class="kpi-label">Causa #1 falta</div><div class="kpi-value" style="font-size: 18px;">Atestado</div><div class="kpi-delta neutral">38% do total</div></div>
+        <div class="kpi-card red"><div class="kpi-label">Remanejamentos c/ OGMO NACK</div><div class="kpi-value">7%</div><div class="kpi-delta down">Justificativa CCT</div></div>
+      </div>
+
+      <div class="bi-grid">
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">📊 Remanejamentos por dia · últimos 7 dias</div>
+            <span class="tag">Média 5,3/dia</span>
+          </div>
+          <div class="panel-body">
+            <div class="bar-chart">
+              <div class="bar-col"><div class="bar" style="height: 60px;"><span class="bar-value">3</span></div><span class="bar-label">06/08</span></div>
+              <div class="bar-col"><div class="bar" style="height: 110px;"><span class="bar-value">6</span></div><span class="bar-label">07/08</span></div>
+              <div class="bar-col"><div class="bar" style="height: 40px;"><span class="bar-value">2</span></div><span class="bar-label">08/08</span></div>
+              <div class="bar-col"><div class="bar" style="height: 150px;"><span class="bar-value">8</span></div><span class="bar-label">09/08</span></div>
+              <div class="bar-col"><div class="bar" style="height: 80px;"><span class="bar-value">4</span></div><span class="bar-label">10/08</span></div>
+              <div class="bar-col"><div class="bar" style="height: 95px;"><span class="bar-value">5</span></div><span class="bar-label">11/08</span></div>
+              <div class="bar-col"><div class="bar" style="height: 130px; background: linear-gradient(180deg, var(--accent-amber), #B8884F);"><span class="bar-value">7</span></div><span class="bar-label" style="color: var(--accent-amber); font-weight: 600;">12/08</span></div>
+            </div>
+            <div style="margin-top: 20px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; font-size: 12px;">
+              <div style="padding: 12px; background: var(--bg-raised); border-radius: 8px;">
+                <div style="color: var(--text-secondary);">Função + remanejada</div>
+                <div style="font-weight: 700; color: var(--accent-amber); font-size: 16px; margin-top: 4px;">Guincho A</div>
+                <div style="color: var(--text-muted); font-size: 10px; margin-top: 2px;">23% do total</div>
+              </div>
+              <div style="padding: 12px; background: var(--bg-raised); border-radius: 8px;">
+                <div style="color: var(--text-secondary);">Cais + problemático</div>
+                <div style="font-weight: 700; color: var(--accent-red); font-size: 16px; margin-top: 4px;">Cais 3</div>
+                <div style="color: var(--text-muted); font-size: 10px; margin-top: 2px;">Suape · Ro-Ro pesado</div>
+              </div>
+              <div style="padding: 12px; background: var(--bg-raised); border-radius: 8px;">
+                <div style="color: var(--text-secondary);">Horário + crítico</div>
+                <div style="font-weight: 700; color: var(--accent-cyan); font-size: 16px; margin-top: 4px;">06:00-07:00</div>
+                <div style="color: var(--text-muted); font-size: 10px; margin-top: 2px;">Pico de trocas de turno</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">🏆 Top remanejados</div>
+            <span class="tag">7 dias</span>
+          </div>
+          <div class="panel-body">
+            <div class="ranking-list">
+              <div class="ranking-item">
+                <span class="ranking-pos">1º</span>
+                <span class="ranking-name">Antônio José da Silva</span>
+                <span class="ranking-value">8x</span>
+              </div>
+              <div class="ranking-item">
+                <span class="ranking-pos">2º</span>
+                <span class="ranking-name">José Carlos Pereira</span>
+                <span class="ranking-value">6x</span>
+              </div>
+              <div class="ranking-item">
+                <span class="ranking-pos">3º</span>
+                <span class="ranking-name">Manoel Florêncio</span>
+                <span class="ranking-value">5x</span>
+              </div>
+              <div class="ranking-item">
+                <span class="ranking-pos">4º</span>
+                <span class="ranking-name">Severino Ramos</span>
+                <span class="ranking-value">4x</span>
+              </div>
+              <div class="ranking-item">
+                <span class="ranking-pos">5º</span>
+                <span class="ranking-name">José Bezerra da Silva</span>
+                <span class="ranking-value">4x</span>
+              </div>
+              <div class="ranking-item">
+                <span class="ranking-pos">6º</span>
+                <span class="ranking-name">Geraldo Alves</span>
+                <span class="ranking-value">3x</span>
+              </div>
+              <div class="ranking-item">
+                <span class="ranking-pos">7º</span>
+                <span class="ranking-name">Marcos Antônio</span>
+                <span class="ranking-value">3x</span>
+              </div>
+            </div>
+            <div style="margin-top: 16px; padding: 12px; background: rgba(212,165,116,.08); border-left: 3px solid var(--accent-gold); border-radius: 4px; font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+              💡 <strong style="color: var(--accent-gold);">Insight:</strong> Antônio José foi remanejado 8x — vale abrir diálogo com ele pra entender o motivo. Pode ser problema de saúde, conflito de turno, ou preferência a regularizar.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- MODAL: REMANEJAMENTO -->
+<div class="modal-backdrop" id="modal-remanejamento">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Remanejamento de TPA</div>
+      <button class="modal-close" id="modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="remanejamento-contexto">
+        <strong>Contexto:</strong> Cais 3 · Turno 08-16 · Função Guincho A
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">TPA a remover (matrícula)</label>
+          <input class="form-input" type="text" placeholder="Ex: 012" value="012">
+        </div>
+        <div class="form-group">
+          <label class="form-label">TPA a inserir (opcional)</label>
+          <input class="form-input" type="text" placeholder="Ex: 245 ou vazio (OGMO decide)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Motivo do remanejamento</label>
+        <select class="form-select">
+          <option>Atestado médico (NR-7)</option>
+          <option>Falta injustificada</option>
+          <option>Reforço de terno (navio extra)</option>
+          <option>Troca de turno entre TPAs</option>
+          <option>Atraso acima de 15 min</option>
+          <option>Falta de EPI</option>
+          <option>Liberação antecipada (acordo)</option>
+          <option>Outro (especificar)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Base legal / CCT</label>
+        <input class="form-input" type="text" placeholder="Ex: CCT 2024-2026, cl. 12ª, §3º" value="CCT 2024-2026, cl. 12ª, §3º">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Observações</label>
+        <textarea class="form-textarea" placeholder="Detalhes que ajudem o OGMO a processar..."></textarea>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Anexar documento (opcional)</label>
+          <input class="form-input" type="file" disabled style="opacity: 0.5;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notificar TPA via PWA</label>
+          <select class="form-select">
+            <option>Sim, push imediato</option>
+            <option>Sim, no próximo turno</option>
+            <option>Não notificar</option>
+          </select>
+        </div>
+      </div>
+      <div class="checkbox-row">
+        <input type="checkbox" id="check-ack" checked>
+        <label for="check-ack">Confirmo que este remanejamento é lícito e respaldado pela CCT vigente</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="modal-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="modal-submit">Executar e notificar OGMO</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toast-container"></div>
+
+<script>
+/* ============================================
+   DADOS MOCKADOS · LOUSA OFICIAL
+   ============================================ */
+
+const FUNCOES = [
+  { name: 'C/M Geral', cat: 'mando' },
+  { name: 'C/M Porão', cat: 'mando' },
+  { name: 'C/M Bloco', cat: 'mando' },
+  { name: 'C/M Rechego', cat: 'mando' },
+  { name: 'C/M Cons.', cat: 'mando' },
+  { name: 'Supervisor', cat: 'mando' },
+  { name: 'Porão', cat: 'terno' },
+  { name: 'Bloco MAX', cat: 'terno' },
+  { name: 'Bloco', cat: 'terno' },
+  { name: 'Rechego', cat: 'terno' },
+  { name: 'Cons.', cat: 'terno' },
+  { name: 'Ship Loader', cat: 'terno' },
+  { name: 'Sinaleiro', cat: 'tecnica' },
+  { name: 'Guincho A', cat: 'tecnica' },
+  { name: 'Guincho B', cat: 'tecnica' },
+  { name: 'Emp. GP', cat: 'tecnica' },
+  { name: 'Emp. PP', cat: 'tecnica' },
+  { name: 'V. Pesado', cat: 'tecnica' },
+  { name: 'V. Leve', cat: 'tecnica' },
+  { name: 'Manobrista', cat: 'tecnica' },
+  { name: 'Transp.', cat: 'tecnica' },
+  { name: 'Pá Mec.', cat: 'tecnica' },
+  { name: 'Retro Esc.', cat: 'tecnica' },
+  { name: 'PC', cat: 'tecnica' },
+  { name: 'Rodízio', cat: 'vigia' },
+  { name: 'Contra Bordo', cat: 'vigia' }
+];
+
+const FAINAS = [
+  { name: 'PRODUÇÃO', cls: 'faina-producao' },
+  { name: 'SALÁRIO', cls: 'faina-salario' },
+  { name: 'SACARIA SOLTA', cls: 'faina-sacaria' },
+  { name: 'SACARIA LING.', cls: 'faina-sacaria' },
+  { name: 'RO-RO LEVE', cls: 'faina-veiculo' },
+  { name: 'RO-RO LEVE 400', cls: 'faina-veiculo' },
+  { name: 'RO-RO PESADO', cls: 'faina-veiculo' },
+  { name: 'DIVERSOS', cls: 'faina-diversos' },
+  { name: 'CADASTRO', cls: 'faina-cadastro' },
+  { name: 'SUPLEMENTAR', cls: 'faina-suplementar' },
+  { name: 'ALTURA NR-35', cls: 'faina-altura' }
+];
+
+// Dados mockados — ponteiros (números de agulhado)
+const PONTEIROS = {
+  SUAPE: {
+    diurno: {
+      'PRODUÇÃO':         ['058','070',null,null,null,'070','032',null,null,null,null,null,'159','264','000','106','091',null,null,null,null,'000','000',null,null,null],
+      'SALÁRIO':          ['144','061','149','094','063',null,'206',null,'115','131','165',null,'133','328','000','105','024','000','000',null,null,'112','028','177','043','211'],
+      'SACARIA SOLTA':    ['201','286',null,null,null,null,'270',null,null,null,null,'266','065','145','145','091','167',null,null,null,null,'000','000',null,null,null],
+      'SACARIA LING.':    ['201','286',null,null,null,null,'093',null,null,null,null,'266','065','145','145','091','167',null,null,null,null,'000','000',null,null,null],
+      'RO-RO LEVE':       ['013','178',null,null,null,'038','000','246',null,null,null,null,'167',null,null,'021','034',null,'158','204','000',null,null,null,null,null],
+      'RO-RO LEVE 400':   ['096','104',null,null,null,'038','000','246',null,null,null,null,'107',null,null,'021','034',null,'207','254',null,null,null,null,null,null],
+      'RO-RO PESADO':     ['012','065',null,null,null,'038','000','246',null,null,null,null,'060',null,null,'021','034',null,'134',null,null,'000',null,null,null,null],
+      'DIVERSOS':         ['223','175',null,null,null,null,'126',null,null,null,null,null,'307','114','000','000','000',null,null,null,null,'000','000','040',null,null],
+      'CADASTRO':         ['000','000','000',null,null,null,'811','000','813','000',null,'000','821','821','000','000','000','000','816','000',null,'821','000','000','800','000'],
+      'SUPLEMENTAR':      ['114','168','019','000',null,'000','226','127','197','272',null,'000','320','234','000','299','173','278','086','291','000','128','000','108','092','000'],
+      'ALTURA NR-35':     ['000','000','000','000',null,'000','000','000','000','000',null,'000','000','000','000',null,null,'000',null,null,null,null,null,null,null,'000']
+    },
+    noturno: {
+      'PRODUÇÃO':         ['084','193',null,null,null,'014','003',null,null,null,null,null,'024','147','000','040','000',null,null,null,null,'000','000',null,null,null],
+      'SALÁRIO':          ['124','069','131','094','050',null,'231',null,'303','189','000',null,'103','168','000','108','169','000','000',null,null,'189','083','045','173','166'],
+      'SACARIA SOLTA':    ['033','229',null,null,null,null,'040',null,null,null,null,'269','036','290','290','018','112',null,null,null,null,'000','000',null,null,null],
+      'SACARIA LING.':    ['033','229',null,null,null,null,'196',null,null,null,null,'269','036','290','290','018','112',null,null,null,null,'000','000',null,null,null],
+      'RO-RO LEVE':       ['167','229',null,null,null,'202','000','263',null,null,null,null,'196',null,null,'075','017',null,'083','130','000',null,null,null,null,null],
+      'RO-RO LEVE 400':   ['060','065',null,null,null,'202','000','263',null,null,null,null,'093',null,null,'075','017',null,'173','010',null,null,null,null,null,null],
+      'RO-RO PESADO':     ['003','029',null,null,null,'202','000','263',null,null,null,null,'032',null,null,'075','017',null,'213',null,null,'000',null,null,null,null],
+      'DIVERSOS':         ['123','069',null,null,null,null,'263',null,null,null,null,null,'320','131','000','000','074',null,null,null,null,'000','000','182',null,null],
+      'CADASTRO':         ['000','000','000',null,null,null,'811','000','813','000',null,'811','804','816','000','000','000','000','803','000',null,'000','000','000','817','000'],
+      'SUPLEMENTAR':      ['201','315','196','000',null,'000','209','200','125','129',null,'000','275','125','000','108','046','242','173','273','000','189','000','106','271','000'],
+      'ALTURA NR-35':     ['000','000','000','000',null,'000','000','000','000','000',null,'000','000','000','000',null,null,'000',null,null,null,null,null,null,null,'000']
+    }
+  },
+  RECIFE: {
+    diurno: {
+      'PRODUÇÃO':         ['045','088',null,null,null,'050','040',null,null,null,null,null,'120','200','000','080','070',null,null,null,null,'000','000',null,null,null],
+      'SALÁRIO':          ['110','055','130','080','050',null,'180',null,'100','115','140',null,'115','280','000','090','020','000','000',null,null,'100','025','150','040','180'],
+      'SACARIA SOLTA':    ['180','250',null,null,null,null,'240',null,null,null,null,'230','060','130','130','080','150',null,null,null,null,'000','000',null,null,null],
+      'SACARIA LING.':    ['180','250',null,null,null,null,'080',null,null,null,null,'230','060','130','130','080','150',null,null,null,null,'000','000',null,null,null],
+      'RO-RO LEVE':       ['010','160',null,null,null,'030','000','220',null,null,null,null,'150',null,null,'020','030',null,'140','180','000',null,null,null,null,null],
+      'RO-RO LEVE 400':   ['085','095',null,null,null,'030','000','220',null,null,null,null,'095',null,null,'020','030',null,'180','220',null,null,null,null,null,null],
+      'RO-RO PESADO':     ['010','055',null,null,null,'030','000','220',null,null,null,null,'050',null,null,'020','030',null,'120',null,null,'000',null,null,null,null],
+      'DIVERSOS':         ['200','155',null,null,null,null,'110',null,null,null,null,null,'270','100','000','000','000',null,null,null,null,'000','000','035',null,null],
+      'CADASTRO':         ['000','000','000',null,null,null,'750','000','760','000',null,'000','770','770','000','000','000','000','765','000',null,'770','000','000','755','000'],
+      'SUPLEMENTAR':      ['100','150','015','000',null,'000','200','115','180','250',null,'000','280','215','000','270','155','250','080','265','000','115','000','100','085','000'],
+      'ALTURA NR-35':     ['000','000','000','000',null,'000','000','000','000','000',null,'000','000','000','000',null,null,'000',null,null,null,null,null,null,null,'000']
+    },
+    noturno: {
+      'PRODUÇÃO':         ['075','170',null,null,null,'012','002',null,null,null,null,null,'020','130','000','035','000',null,null,null,null,'000','000',null,null,null],
+      'SALÁRIO':          ['110','060','115','085','045',null,'210',null,'275','170','000',null,'090','150','000','100','150','000','000',null,null,'170','075','040','155','150'],
+      'SACARIA SOLTA':    ['030','210',null,null,null,null,'035',null,null,null,null,'240','030','260','260','015','100',null,null,null,null,'000','000',null,null,null],
+      'SACARIA LING.':    ['030','210',null,null,null,null,'180',null,null,null,null,'240','030','260','260','015','100',null,null,null,null,'000','000',null,null,null],
+      'RO-RO LEVE':       ['150','210',null,null,null,'180','000','240',null,null,null,null,'180',null,null,'070','015',null,'075','120','000',null,null,null,null,null],
+      'RO-RO LEVE 400':   ['055','060',null,null,null,'180','000','240',null,null,null,null,'085',null,null,'070','015',null,'160','008',null,null,null,null,null,null],
+      'RO-RO PESADO':     ['002','025',null,null,null,'180','000','240',null,null,null,null,'028',null,null,'070','015',null,'195',null,null,'000',null,null,null,null],
+      'DIVERSOS':         ['110','060',null,null,null,null,'240',null,null,null,null,null,'290','120','000','000','065',null,null,null,null,'000','000','165',null,null],
+      'CADASTRO':         ['000','000','000',null,null,null,'750','000','760','000',null,'750','760','770','000','000','000','000','755','000',null,'000','000','000','765','000'],
+      'SUPLEMENTAR':      ['180','285','180','000',null,'000','190','180','115','120',null,'000','250','115','000','100','040','220','160','250','000','170','000','100','250','000'],
+      'ALTURA NR-35':     ['000','000','000','000',null,'000','000','000','000','000',null,'000','000','000','000',null,null,'000',null,null,null,null,null,null,null,'000']
+    }
+  }
+};
+
+// Marcar alguns como remanejados/ausentes pra demo
+const REMANEJADOS = {
+  'PRODUÇÃO': { 'Guincho A': '145' },  // exemplo
+};
+
+let state = {
+  porto: 'SUAPE',
+  turno: 'diurno'
+};
+
+/* ============================================
+   RENDER LOUSA
+   ============================================ */
+
+function renderLousa() {
+  const data = PONTEIROS[state.porto][state.turno];
+  const turnoLabel = state.turno === 'diurno' ? 'TURNO 08-16 (DIURNO)' : 'TURNO 20-02 (NOTURNO)';
+  document.getElementById('turno-label').textContent = turnoLabel;
+
+  const table = document.getElementById('lousa-table');
+  let html = '<thead><tr>';
+  html += '<th rowspan="2" class="th-cais" style="background: var(--bg-raised); min-width: 100px;">FAINA</th>';
+  html += '<th rowspan="2" class="th-cais" style="background: var(--bg-raised); min-width: 50px;">⏱</th>';
+
+  // Cabeçalho agrupado de funções
+  let lastCat = null;
+  let catStart = 0;
+  let catHtml = '';
+  for (let i = 0; i < FUNCOES.length; i++) {
+    const f = FUNCOES[i];
+    if (f.cat !== lastCat) {
+      if (lastCat !== null) {
+        catHtml += `<th colspan="${i - catStart}" class="cat-${lastCat}">${labelForCat(lastCat)}</th>`;
+      }
+      lastCat = f.cat;
+      catStart = i;
+    }
+  }
+  catHtml += `<th colspan="${FUNCOES.length - catStart}" class="cat-${lastCat}">${labelForCat(lastCat)}</th>`;
+  html += catHtml;
+  html += '</tr><tr>';
+
+  FUNCOES.forEach(f => {
+    html += `<th>${f.name}</th>`;
+  });
+  html += '</tr></thead><tbody>';
+
+  FAINAS.forEach((faina, idx) => {
+    const fainaKey = faina.name;
+    html += `<tr><th class="${faina.cls}">${faina.name}</th><th style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-gold);">T${idx+1}</th>`;
+    const valores = data[fainaKey] || [];
+    for (let i = 0; i < FUNCOES.length; i++) {
+      const v = valores[i];
+      if (v === null || v === undefined) {
+        html += `<td class="ponteiro vazio">·</td>`;
+      } else {
+        let cls = 'ponteiro';
+        // Marcar especial: 012 em alguma célula = remanejado, 000 = vazio
+        if (v === '012' && fainaKey === 'RO-RO PESADO' && FUNCOES[i].name === 'C/M Porão') {
+          cls += ' ausente';
+        }
+        if (v === '058' && fainaKey === 'PRODUÇÃO' && state.turno === 'diurno') {
+          cls += ' remanejado';
+        }
+        if (v === '247' && fainaKey === 'EMPILHADOR GP'.toUpperCase() || (v === '247' && fainaKey === 'DIVERSOS')) {
+          cls += ' remanejado';
+        }
+        if (v === '163' && fainaKey === 'SUPLEMENTAR') {
+          cls += ' confirmado';
+        }
+        html += `<td class="${cls}" data-mat="${v}" data-funcao="${FUNCOES[i].name}" data-faina="${fainaKey}">${v}</td>`;
+      }
+    }
+    html += '</tr>';
+  });
+
+  html += '</tbody>';
+  table.innerHTML = html;
+
+  // Click nos ponteiros
+  table.querySelectorAll('.ponteiro:not(.vazio)').forEach(cell => {
+    cell.addEventListener('click', (e) => {
+      const mat = cell.dataset.mat;
+      const funcao = cell.dataset.funcao;
+      const faina = cell.dataset.faina;
+      abrirModalRemanejamento({mat, funcao, faina});
+    });
+  });
+
+  // Atualizar timestamp
+  const now = new Date();
+  document.getElementById('last-update').textContent = 'agora mesmo';
+  document.getElementById('lousa-porto').textContent = state.porto;
+  document.getElementById('lousa-turno').textContent = state.turno === 'diurno' ? 'Diurno 08-16' : 'Noturno 20-02';
+}
+
+function labelForCat(cat) {
+  switch(cat) {
+    case 'mando': return 'FUNÇÕES DE MANDO';
+    case 'terno': return 'TERNO';
+    case 'tecnica': return 'FUNÇÕES TÉCNICAS';
+    case 'vigia': return 'VIGIA';
+  }
+}
+
+/* ============================================
+   NAVEGAÇÃO
+   ============================================ */
+
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    const sec = item.dataset.section;
+    showSection(sec);
+  });
+});
+
+function showSection(sec) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(s => s.classList.remove('active'));
+  document.getElementById('sec-' + sec).classList.add('active');
+  document.querySelector(`[data-section="${sec}"]`).classList.add('active');
+  const labels = {lousa: 'Lousa Espelhada', remanejamentos: 'Remanejamentos', tpa: 'PWA · TPA', ogmo: 'Notificação OGMO', auditoria: 'Auditoria', bi: 'BI & Relatórios'};
+  document.getElementById('crumb-current').textContent = labels[sec] || sec;
+}
+
+/* ============================================
+   PORTO / TURNO
+   ============================================ */
+
+document.querySelectorAll('#porto-switcher .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#porto-switcher .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.porto = chip.dataset.porto;
+    renderLousa();
+    showToast('kind-cyan', 'Porto alterado', `Lousa espelhada atualizada para ${state.porto}`);
+  });
+});
+
+document.querySelectorAll('#turno-switcher .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#turno-switcher .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    state.turno = chip.dataset.turno;
+    renderLousa();
+    showToast('kind-cyan', 'Turno alterado', `Visualizando turno ${state.turno}`);
+  });
+});
+
+/* ============================================
+   MODAL REMANEJAMENTO
+   ============================================ */
+
+function abrirModalRemanejamento(ctx) {
+  const modal = document.getElementById('modal-remanejamento');
+  if (ctx) {
+    const contextoEl = modal.querySelector('.remanejamento-contexto');
+    contextoEl.innerHTML = `<strong>Contexto:</strong> ${ctx.faina} · Função ${ctx.funcao} · TPA matrícula ${ctx.mat} · <span style="color: var(--accent-amber);">Cais 3</span>`;
+  }
+  modal.classList.add('active');
+}
+
+document.getElementById('btn-remanejar').addEventListener('click', () => abrirModalRemanejamento());
+document.getElementById('btn-remanejar-2').addEventListener('click', () => abrirModalRemanejamento());
+document.getElementById('modal-close').addEventListener('click', fecharModal);
+document.getElementById('modal-cancel').addEventListener('click', fecharModal);
+document.getElementById('modal-backdrop-click', ) || true;
+document.getElementById('modal-remanejamento').addEventListener('click', (e) => {
+  if (e.target.id === 'modal-remanejamento') fecharModal();
+});
+
+function fecharModal() {
+  document.getElementById('modal-remanejamento').classList.remove('active');
+}
+
+document.getElementById('modal-submit').addEventListener('click', () => {
+  fecharModal();
+  showToast('', '✓ Remanejamento executado', 'OGMO/PE notificado · Hash 9a4f2c8e... registrado · TPA receberá push em < 30s');
+  setTimeout(() => showToast('kind-amber', 'OGMO/PE · Confirmação', 'ACK recebido em 1m 12s · Manoel Florêncio (247) escalado'), 1500);
+});
+
+/* ============================================
+   TOAST
+   ============================================ */
+
+function showToast(kind, title, msg) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = 'toast' + (kind ? ' kind-' + kind : '');
+  toast.innerHTML = `
+    <div class="toast-title">${title}</div>
+    <div class="toast-msg">${msg}</div>
+  `;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.transition = 'all 0.3s';
+    toast.style.transform = 'translateX(20px)';
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 5000);
+}
+
+/* ============================================
+   INIT
+   ============================================ */
+
+renderLousa();
+
+// Toasts iniciais de demonstração
+setTimeout(() => showToast('kind-cyan', '🛰 Sync OK', 'Lousa OGMO importada · 142 TPAs · 26×10·2 turnos'), 800);
+setTimeout(() => showToast('', '⏱ Última atualização', 'há 12s · próxima sync em 48s'), 2400);
+
+</script>
+
+</body>
+</html>

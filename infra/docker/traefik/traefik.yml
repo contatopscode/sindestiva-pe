@@ -1,0 +1,32 @@
+# =============================================================================
+# SINDESTIVA-PE · Traefik v3 (dev)
+# Config estática mínima. Em prod, adicionar:
+#   - TLS automático via Let's Encrypt (certresolver)
+#   - Rate limit middleware
+#   - BasicAuth no dashboard
+# =============================================================================
+
+api:
+  dashboard: true
+  insecure: true   # dev only — em prod, proteger com auth
+
+entryPoints:
+  web:
+    address: ":80"
+  websecure:
+    address: ":443"
+
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: sindestiva-net
+
+log:
+  level: INFO
+  format: common
+
+accessLog:
+  format: common
+  fields:
+    defaultMode: keep

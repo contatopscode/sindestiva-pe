@@ -1,0 +1,35 @@
+{
+  "name": "sindestiva-pe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Lousa Digital — sistema de lousa portuária do SINDESTIVA-PE (Sindicato dos Estivadores nos Portos de Pernambuco).",
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "dev:web": "turbo run dev --filter=@sindestiva/web",
+    "dev:pwa": "turbo run dev --filter=@sindestiva/pwa",
+    "dev:api": "turbo run dev --filter=@sindestiva/api",
+    "dev:worker": "pnpm --filter=@sindestiva/scraper dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "test:e2e": "playwright test",
+    "clean": "turbo run clean && rm -rf node_modules .turbo",
+    "db:up": "docker compose -f infra/docker-compose.yml --env-file .env up -d postgres redis",
+    "db:down": "docker compose -f infra/docker-compose.yml --env-file .env down",
+    "db:logs": "docker compose -f infra/docker-compose.yml --env-file .env logs -f postgres redis",
+    "db:reset": "docker compose -f infra/docker-compose.yml --env-file .env down -v && pnpm db:up",
+    "infra:up": "docker compose -f infra/docker-compose.yml --env-file .env up -d",
+    "infra:down": "docker compose -f infra/docker-compose.yml --env-file .env down"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.2"
+  }
+}
