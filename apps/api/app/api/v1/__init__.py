@@ -6,7 +6,9 @@ Routers expostos:
   - /health         → health check (sem DB) + DB ping
   - /auth           → login, me, config (T1-08 Sprint 1)
   - /users          → CRUD users (admin)
-  - /lousa          → GET lousa atual, por porto/turno
+  - /lousa          → GET lousa atual, por porto/turno, /escalas (Sprint 2)
+  - /lousa/public   → GET preview sem auth (Sprint 0 — remover em prod)
+  - /scraping       → POST /disparar, GET /status (Sprint 2)
   - /remanejamentos → POST/GET/PATCH
   - /ogmo           → POST envio de notificação, GET status
   - /auditoria      → GET eventos, POST verificar-hash-chain
@@ -20,8 +22,10 @@ from app.api.v1 import (
     health,
     lgpd,
     lousa,
+    lousa_public,
     ogmo,
     remanejamentos,
+    scraping,
     users,
 )
 
@@ -30,6 +34,8 @@ api_v1_router.include_router(health.router)
 api_v1_router.include_router(auth.router)
 api_v1_router.include_router(users.router)
 api_v1_router.include_router(lousa.router)
+api_v1_router.include_router(lousa_public.router)
+api_v1_router.include_router(scraping.router)
 api_v1_router.include_router(remanejamentos.router)
 api_v1_router.include_router(ogmo.router)
 api_v1_router.include_router(auditoria.router)

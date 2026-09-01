@@ -1,0 +1,15 @@
+<!--
+  Fake de HTML do TPA Tecnologia com layout DIFERENTE (estrutura nova).
+
+  Aqui o TPA mudou a estrutura: usa `<div class="celula">` em vez de
+  `<table>`. O scraper deve cair nos fallbacks (regex) e marcar
+  `layout_mudou=True`.
+
+  Atributos data-* numa única linha pra casar o regex fallback do scraper.
+
+  Este é o teste de R2 do plano (TPA muda layout).
+-->
+<div class="nova-estrutura">
+<div class="celula" data-faina="PROD" data-funcao="MANDO_01" data-matricula="OG-9001">Produção · Mando 1 · OG-9001</div>
+<div class="celula" data-faina="SAL" data-funcao="TERNO_02" data-matricula="OG-9002">Salário · Terno 2 · OG-9002</div>
+</div>

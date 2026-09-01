@@ -1,4 +1,4 @@
-"""SINDESTIVA-PE · Pydantic schemas — Remanejamento."""
+"""SINDESTIVA-PE · Pydantic schemas — Remanejamento + List."""
 from __future__ import annotations
 
 from datetime import date, datetime
@@ -27,10 +27,14 @@ class RemanejamentoBase(BaseModel):
     base_legal_texto_livre: str | None = None
     observacoes: str | None = None
     anexo_url: str | None = None
+    snapshot_origem_id: UUID | None = None
 
 
 class RemanejamentoCreate(RemanejamentoBase):
-    fiscal_id: UUID
+    """Body de `POST /api/v1/remanejamentos`.
+
+    `fiscal_id` é derivado do JWT (não enviado no body).
+    """
 
 
 class RemanejamentoUpdate(BaseModel):
@@ -44,7 +48,6 @@ class RemanejamentoRead(RemanejamentoBase):
 
     id: UUID
     codigo_se: str
-    snapshot_origem_id: UUID | None
     fiscal_id: UUID
     status: StatusRemanejamentoEnum
     ack_at: datetime | None
@@ -57,9 +60,32 @@ class RemanejamentoRead(RemanejamentoBase):
 
 
 class RemanejamentoInDB(RemanejamentoRead):
+    """User completo com relacionamentos (uso interno)."""
+
     pass
 
 
+class RemanejamentoListResponse(BaseModel):
+    """Resposta de `GET /api/v1/remanejamentos` (paginado)."""
+
+    items: list[RemanejamentoRead]
+    total: int
+    skip: int
+    limit: int
+
+
 class AprovarRemanejamentoRequest(BaseModel):
-    fiscal_id: UUID
-    observacoes: str | None = None
+    """Body de `PATCH /api/v1/remanejamentos/{id}/aprovar`."""
+
+    observacoes: str | None = Field(default=None, max_length=2000)
+
+
+__all__ = [
+    "RemanejamentoBase",
+    "RemanejamentoCreate",
+    "RemanejamentoUpdate",
+    "RemanejamentoRead",
+    "RemanejamentoInDB",
+    "RemanejamentoListResponse",
+    "AprovarRemanejamentoRequest",
+]

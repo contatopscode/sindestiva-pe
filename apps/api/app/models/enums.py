@@ -19,7 +19,6 @@ import enum
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects import postgresql
 
-
 # Schema default do MVP (DD v1 ADR-002 — schema único).
 SCHEMA = "lousa_main"
 
@@ -189,6 +188,33 @@ class LgpdStatusEnum(str, enum.Enum):
 
 
 # ---------------------------------------------------------------------------
+# Scraping (Sprint 2 — lousa_escala_origem, lousa_alocacao)
+# ---------------------------------------------------------------------------
+
+class FonteEscalaEnum(str, enum.Enum):
+    """Fonte do scrape da lousa.
+
+    TPA = TPA Tecnologia (SUAPE — http://tpa.ogmosuape.com.br).
+    ESCALANET = EscalaNet (RECIFE — http://escalanet.recife.gov.br).
+    MANUAL_FISCAL = entrada manual via PWA do Fiscal (Sprint 4).
+    """
+
+    TPA = "TPA"
+    ESCALANET = "ESCALANET"
+    MANUAL_FISCAL = "MANUAL_FISCAL"
+
+
+class StatusScrapingEnum(str, enum.Enum):
+    """Status de uma execução de scraping (job scheduler + endpoint /disparar)."""
+
+    SUCESSO = "SUCESSO"
+    PARCIAL = "PARCIAL"
+    FALHA = "FALHA"
+    LAYOUT_MUDOU = "LAYOUT_MUDOU"
+    SEM_DADOS = "SEM_DADOS"
+
+
+# ---------------------------------------------------------------------------
 # Funções portuárias (DD v1 §3.8) — `categoria`
 # ---------------------------------------------------------------------------
 # NOTA: `funcoes.categoria` é TEXT com CHECK constraint (DD v1 §3.8),
@@ -204,27 +230,23 @@ class LgpdStatusEnum(str, enum.Enum):
 # só por completude de seção.
 
 __all__ = [
-    "pg_enum",
     "SCHEMA",
-    # auth
-    "RoleEnum",
-    "UserStatusEnum",
-    # perfis
-    "TpaStatusEnum",
-    "FiscalStatusEnum",
-    # lousa
-    "SnapshotStatusEnum",
-    "CellStatusEnum",
-    # remanejamento
-    "MotivoRemanejamentoEnum",
-    "StatusRemanejamentoEnum",
-    # ogmo
     "CanalNotificacaoEnum",
-    "StatusNotificacaoEnum",
-    # lgpd
-    "TermoMetodoEnum",
-    "LgpdTipoEnum",
+    "CellStatusEnum",
+    "FiscalStatusEnum",
+    "FonteEscalaEnum",
     "LgpdStatusEnum",
+    "LgpdTipoEnum",
+    "MotivoRemanejamentoEnum",
+    "RoleEnum",
+    "SnapshotStatusEnum",
+    "StatusNotificacaoEnum",
+    "StatusRemanejamentoEnum",
+    "StatusScrapingEnum",
+    "TermoMetodoEnum",
+    "TpaStatusEnum",
+    "UserStatusEnum",
+    "pg_enum",
     # NOTA: FuncaoCategoriaEnum removido — categoria é TEXT com CHECK,
     # não enum nativo. Ver comentário no lugar original.
 ]
