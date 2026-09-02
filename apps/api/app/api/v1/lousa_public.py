@@ -9,6 +9,8 @@ Endpoint real autenticado: `GET /api/v1/lousa/atual` (em lousa.py).
 """
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -126,3 +128,94 @@ async def preview(
 @router.get("/health", summary="Liveness simples (Sprint 0)")
 async def health_public() -> dict:
     return {"status": "ok", "scope": "public", "warning": "remover em produção"}
+
+
+@router.get("/tpa/{matricula}/escala", summary="Escala do TPA (Sprint 0)")
+async def tpa_escala(
+    matricula: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Retorna a escala do TPA: célula de hoje + próximos 7 dias (mock se vazio).
+
+    Sprint 0: usado pelo PWA do TPA. Em Sprint 1 vira autenticado
+    com CPF + matrícula OGMO + OTP WhatsApp.
+    """
+    # 1) TPA
+    stmt_t = select(Tpa).where(Tpa.matricula_ogmo == matricula)
+    tpa = (await db.execute(stmt_t)).scalar_one_or_none()
+    if tpa is None:
+        raise HTTPException(404, f"TPA com matrícula {matricula} não encontrado.")
+
+    # 2) Célula de hoje (snapshot mais recente)
+    today = date.today()
+    cell_hoje: dict | None = None
+    stmt_s = (
+        select(LousaSnapshot)
+        .order_by(LousaSnapshot.scraped_at.desc())
+        .limit(1)
+    )
+    snap = (await db.execute(stmt_s)).scalar_one_or_none()
+    if snap is not None:
+        stmt_c = (
+            select(LousaCell)
+            .where(LousaCell.snapshot_id == snap.id, LousaCell.tpa_id == tpa.id)
+            .limit(1)
+        )
+        c = (await db.execute(stmt_c)).scalar_one_or_none()
+        if c is not None:
+            faina = (await db.execute(select(Faina).where(Faina.id == c.faina_id))).scalar_one_or_none()
+            funcao = (await db.execute(select(Funcao).where(Funcao.id == c.funcao_id))).scalar_one_or_none()
+            cell_hoje = {
+                "faina": faina.nome_exibicao if faina else None,
+                "funcao": funcao.nome_exibicao if funcao else None,
+                "cais": c.cais,
+                "status": c.status_celula.value,
+                "data_referencia": c.data_referencia.isoformat(),
+            }
+
+    # 3) Próximos 7 dias (mock: gera grade plausível com base em turno + função base)
+    proximos_dias: list[dict] = []
+    funcao_base = (await db.execute(
+        select(Funcao).where(Funcao.id == tpa.funcao_base_id)
+    )).scalar_one_or_none()
+
+    for i in range(1, 8):
+        d = today + timedelta(days=i)
+        # Mock: 70% escalado, 30% folga; sempre turno DIURNO
+        escalado = (i % 3) != 0
+        proximos_dias.append({
+            "data": d.isoformat(),
+            "dia_semana": d.strftime("%a"),
+            "turno": "DIURNO 08-16" if escalado else None,
+            "funcao": funcao_base.nome_exibicao if (escalado and funcao_base) else None,
+            "cais": "CAIS 2" if escalado else None,
+            "escalado": escalado,
+        })
+
+    return {
+        "tpa": {
+            "id": str(tpa.id),
+            "matricula": tpa.matricula_ogmo,
+            "nome": tpa.nome_completo,
+            "categoria": tpa.categoria,
+            "funcao_base": funcao_base.nome_exibicao if funcao_base else None,
+        },
+        "hoje": {
+            "data": today.isoformat(),
+            "dia_semana": today.strftime("%a"),
+            "turno": "DIURNO 08-16" if cell_hoje else None,
+            "celula": cell_hoje,
+            "escalado": cell_hoje is not None,
+        },
+        "proximos_7_dias": proximos_dias,
+        "stats_7d": {
+            "engajamentos": 5,
+            "faltas": 1,
+            "recebimentos_brl": 2847.30,
+            "posicao_rodizio": 14,
+        },
+        "links": {
+            "fiscal_whatsapp": "https://wa.me/5581999990000?text=Ol%C3%A1%20Fiscal%2C%20preciso%20de%20ajuda",
+            "cct_pdf": "/docs/cct-2024-2026.pdf",
+        },
+    }

@@ -2,12 +2,11 @@ import withPWAInit from "next-pwa";
 
 const withPWA = withPWAInit({
   dest: "public",
-  cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
+  // Em dev, gera SW básico só pra servir manifest.json. Em prod, Sprint 3
+  // detalha workboxOptions (Sprint 3 T3-01).
+  disable: process.env.NODE_ENV === "development",
   reloadOnOnline: true,
-  disable: false, // Em dev, false gera o SW. Em prod build, true gera manifest.
   workboxOptions: {
-    // Será detalhado em Sprint 3 (T3-01)
     navigateFallback: "/inicio",
     navigateFallbackDenylist: [/^\/api\//],
   },

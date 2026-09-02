@@ -1,0 +1,301 @@
+@import "tailwindcss";
+
+/* ============================================================================
+   SINDESTIVA-PE · PWA do TPA (Sprint 0)
+   Mobile-first, dark, portuário-industrial.
+   Otimizado pra celular (max-width 480px, mas responsivo).
+   ============================================================================ */
+
+:root {
+  --bg-deep: #061321;
+  --bg-base: #0a1929;
+  --bg-raised: #0f2438;
+  --bg-card: #122e47;
+  --bg-hover: #163554;
+  --border-soft: #1e3a52;
+  --border-strong: #2a5070;
+
+  --text-primary: #e8eef4;
+  --text-secondary: #94a8bd;
+  --text-muted: #5f7a92;
+
+  --accent-gold: #d4a574;
+  --accent-gold-soft: #e8c49a;
+  --accent-cyan: #4fb8c9;
+  --accent-green: #5dbb7d;
+  --accent-amber: #e8a33d;
+  --accent-red: #e04a4a;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  background: linear-gradient(180deg, #0a0e1a 0%, #061321 100%);
+  color: var(--text-primary);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+  min-height: 100vh;
+}
+
+/* ============================================================================
+   PHONE FRAME (PWA mobile)
+   ============================================================================ */
+.phone-frame {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 0;
+}
+
+.phone-screen {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg-base);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border-soft);
+  border-right: 1px solid var(--border-soft);
+  position: relative;
+}
+
+@media (min-width: 481px) {
+  .phone-screen {
+    margin: 16px 0;
+    border-radius: var(--radius-lg);
+    min-height: calc(100vh - 32px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+}
+
+.phone-statusbar {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--bg-base);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.phone-header {
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-raised) 100%);
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.phone-greeting {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.phone-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.phone-balance {
+  font-size: 11px;
+  color: var(--accent-gold);
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.phone-body {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding-bottom: 80px;
+}
+
+/* ============================================================================
+   TPA CARDS
+   ============================================================================ */
+.tpa-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  position: relative;
+}
+
+.tpa-card.highlight {
+  background: linear-gradient(135deg, rgba(212, 165, 116, 0.12) 0%, rgba(212, 165, 116, 0.04) 100%);
+  border-color: var(--accent-gold);
+  box-shadow: 0 0 24px rgba(212, 165, 116, 0.1);
+}
+
+.tpa-card-title {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tpa-card.highlight .tpa-card-title {
+  color: var(--accent-gold);
+  font-weight: 700;
+}
+
+.tpa-card-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.tpa-card-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--accent-gold);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--accent-gold);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.tpa-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+  font-size: 13px;
+}
+
+.tpa-row:last-child { border-bottom: none; }
+.tpa-row .label { color: var(--text-secondary); }
+.tpa-row .value { color: var(--text-primary); font-weight: 600; font-family: "JetBrains Mono", monospace; }
+
+/* ============================================================================
+   NEXT 7 DAYS STRIP
+   ============================================================================ */
+.next-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-top: 8px;
+}
+.next-day {
+  text-align: center;
+  padding: 6px 2px;
+  border-radius: 6px;
+  font-size: 10px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-soft);
+}
+.next-day.on { border-color: var(--accent-cyan); background: rgba(79, 184, 201, 0.1); }
+.next-day.off { opacity: 0.5; }
+.next-day .day-name { color: var(--text-muted); text-transform: uppercase; font-weight: 700; font-size: 9px; }
+.next-day .day-num { color: var(--text-primary); font-size: 16px; font-weight: 700; margin: 2px 0; font-family: "JetBrains Mono", monospace; }
+.next-day .day-tag { color: var(--accent-cyan); font-size: 12px; }
+.next-day.off .day-tag { color: var(--text-muted); }
+
+/* ============================================================================
+   BOTÕES
+   ============================================================================ */
+.tpa-btn {
+  display: block;
+  width: 100%;
+  text-align: center;
+  padding: 12px 16px;
+  background: var(--accent-gold);
+  color: var(--bg-deep);
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  text-decoration: none;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.tpa-btn:hover { background: var(--accent-gold-soft); }
+
+.tpa-btn.ghost {
+  background: var(--bg-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+}
+.tpa-btn.ghost:hover { background: var(--bg-hover); }
+
+/* ============================================================================
+   BOTTOM NAV
+   ============================================================================ */
+.phone-nav {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--bg-base);
+  border-top: 1px solid var(--border-soft);
+  padding: 6px 4px env(safe-area-inset-bottom, 6px);
+}
+
+.phone-nav-item {
+  background: none;
+  border: none;
+  padding: 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.phone-nav-item.active {
+  color: var(--accent-gold);
+  background: var(--bg-card);
+}
+.phone-nav-item:hover { color: var(--text-primary); }
+
+/* ============================================================================
+   LOADING / ERROR
+   ============================================================================ */
+.loading {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.error-box {
+  padding: 12px;
+  background: rgba(224, 74, 74, 0.1);
+  border: 1px solid var(--accent-red);
+  border-radius: 6px;
+  color: var(--accent-red);
+  font-size: 12px;
+}
