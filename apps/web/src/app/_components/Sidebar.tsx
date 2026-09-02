@@ -51,7 +51,7 @@ const GROUPS: SidebarGroup[] = [
   {
     title: "Plataforma",
     items: [
-      { href: "#", label: "BI & Relatórios (Fase 2)", icon: "📊", disabled: true },
+      { href: "/bi", label: "BI & Dashboards", icon: "📊" },
     ],
   },
   {

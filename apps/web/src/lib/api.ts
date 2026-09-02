@@ -19,6 +19,13 @@ import type {
   OgmoNotificacao,
   AuditEvent,
   UserSession,
+  BIKpis,
+  RemanejamentosPorDia,
+  TopRemanejados,
+  TopCards,
+  Insights,
+  DrillDown,
+  PeriodoDias,
 } from "./tipos";
 
 // ---- Configuração ---------------------------------------------------------
@@ -263,6 +270,69 @@ export async function verifyHashChain(): Promise<{ ok: boolean; verificados: num
       resolve({ ok: true, verificados: MOCK_AUDIT.length, quebrados: 0 });
     }, 600);
   });
+}
+
+// ---- BI & Dashboards (Sprint 7) -------------------------------------------
+
+/** 4 KPIs (comparecimento, folha paga, causa #1, % NACK). */
+export async function getBIKpis(periodoDias: PeriodoDias = 30): Promise<BIKpis> {
+  return apiFetch<BIKpis>(`/api/v1/bi/kpis?periodo_dias=${periodoDias}`);
+}
+
+/** Série temporal: remanejamentos por dia. */
+export async function getBIRemanejamentosPorDia(
+  periodoDias: PeriodoDias = 30,
+): Promise<RemanejamentosPorDia> {
+  return apiFetch<RemanejamentosPorDia>(
+    `/api/v1/bi/remanejamentos-por-dia?periodo_dias=${periodoDias}`,
+  );
+}
+
+/** Drill-down: detalhe dos remanejamentos de 1 dia. */
+export async function getBIDrillDown(data: string): Promise<DrillDown> {
+  return apiFetch<DrillDown>(`/api/v1/bi/remanejamentos-por-dia/${data}`);
+}
+
+/** Ranking top-N TPAs mais remanejados. */
+export async function getBITopRemanejados(
+  periodoDias: PeriodoDias = 30,
+  n = 10,
+): Promise<TopRemanejados> {
+  return apiFetch<TopRemanejados>(
+    `/api/v1/bi/top-remanejados?periodo_dias=${periodoDias}&n=${n}`,
+  );
+}
+
+/** 3 cards top-1 (função/cais/horário). */
+export async function getBITopCards(periodoDias: PeriodoDias = 30): Promise<TopCards> {
+  return apiFetch<TopCards>(`/api/v1/bi/top-cards?periodo_dias=${periodoDias}`);
+}
+
+/** Insights determinísticos. */
+export async function getBIInsights(periodoDias: PeriodoDias = 30): Promise<Insights> {
+  return apiFetch<Insights>(`/api/v1/bi/insights?periodo_dias=${periodoDias}`);
+}
+
+/** Dispara download do PDF do BI. */
+export async function downloadBIPDF(periodoDias: PeriodoDias = 30): Promise<void> {
+  const token = getToken();
+  const url = `${API_URL}/api/v1/bi/export-pdf?periodo_dias=${periodoDias}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new ApiError(res.status, text || res.statusText);
+  }
+  const blob = await res.blob();
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `sindestiva-bi-${periodoDias}d.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
 }
 
 // ---- Sessão (mock) --------------------------------------------------------

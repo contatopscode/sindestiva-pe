@@ -173,6 +173,117 @@ export interface UserSession {
   matricula?: string; // TPA
 }
 
+// ---- BI & Dashboards (Sprint 7) ------------------------------------------
+
+export type PeriodoDias = 7 | 30 | 90 | 365;
+
+export interface KpiComparecimento {
+  total_escalados: number;
+  total_confirmados: number;
+  total_ausentes: number;
+  percentual: number;
+}
+
+export interface KpiFolhaPaga {
+  valor_total_brl: number;
+  total_remanejamentos: number;
+  valor_medio_remanejamento_brl: number;
+  periodo_inicio: string;
+  periodo_fim: string;
+}
+
+export interface KpiCausaPrincipal {
+  motivo: string;
+  total: number;
+  percentual: number;
+}
+
+export interface KpiPercentualNack {
+  total_notificados: number;
+  total_nack: number;
+  percentual: number;
+}
+
+export interface BIKpis {
+  periodo_inicio: string;
+  periodo_fim: string;
+  comparecimento: KpiComparecimento;
+  folha_paga: KpiFolhaPaga;
+  causa_principal_falta: KpiCausaPrincipal;
+  percentual_nack: KpiPercentualNack;
+  gerado_em: string;
+}
+
+export interface RemanejamentosPorDiaItem {
+  data: string;
+  total: number;
+}
+
+export interface RemanejamentosPorDia {
+  periodo_inicio: string;
+  periodo_fim: string;
+  items: RemanejamentosPorDiaItem[];
+  total: number;
+  media_diaria: number;
+}
+
+export interface TopRemanejado {
+  tpa_id: string;
+  tpa_nome: string;
+  tpa_matricula: string | null;
+  total_remanejamentos: number;
+}
+
+export interface TopRemanejados {
+  periodo_inicio: string;
+  periodo_fim: string;
+  items: TopRemanejado[];
+}
+
+export interface TopCard {
+  label: string;
+  total: number;
+  percentual: number;
+}
+
+export interface TopCards {
+  funcao_mais_remanejada: TopCard | null;
+  cais_mais_problematico: TopCard | null;
+  horario_mais_critico: TopCard | null;
+}
+
+export interface Insight {
+  severidade: "info" | "alerta" | "critico";
+  regra: string;
+  mensagem: string;
+  tpa_id?: string | null;
+  tpa_nome?: string | null;
+  total?: number | null;
+}
+
+export interface Insights {
+  periodo_inicio: string;
+  periodo_fim: string;
+  items: Insight[];
+}
+
+export interface DrillDownItem {
+  id: string;
+  codigo_se: string;
+  tpa_out_nome: string;
+  tpa_in_nome: string | null;
+  motivo: string;
+  status: string;
+  data_referencia: string;
+  hora_criacao: string;
+}
+
+export interface DrillDown {
+  data: string;
+  items: DrillDownItem[];
+  total: number;
+}
+
 // ---- Helpers --------------------------------------------------------------
 
 /** Mapeia categoria de função para a classe CSS do protótipo. */
