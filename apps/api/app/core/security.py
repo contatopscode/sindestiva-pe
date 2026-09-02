@@ -137,6 +137,20 @@ def get_current_user_id(
     return sub
 
 
+def get_current_user_role(
+    token: Annotated[str | None, Depends(oauth2_scheme)],
+) -> str | None:
+    """Extrai `role` (RoleEnum value) do JWT. Retorna None se token ausente.
+
+    Sprint 7: usado pelo BI pra restringir DIRIGENTE.
+    """
+    if token is None:
+        return None
+    payload = decode_token(token)
+    role = payload.get("role")
+    return str(role) if role is not None else None
+
+
 def require_user(
     user_id: Annotated[str | None, Depends(get_current_user_id)],
 ) -> str:
@@ -156,6 +170,7 @@ __all__ = [
     "create_access_token",
     "decode_token",
     "get_current_user_id",
+    "get_current_user_role",
     "require_user",
     "oauth2_scheme",
 ]
