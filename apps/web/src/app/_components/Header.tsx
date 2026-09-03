@@ -42,7 +42,7 @@ export function Header(): ReactNode {
     .toUpperCase();
 
   return (
-    <header className="flex h-[60px] items-center gap-6 border-b border-[#1e3a52] bg-[#0a1929] px-6 sticky top-0 z-50">
+    <header className="header flex h-[60px] items-center gap-6 border-b border-[#1e3a52] bg-[#0a1929] px-6 sticky top-0 z-50">
       {/* Brand */}
       <div className="flex items-center gap-3 min-w-[216px]">
         <div className="grid h-9 w-9 place-items-center rounded-md bg-gradient-to-br from-[#d4a574] to-[#b8884f] text-sm font-extrabold text-[#0a1929]">

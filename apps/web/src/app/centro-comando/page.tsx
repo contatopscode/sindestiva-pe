@@ -216,14 +216,15 @@ export default function CentroComandoPage(): ReactNode {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4"
+          aria-labelledby="remanejamento-modal-title"
+          className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4"
           onClick={() => setRemanejarCtx(null)}
         >
           <div
             className="w-full max-w-md rounded-lg border border-[#2a5070] bg-[#0a1929] p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="mb-1 text-lg font-bold text-[#e8eef4]">
+            <h2 id="remanejamento-modal-title" className="mb-1 text-lg font-bold text-[#e8eef4]">
               Remanejar TPA
             </h2>
             <p className="mb-4 text-[12px] text-[#94a8bd]">

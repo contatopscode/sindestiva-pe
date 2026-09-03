@@ -9,8 +9,8 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { StatusBadge, toneForOgmoStatus } from "@/app/_components/StatusBadge";
-import type { RemanejamentoItem, StatusOgmo } from "@/lib/tipos";
-import type { Turno } from "@sindestiva/shared";
+import type { RemanejamentoItem } from "@/lib/tipos";
+import type { StatusOgmo, Turno } from "@sindestiva/shared";
 
 const STATUSES: Array<StatusOgmo | "TODOS"> = ["TODOS", "PEND", "SENT", "ACK", "NACK"];
 

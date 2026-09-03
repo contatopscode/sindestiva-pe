@@ -30,7 +30,7 @@ export function CellTooltip({ cell, funcao, faina, showDetailsHint = true }: Cel
   return (
     <div
       role="tooltip"
-      className="pointer-events-none absolute z-50 w-64 rounded-md border border-[#2a5070] bg-[#0a1929] p-3 text-left text-[12px] text-[#e8eef4] shadow-lg"
+      className="pointer-events-none absolute z-[80] w-64 max-w-[calc(100vw-16px)] rounded-md border border-[#2a5070] bg-[#0a1929] p-3 text-left text-[12px] text-[#e8eef4] shadow-lg"
     >
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="font-mono text-[11px] text-[#d4a574]">

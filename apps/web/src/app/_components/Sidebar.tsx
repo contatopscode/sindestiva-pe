@@ -14,10 +14,12 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 export interface SidebarItem {
+  /** String para acomodar hrefs placeholder tipo "#". Cast para Route no Link. */
   href: string;
   label: string;
   icon?: string;
@@ -66,7 +68,7 @@ export function Sidebar(): ReactNode {
   const pathname = usePathname();
 
   return (
-    <aside className="flex h-full w-[240px] flex-col border-r border-[#1e3a52] bg-[#0a1929] py-4 overflow-y-auto">
+    <aside className="sidebar flex h-full w-[240px] flex-col border-r border-[#1e3a52] bg-[#0a1929] py-4 overflow-y-auto">
       {GROUPS.map((group) => (
         <div key={group.title} className="mb-6">
           <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-[#5f7a92]">
@@ -102,7 +104,7 @@ export function Sidebar(): ReactNode {
               );
             }
             return (
-              <Link key={item.href} href={item.href} className={`${base} ${state}`}>
+              <Link key={item.href} href={item.href as Route} className={`${base} ${state}`}>
                 {content}
               </Link>
             );

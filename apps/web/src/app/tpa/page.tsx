@@ -10,8 +10,16 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import type { Route } from "next";
 
-const CARDS = [
+const CARDS: Array<{
+  href: string;
+  icon: string;
+  titulo: string;
+  descricao: string;
+  cor: string;
+  disabled?: boolean;
+}> = [
   {
     href: "/tpa/escala",
     icon: "📅",
@@ -87,7 +95,7 @@ export default function TpaInicioPage(): ReactNode {
           return c.disabled ? (
             <div key={c.titulo}>{inner}</div>
           ) : (
-            <Link key={c.titulo} href={c.href}>{inner}</Link>
+            <Link key={c.titulo} href={c.href as Route}>{inner}</Link>
           );
         })}
       </div>

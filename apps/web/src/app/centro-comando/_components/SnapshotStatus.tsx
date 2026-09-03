@@ -16,7 +16,7 @@ export interface SnapshotStatusProps {
   loading: boolean;
 }
 
-function formatTime(iso: string | null): string {
+function formatTime(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {
     return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -25,7 +25,7 @@ function formatTime(iso: string | null): string {
   }
 }
 
-function shortHash(h: string | undefined): string {
+function shortHash(h: string | null | undefined): string {
   if (!h) return "—";
   if (h === "0".repeat(64)) return "(mock)";
   return h.slice(0, 8);
