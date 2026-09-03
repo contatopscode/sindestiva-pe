@@ -43,6 +43,8 @@ html, body {
   -webkit-font-smoothing: antialiased;
   margin: 0;
   min-height: 100vh;
+  /* Evita scroll horizontal acidental quando conteúdo estoura */
+  overflow-x: hidden;
 }
 
 /* ============================================================================
@@ -63,9 +65,10 @@ html, body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  border-left: 1px solid var(--border-soft);
-  border-right: 1px solid var(--border-soft);
+  /* Em mobile real (sem moldura), sem bordas laterais — só no "modo
+     preview desktop" (≥481px) que simulamos um frame de celular. */
   position: relative;
+  overflow: hidden;
 }
 
 @media (min-width: 481px) {
@@ -74,24 +77,31 @@ html, body {
     border-radius: var(--radius-lg);
     min-height: calc(100vh - 32px);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border-left: 1px solid var(--border-soft);
+    border-right: 1px solid var(--border-soft);
   }
 }
 
 .phone-statusbar {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 8px 16px;
+  padding-top: calc(8px + env(safe-area-inset-top, 0px));
   background: var(--bg-base);
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-soft);
+  /* Não encolhe — a status bar é a primeira coisa visível */
+  flex: 0 0 auto;
 }
 
 .phone-header {
   background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-raised) 100%);
   padding: 20px 16px 16px;
   border-bottom: 1px solid var(--border-soft);
+  flex: 0 0 auto;
 }
 
 .phone-greeting {
@@ -116,13 +126,15 @@ html, body {
 }
 
 .phone-body {
-  flex: 1;
-  padding: 16px;
+  flex: 1 1 0;
+  min-height: 0;             /* habilita scroll dentro de flex item */
+  padding: 16px 16px 80px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   overflow-y: auto;
-  padding-bottom: 80px;
+  /* Evita que o rubber-band do iOS empurre o body pra baixo do nav. */
+  overscroll-behavior-y: contain;
 }
 
 /* ============================================================================
@@ -241,8 +253,15 @@ html, body {
   text-decoration: none;
   font-family: inherit;
   transition: all 0.15s;
+  /* Garante área de toque mínima em mobile (44px de altura) */
+  min-height: 44px;
 }
 .tpa-btn:hover { background: var(--accent-gold-soft); }
+.tpa-btn:active { transform: scale(0.98); }
+.tpa-btn:focus-visible {
+  outline: 2px solid var(--accent-gold-soft);
+  outline-offset: 2px;
+}
 
 .tpa-btn.ghost {
   background: var(--bg-raised);
@@ -255,13 +274,17 @@ html, body {
    BOTTOM NAV
    ============================================================================ */
 .phone-nav {
-  position: sticky;
-  bottom: 0;
+  /* Sibling do phone-body dentro de flex column — o body tem
+     overflow-y: auto, então o nav fica "grudado" no fim do phone-screen
+     via flexbox natural, sem precisar de position: sticky (que não funciona
+     em sibling de overflow). */
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   background: var(--bg-base);
   border-top: 1px solid var(--border-soft);
-  padding: 6px 4px env(safe-area-inset-bottom, 6px);
+  padding: 6px 4px;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
 }
 
 .phone-nav-item {
@@ -275,6 +298,12 @@ html, body {
   border-radius: 6px;
   text-transform: uppercase;
   letter-spacing: 0.3px;
+  /* Garante área de toque mínima em mobile */
+  min-height: 44px;
+}
+.phone-nav-item:focus-visible {
+  outline: 2px solid var(--accent-gold-soft);
+  outline-offset: 2px;
 }
 .phone-nav-item.active {
   color: var(--accent-gold);
@@ -298,4 +327,13 @@ html, body {
   border-radius: 6px;
   color: var(--accent-red);
   font-size: 12px;
+}
+
+/* ============================================================================
+   FORM ELEMENTS (iOS zoom guard)
+   ============================================================================ */
+/* iOS Safari dá zoom em inputs com font-size < 16px. Forçamos 16px onde há
+   controle de formulário no PWA. */
+input, select, textarea {
+  font-size: 16px;
 }

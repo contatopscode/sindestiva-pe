@@ -69,10 +69,14 @@ export default function HomePage() {
 
         {/* DEMO SELECTOR (só Sprint 0) */}
         <div style={{ padding: "8px 16px", background: "var(--bg-raised)", borderBottom: "1px solid var(--border-soft)" }}>
-          <label style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.5 }}>
+          <label
+            htmlFor="demo-tpa-select"
+            style={{ fontSize: 11, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: 0.5 }}
+          >
             🎭 Demo: simular TPA
           </label>
           <select
+            id="demo-tpa-select"
             value={matricula}
             onChange={(e) => setMatricula(e.target.value)}
             style={{
