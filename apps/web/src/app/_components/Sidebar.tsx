@@ -40,25 +40,20 @@ const GROUPS: SidebarGroup[] = [
       { href: "/remanejamentos", label: "Remanejamentos", icon: "🔄" },
       { href: "/ogmo", label: "Fila OGMO", icon: "📡" },
       { href: "/auditoria", label: "Auditoria", icon: "🔍" },
+      { href: "/navios", label: "Navios", icon: "🚢" },
     ],
   },
   {
     title: "TPA",
-    items: [
-      { href: "/tpa", label: "PWA (Início)", icon: "👷" },
-    ],
+    items: [{ href: "/tpa", label: "PWA (Início)", icon: "👷" }],
   },
   {
     title: "Plataforma",
-    items: [
-      { href: "/bi", label: "BI & Dashboards", icon: "📊" },
-    ],
+    items: [{ href: "/bi", label: "BI & Dashboards", icon: "📊" }],
   },
   {
     title: "Sistema",
-    items: [
-      { href: "#", label: "Manual (em breve)", icon: "📖", disabled: true },
-    ],
+    items: [{ href: "#", label: "Manual (em breve)", icon: "📖", disabled: true }],
   },
 ];
 
