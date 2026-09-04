@@ -31,7 +31,11 @@ export const ROTULO_TIPO_OPERACAO: Record<TipoOperacao, string> = {
 };
 
 /** `""` / `"   "` → `undefined` (campo opcional não enviado). */
-const opcional = (v: unknown) => (typeof v === "string" ? v.trim() : (v ?? undefined));
+const opcional = (v: unknown) => {
+  if (typeof v !== "string") return v ?? undefined;
+  const t = v.trim();
+  return t === "" ? undefined : t;
+};
 
 export const navioFormSchema = z.object({
   nome: z
