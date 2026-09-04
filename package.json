@@ -28,6 +28,7 @@
     "infra:down": "docker compose -f infra/docker-compose.yml --env-file .env down"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.1",
     "@types/node": "^22.10.5",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2"

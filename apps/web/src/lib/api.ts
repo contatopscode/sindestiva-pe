@@ -12,7 +12,13 @@
 // =============================================================================
 
 import type { Porto, Turno } from "@sindestiva/shared";
-import { getMockLousaPreview, MOCK_REMANEJAMENTOS, MOCK_OGMO, MOCK_AUDIT, MOCK_SESSION } from "./mock";
+import {
+  getMockLousaPreview,
+  MOCK_REMANEJAMENTOS,
+  MOCK_OGMO,
+  MOCK_AUDIT,
+  MOCK_SESSION,
+} from "./mock";
 import type {
   LousaPreviewResponse,
   RemanejamentoItem,
@@ -34,8 +40,7 @@ const DEFAULT_API_URL = "http://127.0.0.1:8000";
 
 /** Base URL da API. Configurável via `NEXT_PUBLIC_API_URL` no .env do web. */
 export const API_URL: string =
-  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) ||
-  DEFAULT_API_URL;
+  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) || DEFAULT_API_URL;
 
 const STORAGE_KEY_TOKEN = "sindestiva.jwt";
 const STORAGE_KEY_USER = "sindestiva.user";
@@ -89,11 +94,14 @@ export function logout() {
 export class ApiError extends Error {
   status: number;
   detail: string;
+  /** Código estável da API (`detail.code`), quando presente. Ex.: `NAVIO_IMO_DUPLICADO`. */
+  code?: string;
 
-  constructor(status: number, detail: string) {
+  constructor(status: number, detail: string, code?: string) {
     super(`[${status}] ${detail}`);
     this.status = status;
     this.detail = detail;
+    this.code = code;
     this.name = "ApiError";
   }
 }
@@ -157,13 +165,33 @@ export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<
 
   if (!res.ok) {
     let detail = res.statusText;
+    let code: string | undefined;
     try {
-      const j = (await res.json()) as { detail?: string };
-      if (j?.detail) detail = j.detail;
+      const j = (await res.json()) as { detail?: unknown };
+      // A API emite 3 formatos de `detail`:
+      //   - string                       (HTTPException simples)
+      //   - {code, message}              (erros de negócio dos services)
+      //   - [{loc, msg, type}, ...]      (422 do Pydantic)
+      // Antes o código assumia sempre string, então os dois últimos
+      // chegavam na UI como "[object Object]" (issue #15).
+      const d = j?.detail;
+      if (typeof d === "string" && d) {
+        detail = d;
+      } else if (Array.isArray(d) && d.length > 0) {
+        detail =
+          d
+            .map((i) => (i as { msg?: string })?.msg)
+            .filter(Boolean)
+            .join("; ") || detail;
+      } else if (d && typeof d === "object") {
+        const obj = d as { code?: string; message?: string };
+        if (obj.message) detail = obj.message;
+        if (obj.code) code = obj.code;
+      }
     } catch {
       /* body não é JSON */
     }
-    throw new ApiError(res.status, detail);
+    throw new ApiError(res.status, detail, code);
   }
 
   if (res.status === 204) return undefined as T;
@@ -264,7 +292,11 @@ export async function getAuditEvents(limit = 50): Promise<AuditEvent[]> {
 }
 
 /** Verifica integridade da hash chain. Sprint 6 implementa. */
-export async function verifyHashChain(): Promise<{ ok: boolean; verificados: number; quebrados: number }> {
+export async function verifyHashChain(): Promise<{
+  ok: boolean;
+  verificados: number;
+  quebrados: number;
+}> {
   return new Promise((resolve) => {
     setTimeout(() => {
       resolve({ ok: true, verificados: MOCK_AUDIT.length, quebrados: 0 });
@@ -298,9 +330,7 @@ export async function getBITopRemanejados(
   periodoDias: PeriodoDias = 30,
   n = 10,
 ): Promise<TopRemanejados> {
-  return apiFetch<TopRemanejados>(
-    `/api/v1/bi/top-remanejados?periodo_dias=${periodoDias}&n=${n}`,
-  );
+  return apiFetch<TopRemanejados>(`/api/v1/bi/top-remanejados?periodo_dias=${periodoDias}&n=${n}`);
 }
 
 /** 3 cards top-1 (função/cais/horário). */
