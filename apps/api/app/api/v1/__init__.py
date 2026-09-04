@@ -15,6 +15,7 @@ Routers expostos:
   - /lgpd           → termo de consentimento + Art. 18 (T1-10 Sprint 1)
   - /dpo            → dashboard DPO + export Art. 18 (Sprint 6 T6-10/12)
   - /bi             → BI & Dashboards — Sprint 7 (kpis/por-dia/top/insights/pdf)
+  - /navios         → catálogo de navios: GET lista + POST cadastro (issue #15)
 """
 from fastapi import APIRouter
 
@@ -27,6 +28,7 @@ from app.api.v1 import (
     lgpd,
     lousa,
     lousa_public,
+    navios,
     ogmo,
     remanejamentos,
     scraping,
@@ -46,5 +48,6 @@ api_v1_router.include_router(auditoria.router)
 api_v1_router.include_router(lgpd.router)
 api_v1_router.include_router(dpo.router)
 api_v1_router.include_router(bi.router)  # Sprint 7
+api_v1_router.include_router(navios.router)  # issue #15
 
 __all__ = ["api_v1_router"]
