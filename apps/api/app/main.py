@@ -139,11 +139,11 @@ app.add_middleware(
         # "https://web.lousa.pscode.ia.br",
         # "https://pwa.lousa.pscode.ia.br",
     ],
-    allow_origin_regex=[
-        # Preview deploys do Vercel (sindestiva-web-<hash>.vercel.app)
-        r"https://sindestiva-web[a-z0-9-]*\.vercel\.app",
-        r"https://sindestiva-pwa[a-z0-9-]*\.vercel\.app",
-    ],
+    # CORS Middleware do Starlette/FastAPI aceita UMA string regex (não lista).
+    # Junta com alternation `|` para cobrir web+pwa num único padrão.
+    allow_origin_regex=(
+        r"https://sindestiva-(web|pwa)[a-z0-9-]*\.vercel\.app"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
