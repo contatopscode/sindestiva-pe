@@ -203,6 +203,7 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     """
     import bcrypt
     from datetime import datetime as dt, timezone
+    from sqlalchemy import text as sql_text
 
     now = dt.now(tz=timezone.utc)
     today = now.date()
