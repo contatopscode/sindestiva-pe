@@ -83,6 +83,21 @@ class UserStatusEnum(str, enum.Enum):
     INATIVO = "INATIVO"
 
 
+class ModuloPapelEnum(str, enum.Enum):
+    """Papel de um User DENTRO de um módulo (issue #14).
+
+    Ortogonal a `RoleEnum`: `role` diz QUEM a pessoa é no Sindicato
+    (fiscal/dirigente/TPA); `papel` diz O QUE ela pode fazer num módulo
+    específico. Hierárquico — ADMIN > EDITAR > VISUALIZAR (a ordem vive
+    em `app.core.permissions.NIVEL_PAPEL`, não aqui, porque enum Python
+    não garante ordenação estável entre versões).
+    """
+
+    VISUALIZAR = "VISUALIZAR"
+    EDITAR = "EDITAR"
+    ADMIN = "ADMIN"
+
+
 # ---------------------------------------------------------------------------
 # Perfis de negócio (DD v1 §3.3, §3.4, §3.5)
 # ---------------------------------------------------------------------------
@@ -237,6 +252,7 @@ __all__ = [
     "FonteEscalaEnum",
     "LgpdStatusEnum",
     "LgpdTipoEnum",
+    "ModuloPapelEnum",
     "MotivoRemanejamentoEnum",
     "RoleEnum",
     "SnapshotStatusEnum",
