@@ -205,7 +205,7 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     Sprint 1+: PROTEGER com auth admin + REMOVER (ou mover para CLI).
     """
     import bcrypt
-    from datetime import datetime as dt, timezone
+    from datetime import datetime as dt, time as dtime, timezone
     from sqlalchemy import text as sql_text
 
     now = dt.now(tz=timezone.utc)
@@ -247,17 +247,17 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
         "porto RECIFE",
     )
 
-    # 2. Turnos (hora_inicio/hora_fim são TIME, não TEXT — usa CAST explícito)
+    # 2. Turnos (hora_inicio/hora_fim são TIME — asyncpg exige datetime.time, não string)
     await upsert(
         "INSERT INTO lousa_main.turnos (codigo, nome_exibicao, hora_inicio, hora_fim, duracao_horas) "
-        "VALUES (:c, :n, CAST(:hi AS TIME), CAST(:hf AS TIME), :d)",
-        {"c": "DIURNO", "n": "Diurno (08h-16h)", "hi": "08:00:00", "hf": "16:00:00", "d": 8.0},
+        "VALUES (:c, :n, :hi, :hf, :d)",
+        {"c": "DIURNO", "n": "Diurno (08h-16h)", "hi": dtime(8, 0), "hf": dtime(16, 0), "d": 8.0},
         "turno DIURNO",
     )
     await upsert(
         "INSERT INTO lousa_main.turnos (codigo, nome_exibicao, hora_inicio, hora_fim, duracao_horas) "
-        "VALUES (:c, :n, CAST(:hi AS TIME), CAST(:hf AS TIME), :d)",
-        {"c": "NOTURNO", "n": "Noturno (20h-04h)", "hi": "20:00:00", "hf": "04:00:00", "d": 8.0},
+        "VALUES (:c, :n, :hi, :hf, :d)",
+        {"c": "NOTURNO", "n": "Noturno (20h-04h)", "hi": dtime(20, 0), "hf": dtime(4, 0), "d": 8.0},
         "turno NOTURNO",
     )
 
@@ -315,13 +315,15 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
         )
 
     # 5. User fiscal (paulo@pscode.ia.br)
+    # `purge_after` é NOT NULL (LGPD 5a default). Calcula 5 anos no futuro.
     pwd_hash = bcrypt.hashpw(b"sinapse-demo-2026", bcrypt.gensalt()).decode()
     await upsert(
         "INSERT INTO lousa_main.users (email, telefone, password_hash, role, status, "
-        "accepted_terms_at, accepted_terms_version) "
+        "accepted_terms_at, accepted_terms_version, purge_after) "
         "VALUES (:email, :tel, :pwd, 'FISCAL'::role_enum, 'ATIVO'::user_status_enum, "
-        ":now, '1.0')",
-        {"email": "paulo@pscode.ia.br", "tel": "+5581999998888", "pwd": pwd_hash, "now": now},
+        ":now, '1.0', :purge)",
+        {"email": "paulo@pscode.ia.br", "tel": "+5581999998888", "pwd": pwd_hash,
+         "now": now, "purge": now.replace(year=now.year + 5)},
         "user paulo@pscode.ia.br",
     )
 
@@ -329,10 +331,11 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     pwd_hash_tpa = bcrypt.hashpw(b"sinapse-demo-2026", bcrypt.gensalt()).decode()
     await upsert(
         "INSERT INTO lousa_main.users (email, telefone, password_hash, role, status, "
-        "accepted_terms_at, accepted_terms_version) "
+        "accepted_terms_at, accepted_terms_version, purge_after) "
         "VALUES (:email, :tel, :pwd, 'TPA'::role_enum, 'ATIVO'::user_status_enum, "
-        ":now, '1.0')",
-        {"email": "tpa058@ogmo-pe.com.br", "tel": "+5581988887777", "pwd": pwd_hash_tpa, "now": now},
+        ":now, '1.0', :purge)",
+        {"email": "tpa058@ogmo-pe.com.br", "tel": "+5581988887777", "pwd": pwd_hash_tpa,
+         "now": now, "purge": now.replace(year=now.year + 5)},
         "user tpa058",
     )
 
@@ -352,12 +355,14 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     if fiscal_user_id and suape_id_pre and diurno_id_pre:
         await upsert(
             "INSERT INTO lousa_main.fiscais (user_id, cpf, matricula_sindicato, "
-            "nome_completo, telefone, porto_id, turno_id, status, data_inicio) "
+            "nome_completo, telefone, porto_id, turno_id, status, data_inicio, "
+            "purge_after) "
             "VALUES (:uid, :cpf, :mat, :nome, :tel, :p, :t, "
-            "'ATIVO'::fiscal_status_enum, :di)",
+            "'ATIVO'::fiscal_status_enum, :di, :purge)",
             {"uid": fiscal_user_id, "cpf": "111.222.333-96", "mat": "F-001",
              "nome": "Paulo Siqueira", "tel": "+5581999998888",
-             "p": suape_id_pre, "t": diurno_id_pre, "di": today},
+             "p": suape_id_pre, "t": diurno_id_pre, "di": today,
+             "purge": now.replace(year=now.year + 5)},
             "fiscal Paulo Siqueira",
         )
 
@@ -374,13 +379,14 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
         await upsert(
             "INSERT INTO lousa_main.tpas (user_id, cpf, nome_completo, "
             "matricula_ogmo, telefone, funcao_base_id, categoria, "
-            "data_nascimento, status_cadastro) "
+            "data_nascimento, status_cadastro, purge_after) "
             "VALUES (:uid, :cpf, :nome, :mat, :tel, :fb, :cat, :dn, "
-            "'ATIVO'::tpa_status_enum)",
+            "'ATIVO'::tpa_status_enum, :purge)",
             {"uid": tpa_user_id, "cpf": "123.456.789-00",
              "nome": "João da Silva Santos", "mat": "OG-058",
              "tel": "+5581988887777", "fb": funcao_base_id, "cat": "MANDO",
-             "dn": "1985-03-15"},
+             "dn": "1985-03-15",
+             "purge": now.replace(year=now.year + 5)},
             "tpa João da Silva (OG-058)",
         )
 
