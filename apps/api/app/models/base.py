@@ -65,10 +65,10 @@ class SoftDeleteMixin:
     purge_after: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        # `now() + INTERVAL '24 months'` (Postgres) — equivalente a
-        # func.now() + text("INTERVAL '24 months'") mas sem import
-        # adicional. Server-side, sem custo Python.
-        server_default=func.text("now() + INTERVAL '24 months'"),
+        # server_default omitido — ver perfis_internos.py para rationale
+        # (SQLAlchemy wrappa em string literal no DDL, Postgres não
+        # consegue fazer cast para timestamptz). Adicionado via ALTER
+        # TABLE no init endpoint.
     )
 
 
