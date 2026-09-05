@@ -178,3 +178,255 @@ async def init_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
         "tables_created": len(tables),
         "tables": tables,
     }
+
+
+# ---------------------------------------------------------------------------
+# SEED de dados de teste (Sprint 0+ — REMOVER em produção após Sprint 1)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/seed", summary="Popula DB com dados de teste (admin only)")
+async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
+    """Cria dados de teste mínimos para visualizar o sistema.
+
+    Idempotente (ON CONFLICT DO NOTHING). Cria:
+      - 1 porto SUAPE
+      - 2 turnos (DIURNO 08-16, NOTURNO 20-04)
+      - 7 fainas canônicas (Produção, Salário, Sacaria, Veículo, Diversos, Cadastro, Suplementar)
+      - 26 funções canônicas
+      - 1 fiscal (paulo@pscode.ia.br / sinapse-demo-2026)
+      - 1 TPA (matrícula 058)
+      - 1 escala de origem (hoje, SUAPE+DIURNO)
+      - 10 alocações de teste
+
+    Sprint 1+: PROTEGER com auth admin + REMOVER (ou mover para CLI).
+    """
+    import bcrypt
+    from datetime import datetime as dt, timezone
+    from app.models.enums import (
+        FainaCodigoEnum, FuncaoCodigoEnum, PortoCodigoEnum, TurnoCodigoEnum,
+        RoleEnum, UserStatusEnum,
+    )
+
+    now = dt.now(tz=timezone.utc)
+    today = now.date()
+    results = {"created": [], "skipped": []}
+
+    async def upsert(sql: str, params: dict, label: str) -> str:
+        """INSERT ... ON CONFLICT DO NOTHING. Retorna 'created' ou 'skipped'."""
+        try:
+            result = await db.execute(sql_text(sql + " ON CONFLICT DO NOTHING"), params)
+            await db.commit()
+            status = "created" if result.rowcount > 0 else "skipped"
+        except Exception as exc:  # noqa: BLE001
+            await db.rollback()
+            status = f"error: {exc!s}"
+        results[status if status in ("created", "skipped") else "errors"].append(label)
+        return status
+
+    # 1. Portos
+    await upsert(
+        "INSERT INTO lousa_main.portos (codigo, nome_completo, cnpj_ogmo, is_active) "
+        "VALUES (:c, :n, :cnpj, true)",
+        {"c": "SUAPE", "n": "Porto de Suape", "cnpj": "08.978.103/0001-26"},
+        "porto SUAPE",
+    )
+    await upsert(
+        "INSERT INTO lousa_main.portos (codigo, nome_completo, cnpj_ogmo, is_active) "
+        "VALUES (:c, :n, :cnpj, true)",
+        {"c": "RECIFE", "n": "Porto do Recife", "cnpj": "10.504.532/0001-89"},
+        "porto RECIFE",
+    )
+
+    # 2. Turnos
+    await upsert(
+        "INSERT INTO lousa_main.turnos (codigo, nome_exibicao, hora_inicio, hora_fim, duracao_horas) "
+        "VALUES (:c, :n, :hi, :hf, :d)",
+        {"c": "DIURNO", "n": "Diurno (08h-16h)", "hi": "08:00:00", "hf": "16:00:00", "d": 8.0},
+        "turno DIURNO",
+    )
+    await upsert(
+        "INSERT INTO lousa_main.turnos (codigo, nome_exibicao, hora_inicio, hora_fim, duracao_horas) "
+        "VALUES (:c, :n, :hi, :hf, :d)",
+        {"c": "NOTURNO", "n": "Noturno (20h-04h)", "hi": "20:00:00", "hf": "04:00:00", "d": 8.0},
+        "turno NOTURNO",
+    )
+
+    # 3. Fainas (7 principais do seed — Manoel Costa confirma)
+    fainas = [
+        ("PRODUCAO", "Produção", 1, "#3b82f6"),
+        ("SALARIO", "Salário", 2, "#10b981"),
+        ("SACARIA", "Sacaria", 3, "#f59e0b"),
+        ("VEICULO", "Veículo", 4, "#8b5cf6"),
+        ("DIVERSOS", "Diversos", 5, "#ec4899"),
+        ("CADASTRO", "Cadastro", 6, "#06b6d4"),
+        ("SUPLEMENTAR", "Suplementar", 7, "#84cc16"),
+    ]
+    for codigo, nome, ordem, cor in fainas:
+        await upsert(
+            "INSERT INTO lousa_main.fainas (codigo, nome_exibicao, ordem_lousa, cor_hex, is_active) "
+            "VALUES (:c, :n, :o, :cor, true)",
+            {"c": codigo, "n": nome, "o": ordem, "cor": cor},
+            f"faina {codigo}",
+        )
+
+    # 4. Funções (26 canônicas — subset p/ seed; Manoel Costa complementa)
+    funcoes = [
+        ("MANDO_01", "C/M Geral", 1, "MANDO"),
+        ("MANDO_02", "C/M Porão", 2, "MANDO"),
+        ("MANDO_03", "C/M Bloco", 3, "MANDO"),
+        ("MANDO_04", "C/M Rechego", 4, "MANDO"),
+        ("MANDO_05", "C/M Cons.", 5, "MANDO"),
+        ("MANDO_06", "Supervisor", 6, "MANDO"),
+        ("TERNO_01", "Porão", 7, "TERNO"),
+        ("TERNO_02", "Bloco MAX", 8, "TERNO"),
+        ("TERNO_03", "Bloco", 9, "TERNO"),
+        ("TERNO_04", "Rechego", 10, "TERNO"),
+        ("TERNO_05", "Cons.", 11, "TERNO"),
+        ("TERNO_06", "Ship Loader", 12, "TERNO"),
+        ("TECNICA_01", "Sinaleiro", 13, "TECNICA"),
+        ("TECNICA_02", "Guincho A", 14, "TECNICA"),
+        ("TECNICA_03", "Guincho B", 15, "TECNICA"),
+        ("TECNICA_04", "Emp. GP", 16, "TECNICA"),
+        ("TECNICA_05", "Emp. PP", 17, "TECNICA"),
+        ("TECNICA_06", "V. Pesado", 18, "TECNICA"),
+        ("TECNICA_07", "V. Leve", 19, "TECNICA"),
+        ("TECNICA_08", "Manobrista", 20, "TECNICA"),
+        ("TECNICA_09", "Transp.", 21, "TECNICA"),
+        ("TECNICA_10", "Pá Mec.", 22, "TECNICA"),
+        ("VIGIA_01", "Vigia Porto", 23, "VIGIA"),
+        ("VIGIA_02", "Vigia Cais", 24, "VIGIA"),
+    ]
+    for codigo, nome, ordem, cat in funcoes:
+        await upsert(
+            "INSERT INTO lousa_main.funcoes (codigo, nome_exibicao, categoria, ordem_lousa, is_active) "
+            "VALUES (:c, :n, :cat, :o, true)",
+            {"c": codigo, "n": nome, "cat": cat, "o": ordem},
+            f"funcao {codigo}",
+        )
+
+    # 5. User fiscal (paulo@pscode.ia.br)
+    pwd_hash = bcrypt.hashpw(b"sinapse-demo-2026", bcrypt.gensalt()).decode()
+    await upsert(
+        "INSERT INTO lousa_main.users (email, telefone, password_hash, role, status, "
+        "accepted_terms_at, accepted_terms_version) "
+        "VALUES (:email, :tel, :pwd, 'FISCAL'::role_enum, 'ATIVO'::user_status_enum, "
+        ":now, '1.0')",
+        {"email": "paulo@pscode.ia.br", "tel": "+5581999998888", "pwd": pwd_hash, "now": now},
+        "user paulo@pscode.ia.br",
+    )
+
+    # 6. User TPA (matricula 058)
+    pwd_hash_tpa = bcrypt.hashpw(b"sinapse-demo-2026", bcrypt.gensalt()).decode()
+    await upsert(
+        "INSERT INTO lousa_main.users (email, telefone, password_hash, role, status, "
+        "accepted_terms_at, accepted_terms_version) "
+        "VALUES (:email, :tel, :pwd, 'TPA'::role_enum, 'ATIVO'::user_status_enum, "
+        ":now, '1.0')",
+        {"email": "tpa058@ogmo-pe.com.br", "tel": "+5581988887777", "pwd": pwd_hash_tpa, "now": now},
+        "user tpa058",
+    )
+
+    # 7. Fiscal profile (linka user FISCAL ao perfil Fiscal)
+    await db.commit()
+    fiscal_user_id = (await db.execute(sql_text(
+        "SELECT id FROM lousa_main.users WHERE email = :email"
+    ), {"email": "paulo@pscode.ia.br"})).scalar()
+    if fiscal_user_id:
+        await upsert(
+            "INSERT INTO lousa_main.fiscais (user_id, matricula, nome_completo, status, "
+            "portos_autorizados, telefone) "
+            "VALUES (:uid, :mat, :nome, 'ATIVO'::fiscal_status_enum, :pa, :tel)",
+            {"uid": fiscal_user_id, "mat": "F-001", "nome": "Paulo Siqueira",
+             "pa": ["SUAPE", "RECIFE"], "tel": "+5581999998888"},
+            "fiscal Paulo Siqueira",
+        )
+
+    # 8. TPA profile (linka user TPA ao perfil TPA)
+    tpa_user_id = (await db.execute(sql_text(
+        "SELECT id FROM lousa_main.users WHERE email = :email"
+    ), {"email": "tpa058@ogmo-pe.com.br"})).scalar()
+    if tpa_user_id:
+        await upsert(
+            "INSERT INTO lousa_main.tpas (user_id, matricula, nome_completo, status, "
+            "data_nascimento, telefone, cpf) "
+            "VALUES (:uid, :mat, :nome, 'ATIVO'::tpa_status_enum, :dn, :tel, :cpf)",
+            {"uid": tpa_user_id, "mat": "OG-058", "nome": "João da Silva Santos",
+             "dn": "1985-03-15", "tel": "+5581988887777", "cpf": "123.456.789-00"},
+            "tpa João da Silva (OG-058)",
+        )
+
+    # 9. Lousa_escala_origem (hoje, SUAPE+DIURNO)
+    suape_id = (await db.execute(sql_text(
+        "SELECT id FROM lousa_main.portos WHERE codigo = 'SUAPE'"
+    ))).scalar()
+    diurno_id = (await db.execute(sql_text(
+        "SELECT id FROM lousa_main.turnos WHERE codigo = 'DIURNO'"
+    ))).scalar()
+
+    if suape_id and diurno_id:
+        await upsert(
+            "INSERT INTO lousa_main.lousa_escala_origem (fonte, porto_id, turno_id, "
+            "data_referencia, url_origem, content_hash, payload_jsonb, duracao_ms, status) "
+            "VALUES ('TPA'::fonte_escala_enum, :p, :t, :d, :url, :hash, '{}'::jsonb, 1200, "
+            "'SUCESSO'::status_scraping_enum)",
+            {"p": suape_id, "t": diurno_id, "d": today,
+             "url": "http://tpa.ogmosuape.com.br/web/lousa_estiva",
+             "hash": "a" * 64},
+            "lousa_escala_origem (SUAPE+DIURNO)",
+        )
+
+    # 10. Lousa_alocacao (10 alocações de teste)
+    escala_id = (await db.execute(sql_text(
+        "SELECT id FROM lousa_main.lousa_escala_origem "
+        "WHERE fonte = 'TPA' AND data_referencia = :d "
+        "ORDER BY created_at DESC LIMIT 1"
+    ), {"d": today})).scalar()
+
+    if escala_id and suape_id and diurno_id:
+        alocacoes_teste = [
+            ("PRODUCAO", "MANDO_01", "OG-058"),
+            ("PRODUCAO", "MANDO_02", "OG-100"),
+            ("PRODUCAO", "MANDO_03", "OG-133"),
+            ("SALARIO", "MANDO_01", "OG-058"),
+            ("SALARIO", "TERNO_01", "OG-200"),
+            ("SACARIA", "MANDO_01", "OG-058"),
+            ("SACARIA", "TECNICA_01", "OG-300"),
+            ("VEICULO", "TECNICA_06", "OG-400"),
+            ("CADASTRO", "VIGIA_01", "OG-500"),
+            ("SUPLEMENTAR", "MANDO_06", "OG-058"),
+        ]
+        for faina, funcao, mat in alocacoes_teste:
+            faina_id = (await db.execute(sql_text(
+                "SELECT id FROM lousa_main.fainas WHERE codigo = :c"
+            ), {"c": faina})).scalar()
+            funcao_id = (await db.execute(sql_text(
+                "SELECT id FROM lousa_main.funcoes WHERE codigo = :c"
+            ), {"c": funcao})).scalar()
+            if faina_id and funcao_id:
+                categoria = funcao.split("_")[0]  # MANDO/TERNO/TECNICA/VIGIA
+                fk_mando = 1 if categoria == "MANDO" else None
+                fk_terno = 1 if categoria == "TERNO" else None
+                fk_tecnica = 1 if categoria == "TECNICA" else None
+                fk_vigia = 1 if categoria == "VIGIA" else None
+                await upsert(
+                    "INSERT INTO lousa_main.lousa_alocacao (escala_origem_id, porto_id, "
+                    "turno_id, faina_id, funcao_id, data_referencia, trabalhador_matricula, "
+                    "fk_mando, fk_terno, fk_tecnica, fk_vigia, scraped_at, created_at) "
+                    "VALUES (:e, :p, :t, :fa, :fu, :d, :mat, :m, :te, :tc, :v, :now, :now)",
+                    {"e": escala_id, "p": suape_id, "t": diurno_id,
+                     "fa": faina_id, "fu": funcao_id, "d": today, "mat": mat,
+                     "m": fk_mando, "te": fk_terno, "tc": fk_tecnica, "v": fk_vigia,
+                     "now": now},
+                    f"alocacao {faina}+{funcao}+{mat}",
+                )
+
+    return {
+        "ok": True,
+        "created": results["created"],
+        "skipped": results["skipped"],
+        "test_credentials": {
+            "fiscal": {"email": "paulo@pscode.ia.br", "senha": "sinapse-demo-2026"},
+            "tpa": {"email": "tpa058@ogmo-pe.com.br", "senha": "sinapse-demo-2026"},
+        },
+    }
