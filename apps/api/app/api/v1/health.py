@@ -210,7 +210,7 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
 
     now = dt.now(tz=timezone.utc)
     today = now.date()
-    results = {"created": [], "skipped": [], "errors": []}
+    results: dict[str, list[str]] = {"created": [], "skipped": [], "errors": []}
 
     async def upsert(sql: str, params: dict, label: str) -> str:
         """INSERT ... ON CONFLICT DO NOTHING. Retorna 'created' ou 'skipped'."""
@@ -220,9 +220,14 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
             status = "created" if result.rowcount > 0 else "skipped"
         except Exception as exc:  # noqa: BLE001
             await db.rollback()
-            status = "error"
+            status = "errors"  # chave do dict (plural)
             # Loga o erro completo no log do app (visível no Render)
-            log.error("seed.upsert_failed", label=label, exc_type=type(exc).__name__, exc_msg=str(exc))
+            log.error(
+                "seed.upsert_failed",
+                label=label,
+                exc_type=type(exc).__name__,
+                exc_msg=str(exc),
+            )
         results[status].append(label)
         return status
 
@@ -330,31 +335,50 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     )
 
     # 7. Fiscal profile (linka user FISCAL ao perfil Fiscal)
+    # Modelo: cpf, matricula_sindicato, porto_id, turno_id, data_inicio
+    # são NOT NULL — populamos todos.
     await db.commit()
     fiscal_user_id = (await db.execute(sql_text(
         "SELECT id FROM lousa_main.users WHERE email = :email"
     ), {"email": "paulo@pscode.ia.br"})).scalar()
-    if fiscal_user_id:
+    suape_id_pre = (await db.execute(sql_text(
+        "SELECT id FROM lousa_main.portos WHERE codigo = 'SUAPE'"
+    ))).scalar()
+    diurno_id_pre = (await db.execute(sql_text(
+        "SELECT id FROM lousa_main.turnos WHERE codigo = 'DIURNO'"
+    ))).scalar()
+    if fiscal_user_id and suape_id_pre and diurno_id_pre:
         await upsert(
-            "INSERT INTO lousa_main.fiscais (user_id, matricula, nome_completo, status, "
-            "portos_autorizados, telefone) "
-            "VALUES (:uid, :mat, :nome, 'ATIVO'::fiscal_status_enum, :pa, :tel)",
-            {"uid": fiscal_user_id, "mat": "F-001", "nome": "Paulo Siqueira",
-             "pa": ["SUAPE", "RECIFE"], "tel": "+5581999998888"},
+            "INSERT INTO lousa_main.fiscais (user_id, cpf, matricula_sindicato, "
+            "nome_completo, telefone, porto_id, turno_id, status, data_inicio) "
+            "VALUES (:uid, :cpf, :mat, :nome, :tel, :p, :t, "
+            "'ATIVO'::fiscal_status_enum, :di)",
+            {"uid": fiscal_user_id, "cpf": "111.222.333-96", "mat": "F-001",
+             "nome": "Paulo Siqueira", "tel": "+5581999998888",
+             "p": suape_id_pre, "t": diurno_id_pre, "di": today},
             "fiscal Paulo Siqueira",
         )
 
     # 8. TPA profile (linka user TPA ao perfil TPA)
+    # Modelo: matricula_ogmo (não matricula), status_cadastro (não status),
+    # funcao_base_id + categoria são NOT NULL.
     tpa_user_id = (await db.execute(sql_text(
         "SELECT id FROM lousa_main.users WHERE email = :email"
     ), {"email": "tpa058@ogmo-pe.com.br"})).scalar()
-    if tpa_user_id:
+    funcao_base_id = (await db.execute(sql_text(
+        "SELECT id FROM lousa_main.funcoes WHERE codigo = 'MANDO_01'"
+    ))).scalar()
+    if tpa_user_id and funcao_base_id:
         await upsert(
-            "INSERT INTO lousa_main.tpas (user_id, matricula, nome_completo, status, "
-            "data_nascimento, telefone, cpf) "
-            "VALUES (:uid, :mat, :nome, 'ATIVO'::tpa_status_enum, :dn, :tel, :cpf)",
-            {"uid": tpa_user_id, "mat": "OG-058", "nome": "João da Silva Santos",
-             "dn": "1985-03-15", "tel": "+5581988887777", "cpf": "123.456.789-00"},
+            "INSERT INTO lousa_main.tpas (user_id, cpf, nome_completo, "
+            "matricula_ogmo, telefone, funcao_base_id, categoria, "
+            "data_nascimento, status_cadastro) "
+            "VALUES (:uid, :cpf, :nome, :mat, :tel, :fb, :cat, :dn, "
+            "'ATIVO'::tpa_status_enum)",
+            {"uid": tpa_user_id, "cpf": "123.456.789-00",
+             "nome": "João da Silva Santos", "mat": "OG-058",
+             "tel": "+5581988887777", "fb": funcao_base_id, "cat": "MANDO",
+             "dn": "1985-03-15"},
             "tpa João da Silva (OG-058)",
         )
 
