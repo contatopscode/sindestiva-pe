@@ -422,8 +422,25 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
         "ok": True,
         "created": results["created"],
         "skipped": results["skipped"],
+        "errors": results["errors"],
         "test_credentials": {
             "fiscal": {"email": "paulo@pscode.ia.br", "senha": "sinapse-demo-2026"},
             "tpa": {"email": "tpa058@ogmo-pe.com.br", "senha": "sinapse-demo-2026"},
         },
     }
+
+
+@router.get("/counts", summary="Conta registros em cada tabela (debug)")
+async def counts(db: AsyncSession = Depends(get_db)) -> dict[str, int]:
+    """Retorna COUNT(*) de cada tabela útil (debug de seed/scraper)."""
+    from sqlalchemy import text as sql_text
+    tables = [
+        "users", "fiscais", "tpas", "portos", "turnos", "fainas", "funcoes",
+        "lousa_escala_origem", "lousa_alocacao", "remanejamentos",
+        "hash_chain_checkpoint", "audit_events",
+    ]
+    result = {}
+    for t in tables:
+        n = (await db.execute(sql_text(f"SELECT COUNT(*) FROM lousa_main.{t}"))).scalar()
+        result[t] = n
+    return result
