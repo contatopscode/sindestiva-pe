@@ -53,6 +53,16 @@ async def login(
         )
     except AuthError as e:
         raise HTTPException(status_code=e.status, detail={"code": e.code, "message": e.message})
+    except Exception as exc:  # noqa: BLE001
+        # Captura qualquer outro erro (ex: select_in_relationship falha) e
+        # retorna 500 com detalhes para debug em prod.
+        from app.core.logging import get_logger
+        log = get_logger(__name__)
+        log.error("auth.login_unexpected", exc_type=type(exc).__name__, exc_msg=str(exc))
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "LOGIN_ERROR", "message": f"{type(exc).__name__}: {exc}"},
+        ) from exc
 
     return LoginResponse(
         access_token=token,
