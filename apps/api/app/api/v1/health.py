@@ -72,3 +72,43 @@ async def diag(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
         "all_tables": all_tables,
         "database_url_host": settings.database_url_async.split("@")[-1].split("/")[0],
     }
+
+
+@router.post("/init", summary="Cria schema + tabelas manualmente (admin only)")
+async def init_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
+    """Endpoint administrativo para criar schema + tabelas manualmente.
+
+    Idempotente. Use se o lifespan do FastAPI falhou em criar (ex: cold
+    start muito rápido). APÓS Sprint 1, proteger com auth de admin.
+    """
+    from sqlalchemy import text as sql_text
+
+    # 1. Cria schema
+    await db.execute(sql_text(f"CREATE SCHEMA IF NOT EXISTS {settings.db_schema}"))
+
+    # 2. Cria tabelas via Base.metadata
+    from app.core.database import Base
+    import app.models  # noqa: F401  (popula Base.metadata)
+    # sync_conn vem do AsyncSession — usa run_sync
+    # Em vez de usar db.run_sync, executa direto:
+    await db.commit()  # fecha transação atual
+
+    from app.core.database import engine as _engine
+    async with _engine.begin() as conn:
+        await conn.run_sync(
+            lambda sync_conn: Base.metadata.create_all(sync_conn, checkfirst=True)
+        )
+
+    # 3. Verifica resultado
+    tables = [
+        r[0]
+        for r in (await db.execute(sql_text(
+            "SELECT table_name FROM information_schema.tables "
+            "WHERE table_schema = :s ORDER BY table_name"
+        ), {"s": settings.db_schema})).all()
+    ]
+    return {
+        "schema": settings.db_schema,
+        "tables_created": len(tables),
+        "tables": tables,
+    }
