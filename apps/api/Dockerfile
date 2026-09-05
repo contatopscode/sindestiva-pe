@@ -82,6 +82,7 @@ COPY --from=deps --chown=appuser:appuser /app/.venv /app/.venv
 COPY --chown=appuser:appuser app ./app
 COPY --chown=appuser:appuser alembic ./alembic
 COPY --chown=appuser:appuser alembic.ini ./
+COPY --chown=appuser:appuser entrypoint.sh ./
 COPY --chown=appuser:appuser pyproject.toml uv.lock README.md ./
 
 USER appuser
@@ -94,7 +95,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD python -c "import urllib.request, sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health', timeout=3).status == 200 else 1)"
 
 # tini como PID 1 (forwarda SIGTERM pro uvicorn → graceful shutdown)
-ENTRYPOINT ["/usr/bin/tini", "--"]
-
-# uvicorn direto (sem `uv run` porque o venv já está no PATH)
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]
