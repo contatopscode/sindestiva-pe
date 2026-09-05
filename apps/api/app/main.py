@@ -22,11 +22,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import api_v1_router
 from app.core.config import settings
-from app.core.database import engine
+from app.core.database import Base, engine
 from app.core.logging import configure_logging, get_logger
 from app.jobs.scheduler import start_scheduler as start_s6_scheduler, stop_scheduler as stop_s6_scheduler
 from app.jobs.scraping_job import get_scheduler as get_scraping_scheduler
 from app.middleware.access_log import AccessLogMiddleware
+# Import models para popular Base.metadata
+import app.models  # noqa: F401  (popula Base.metadata com as 26 tabelas)
 
 configure_logging()
 log = get_logger("sindestiva.api")
@@ -65,6 +67,23 @@ async def lifespan(app: FastAPI):
         log.info("api.schema_ensured", schema=settings.db_schema)
     except Exception as exc:  # noqa: BLE001
         log.warning("api.schema_create_failed", schema=settings.db_schema, erro=str(exc))
+
+    # Sprint 0+ deploy: cria tabelas via SQLAlchemy metadata (idempotente).
+    # Alembic tem problema com DB compartilhado (alembic_version table
+    # falha em criar no schema certo, transactions reverterem silenciosamente).
+    # `Base.metadata.create_all(checkfirst=True)` é idempotente e mais
+    # robusto para o MVP. Sprint 2+ vai refazer com Alembic dedicado.
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(
+                lambda sync_conn: Base.metadata.create_all(
+                    sync_conn, checkfirst=True
+                )
+            )
+        log.info("api.tables_ensured")
+    except Exception as exc:  # noqa: BLE001
+        log.error("api.tables_create_failed", erro=str(exc), exc_info=True)
+
     # Sprint 6: inicia scheduler de jobs LGPD/auditoria
     await start_s6_scheduler()
     # Sprint 2: inicia o scheduler de scraping (interval = 15min).
