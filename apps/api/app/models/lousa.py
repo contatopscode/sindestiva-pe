@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, Text, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Integer, Text, String, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -63,7 +63,7 @@ class LousaSnapshot(Base):
     fonte: Mapped[str] = mapped_column(Text, nullable=False)
     # TPA_OGMO / ESCALANET / MANUAL_FISCAL
     url_origem: Mapped[str | None] = mapped_column(Text, nullable=True)
-    html_hash_sha256: Mapped[str] = mapped_column(Text(64), nullable=False)
+    html_hash_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
 
     layout_fingerprint_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("lousa_main.layout_fingerprints.id", ondelete="SET NULL"),
@@ -203,7 +203,7 @@ class LayoutFingerprint(Base):
     )
 
     versao: Mapped[int] = mapped_column(Integer, nullable=False)
-    html_hash_sha256: Mapped[str] = mapped_column(Text(64), nullable=False)
+    html_hash_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
 
     seletores_parser: Mapped[dict] = mapped_column(JSONB, nullable=False)
     fingerprint_estrutura: Mapped[dict] = mapped_column(JSONB, nullable=False)

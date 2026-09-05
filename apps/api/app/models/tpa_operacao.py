@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Numeric, Text, text
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Index, Numeric, Text, String, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, SoftDeleteMixin
@@ -62,7 +62,7 @@ class TpaConfirmacaoPresenca(Base, SoftDeleteMixin):
     precisao_m: Mapped[int | None] = mapped_column(Numeric, nullable=True)
     dispositivo: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    hash_integridade: Mapped[str] = mapped_column(Text(64), nullable=False)
+    hash_integridade: Mapped[str] = mapped_column(String(64), nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")

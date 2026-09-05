@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Text, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Text, String, text
 from sqlalchemy.dialects.postgresql import ARRAY, INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -72,7 +72,7 @@ class TermoConsentimento(Base):
     metodo: Mapped[TermoMetodoEnum] = mapped_column(
         pg_enum(TermoMetodoEnum), nullable=False
     )
-    termo_texto_hash: Mapped[str] = mapped_column(Text(64), nullable=False)
+    termo_texto_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     termo_url_pdf: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -186,7 +186,7 @@ class LgpdPurgeLog(Base):
     registros_deletados: Mapped[int] = mapped_column(Integer, nullable=False)
     criterio: Mapped[str] = mapped_column(Text, nullable=False)  # "purge_after < now()"
     registros_ids_antes_delete: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    hash_lote_sha256: Mapped[str] = mapped_column(Text(64), nullable=False)
+    hash_lote_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     job_id: Mapped[str] = mapped_column(Text, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

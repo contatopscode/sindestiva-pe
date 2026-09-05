@@ -23,7 +23,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import Date, DateTime, ForeignKey, Index, Text, text
+from sqlalchemy import Date, DateTime, ForeignKey, Index, Text, String, text
 from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -130,7 +130,7 @@ class Remanejamento(Base, TimestampMixin, SoftDeleteMixin):
     nack_motivo: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Hash chain (DD v1 §3.14) — ver TODO(D8) sobre unificação.
-    hash_evento: Mapped[str] = mapped_column(Text(64), nullable=False)
+    hash_evento: Mapped[str] = mapped_column(String(64), nullable=False)
     hash_anterior_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("lousa_main.remanejamentos.id", ondelete="SET NULL"),
         nullable=True,

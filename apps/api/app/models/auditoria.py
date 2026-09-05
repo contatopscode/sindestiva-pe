@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, Text, text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, Text, String, text
 from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -78,8 +78,8 @@ class AuditEvent(Base):
     payload_after: Mapped[dict] = mapped_column(JSONB, nullable=False)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB, nullable=True)
 
-    hash_anterior: Mapped[str | None] = mapped_column(Text(64), nullable=True)
-    hash_evento: Mapped[str] = mapped_column(Text(64), nullable=False)
+    hash_anterior: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    hash_evento: Mapped[str] = mapped_column(String(64), nullable=False)
 
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
@@ -115,8 +115,8 @@ class HashChainCheckpoint(Base):
     primeiro_sequencia: Mapped[int] = mapped_column(BigInteger, nullable=False)
     ultimo_sequencia: Mapped[int] = mapped_column(BigInteger, nullable=False)
 
-    hash_calculado_final: Mapped[str] = mapped_column(Text(64), nullable=False)
-    hash_esperado_final: Mapped[str] = mapped_column(Text(64), nullable=False)
+    hash_calculado_final: Mapped[str] = mapped_column(String(64), nullable=False)
+    hash_esperado_final: Mapped[str] = mapped_column(String(64), nullable=False)
 
     integro: Mapped[bool] = mapped_column(Boolean, nullable=False)
     primeiro_evento_com_falha: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

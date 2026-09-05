@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Text, text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, Text, String, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -62,7 +62,7 @@ class OgmoNotificacao(Base, TimestampMixin):
     assunto: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     payload_json: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    payload_hash_sha256: Mapped[str] = mapped_column(Text(64), nullable=False)
+    payload_hash_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
 
     destinatario_email: Mapped[str | None] = mapped_column(Text, nullable=True)
     destinatario_webhook_id: Mapped[UUID | None] = mapped_column(
