@@ -205,7 +205,7 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     Sprint 1+: PROTEGER com auth admin + REMOVER (ou mover para CLI).
     """
     import bcrypt
-    from datetime import datetime as dt, time as dtime, timezone
+    from datetime import date as ddate, datetime as dt, time as dtime, timezone
     from sqlalchemy import text as sql_text
 
     now = dt.now(tz=timezone.utc)
@@ -385,7 +385,7 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
             {"uid": tpa_user_id, "cpf": "123.456.789-00",
              "nome": "João da Silva Santos", "mat": "OG-058",
              "tel": "+5581988887777", "fb": funcao_base_id, "cat": "MANDO",
-             "dn": "1985-03-15",
+             "dn": ddate(1985, 3, 15),
              "purge": now.replace(year=now.year + 5)},
             "tpa João da Silva (OG-058)",
         )
