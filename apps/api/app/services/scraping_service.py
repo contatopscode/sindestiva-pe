@@ -171,16 +171,47 @@ async def executar_scraping(
     else:
         status = StatusScrapingEnum.SUCESSO
 
+    # 3a. Filtra células por turno (TPA raspa 2 turnos na mesma página;
+    # sem este filtro, teríamos UNIQUE violation em `lousa_alocacao`
+    # porque ambas as tabelas (DIURNO/NOTURNO) compartilhariam o mesmo
+    # `escala_origem_id`).
+    # EscalaNet (Sprint 3) e o regex fallback ainda não setam
+    # `turno_codigo` — neste caso, aceita todas as células (assume-se
+    # que o scraper já foi chamado para o turno certo).
+    celulas_turno = [
+        c for c in bruto.celulas
+        if not c.turno_codigo or c.turno_codigo == turno_codigo
+    ]
+    if not celulas_turno and bruto.celulas:
+        # Scraper retornou células, mas nenhuma é do turno certo —
+        # provavelmente layout mudou.
+        log.warning(
+            "scraping_service.turno_sem_celulas",
+            turno=turno_codigo,
+            total_bruto=len(bruto.celulas),
+            turnos_presentes=sorted({c.turno_codigo for c in bruto.celulas if c.turno_codigo}),
+        )
+    bruto_para_persistir = type(bruto)(
+        html_bruto=bruto.html_bruto,
+        content_hash=bruto.content_hash,
+        celulas=celulas_turno,
+        duracao_ms=bruto.duracao_ms,
+        url_origem=bruto.url_origem,
+        layout_mudou=bruto.layout_mudou,
+        erro_detalhes=bruto.erro_detalhes,
+    )
+
     # 4. UPSERT em `lousa_escala_origem` (idempotente).
     payload_jsonb: dict[str, Any] = {
-        "html_bruto": bruto.html_bruto,
+        "html_bruto": bruto_para_persistir.html_bruto,
         "celulas": [
             {
                 "faina_codigo": c.faina_codigo,
                 "funcao_codigo": c.funcao_codigo,
+                "turno_codigo": c.turno_codigo,
                 "trabalhador_matricula": c.trabalhador_matricula,
             }
-            for c in bruto.celulas
+            for c in bruto_para_persistir.celulas
         ],
     }
     agora = datetime.now(tz=UTC)
@@ -243,7 +274,7 @@ async def executar_scraping(
 
         # 5c. Insere alocações (apenas fainas/funções conhecidas no catálogo).
         alocacoes_inserir: list[dict[str, Any]] = []
-        for celula in bruto.celulas:
+        for celula in bruto_para_persistir.celulas:
             faina = fainas_idx.get(celula.faina_codigo)
             funcao = funcoes_idx.get(celula.funcao_codigo)
             if faina is None or funcao is None:
@@ -282,11 +313,11 @@ async def executar_scraping(
         turno_codigo=turno_codigo,
         data=data,
         status=status,
-        total_celulas=len(bruto.celulas),
-        duracao_ms=bruto.duracao_ms,
-        content_hash=bruto.content_hash,
-        layout_mudou=bruto.layout_mudou,
-        erro_detalhes=bruto.erro_detalhes,
+        total_celulas=len(bruto_para_persistir.celulas),
+        duracao_ms=bruto_para_persistir.duracao_ms,
+        content_hash=bruto_para_persistir.content_hash,
+        layout_mudou=bruto_para_persistir.layout_mudou,
+        erro_detalhes=bruto_para_persistir.erro_detalhes,
     )
 
 

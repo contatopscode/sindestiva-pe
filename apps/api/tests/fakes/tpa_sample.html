@@ -1,26 +1,96 @@
 <!--
-  Fake de HTML retornado pelo TPA Tecnologia (SUAPE).
+  Fake de HTML retornado pelo TPA Tecnologia (SUAPE) — versão Sprint 2 refator T2-09.
 
-  Estrutura: tabela `.lousa-oficial` com `<tr>` tendo atributos
-  `data-faina` / `data-funcao` / `data-matricula`. É o seletor
-  primário do scraper TPA.
+  Estrutura real (validada em 05/09/2026 contra http://tpa.ogmosuape.com.br/web/lousa_estiva):
+    - 2 tabelas `<table id="lousa">` (DIURNO + NOTURNO)
+    - Classes `turno-diurno` / `turno-noturno` no `<td>` da primeira `<tr>` (não no `<table>`)
+    - Row 0: SUAPE + nome do turno (rowspan 3)
+    - Row 1: 4 grupos (Mando, Terno, Técnica, Vigia) — ignorado pelo scraper
+    - Row 2: 26 funções individuais (resumimos a 4 neste fake)
+    - Row 3+: fainas com células-ponteiro (3 dígitos = matrícula OGMO)
+
+  Total de células esperado (DIURNO + NOTURNO): 12 (3 fainas × 2 funções não-vazias × 2 turnos).
 
   NÃO usar dados reais — este HTML é fictício.
 -->
-<table class="lousa-oficial">
-  <tr data-faina="PROD" data-funcao="MANDO_01" data-matricula="OG-1001">
-    <td>Produção</td><td>Chefe de Máquina Geral</td><td>OG-1001</td>
+<!-- ============================================================ -->
+<!-- Tabela 1: TURNO DIURNO                                        -->
+<!-- ============================================================ -->
+<table id="lousa">
+  <tr>
+    <td class="turno-diurno" rowspan="3">SUAPE</td>
+    <td rowspan="3">TURNO DIURNO</td>
+    <td rowspan="3">07:00 às 19:00</td>
   </tr>
-  <tr data-faina="PROD" data-funcao="MANDO_02" data-matricula="OG-1002">
-    <td>Produção</td><td>Chefe de Máquina Porão</td><td>OG-1002</td>
+  <tr><td></td><td></td><td></td></tr>
+  <tr><td></td><td></td><td></td></tr>
+  <tr class="funcoes">
+    <td>FAINAS</td>
+    <td>C/M Geral</td>
+    <td>C/M Porão</td>
+    <td>Sinaleiro</td>
+    <td>Guincho A</td>
   </tr>
-  <tr data-faina="SAL" data-funcao="TERNO_01" data-matricula="OG-2001">
-    <td>Salário</td><td>Terno 1</td><td>OG-2001</td>
+  <tr>
+    <td class="fainas">Produção</td>
+    <td class="ponteiro">058</td>
+    <td class="ponteiro">133</td>
+    <td class="ponteiro-vazio"></td>
+    <td class="ponteiro">175</td>
   </tr>
-  <tr data-faina="SAC" data-funcao="GUINCHO_A" data-matricula="OG-3001">
-    <td>Sacaria</td><td>Guincho A</td><td>OG-3001</td>
+  <tr>
+    <td class="fainas">Salário</td>
+    <td class="ponteiro">162</td>
+    <td class="ponteiro-vazio"></td>
+    <td class="ponteiro">100</td>
+    <td class="ponteiro-vazio"></td>
   </tr>
-  <tr data-faina="CONT" data-funcao="VIGIA_01" data-matricula="">
-    <td>Container</td><td>Vigia 1</td><td></td>
+  <tr>
+    <td class="fainas">Sacaria Solta</td>
+    <td class="ponteiro">208</td>
+    <td class="ponteiro">094</td>
+    <td class="ponteiro-vazio"></td>
+    <td class="ponteiro">300</td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- Tabela 2: TURNO NOTURNO                                       -->
+<!-- ============================================================ -->
+<table id="lousa">
+  <tr>
+    <td class="turno-noturno" rowspan="3">SUAPE</td>
+    <td rowspan="3">TURNO NOTURNO</td>
+    <td rowspan="3">19:00 às 07:00</td>
+  </tr>
+  <tr><td></td><td></td><td></td></tr>
+  <tr><td></td><td></td><td></td></tr>
+  <tr class="funcoes">
+    <td>FAINAS</td>
+    <td>C/M Geral</td>
+    <td>C/M Porão</td>
+    <td>Sinaleiro</td>
+    <td>Guincho A</td>
+  </tr>
+  <tr>
+    <td class="fainas">Produção</td>
+    <td class="ponteiro">058</td>
+    <td class="ponteiro">133</td>
+    <td class="ponteiro-vazio"></td>
+    <td class="ponteiro">175</td>
+  </tr>
+  <tr>
+    <td class="fainas">Salário</td>
+    <td class="ponteiro">162</td>
+    <td class="ponteiro-vazio"></td>
+    <td class="ponteiro">100</td>
+    <td class="ponteiro-vazio"></td>
+  </tr>
+  <tr>
+    <td class="fainas">Sacaria Solta</td>
+    <td class="ponteiro">208</td>
+    <td class="ponteiro">094</td>
+    <td class="ponteiro-vazio"></td>
+    <td class="ponteiro">300</td>
   </tr>
 </table>

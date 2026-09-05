@@ -1,15 +1,17 @@
 <!--
-  Fake de HTML do TPA Tecnologia com layout DIFERENTE (estrutura nova).
+  Fake de HTML do TPA Tecnologia com layout DIFERENTE (estrutura nova, ainda não catalogada).
 
-  Aqui o TPA mudou a estrutura: usa `<div class="celula">` em vez de
-  `<table>`. O scraper deve cair nos fallbacks (regex) e marcar
-  `layout_mudou=True`.
+  Aqui o TPA Tecnologia introduziu um layout com `<div data-faina data-funcao data-matricula>`
+  em vez de `<table id="lousa">` com classes CSS. O scraper primário falha, e cai pro
+  `REGEX_CELULA` fallback (que extrai via atributos data-*). Resultado: `layout_mudou=True`
+  + 2 células parseadas.
 
-  Atributos data-* numa única linha pra casar o regex fallback do scraper.
-
-  Este é o teste de R2 do plano (TPA muda layout).
+  NÃO usar dados reais — este HTML é fictício.
 -->
-<div class="nova-estrutura">
-<div class="celula" data-faina="PROD" data-funcao="MANDO_01" data-matricula="OG-9001">Produção · Mando 1 · OG-9001</div>
-<div class="celula" data-faina="SAL" data-funcao="TERNO_02" data-matricula="OG-9002">Salário · Terno 2 · OG-9002</div>
+<div class="lousa-nova-estrutura">
+  <div data-faina="PRODUCAO" data-funcao="MANDO_01" data-matricula="OG-1001">Produção 1</div>
+  <div data-faina="PRODUCAO" data-funcao="MANDO_02" data-matricula="OG-1002">Produção 2</div>
+  <div data-faina="SALARIO" data-funcao="TERNO_01" data-matricula="OG-2001">Salário 1</div>
+  <div data-faina="SALARIO" data-funcao="TERNO_02" data-matricula="OG-2002">Salário 2</div>
+  <div data-faina="SACARIA" data-funcao="SINALEIRO" data-matricula="">Sacaria 1 (vazio)</div>
 </div>

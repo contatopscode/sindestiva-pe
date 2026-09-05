@@ -12,18 +12,21 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True, slots=True)
 class CelulaBruta:
-    """1 célula da lousa, normalizada pra (faina, função, matrícula).
+    """1 célula da lousa, normalizada pra (faina, função, matrícula, turno).
 
     Atributos:
-        faina_codigo: código da faina (ex: "PROD", "SAL").
-        funcao_codigo: código da função (ex: "MANDO_01", "GUINCHO_A").
+        faina_codigo: código da faina (ex: "SALARIO", "PRODUCAO").
+        funcao_codigo: código da função (ex: "MANDO_01", "TECNICA_04").
         trabalhador_matricula: matrícula OGMO do TPA escalado, ou None
             se a célula está vazia.
+        turno_codigo: "DIURNO" ou "NOTURNO" (default "" — compat com
+            scrapers que ainda não setam, ex: EscalaNet Sprint 3).
     """
 
     faina_codigo: str
     funcao_codigo: str
     trabalhador_matricula: str | None
+    turno_codigo: str = ""
 
 
 @dataclass(frozen=True, slots=True)
