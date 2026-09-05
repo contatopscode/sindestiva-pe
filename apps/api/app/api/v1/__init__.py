@@ -6,6 +6,7 @@ Routers expostos:
   - /health         → health check (sem DB) + DB ping
   - /auth           → login, me, config (T1-08 Sprint 1)
   - /users          → CRUD users (admin)
+  - /modulos        → gestão de usuários por módulo + matriz (issue #14)
   - /lousa          → GET lousa atual, por porto/turno, /escalas (Sprint 2)
   - /lousa/public   → GET preview sem auth (Sprint 0 — remover em prod)
   - /scraping       → POST /disparar, GET /status (Sprint 2)
@@ -27,6 +28,7 @@ from app.api.v1 import (
     lgpd,
     lousa,
     lousa_public,
+    modulos,
     ogmo,
     remanejamentos,
     scraping,
@@ -37,6 +39,7 @@ api_v1_router = APIRouter(prefix="/api/v1")
 api_v1_router.include_router(health.router)
 api_v1_router.include_router(auth.router)
 api_v1_router.include_router(users.router)
+api_v1_router.include_router(modulos.router)  # issue #14
 api_v1_router.include_router(lousa.router)
 api_v1_router.include_router(lousa_public.router)
 api_v1_router.include_router(scraping.router)
