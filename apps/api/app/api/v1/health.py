@@ -206,7 +206,7 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
 
     now = dt.now(tz=timezone.utc)
     today = now.date()
-    results = {"created": [], "skipped": []}
+    results = {"created": [], "skipped": [], "errors": []}
 
     async def upsert(sql: str, params: dict, label: str) -> str:
         """INSERT ... ON CONFLICT DO NOTHING. Retorna 'created' ou 'skipped'."""
