@@ -94,10 +94,16 @@ class Fiscal(Base, TimestampMixin, SoftDeleteMixin):
     # (que é 24m). O DDL da migration 0001 já reflete isso via
     # `server_default=now() + INTERVAL '5 years'`. Aqui só ajustamos
     # a metadata do SQLAlchemy para alinhar.
+    #
+    # NOTA Sprint 0+ deploy: o SQLAlchemy 2 wrappa `text("now() + INTERVAL '5 years'")`
+    # em `'now() + INTERVAL 5 years'` (string literal) no DDL, e o
+    # Postgres não consegue fazer cast para timestamptz. Workaround:
+    # omitir `server_default` aqui e adicionar via SQL raw no init
+    # endpoint (ver app/api/v1/health.py init_db). Sprint 1+: reintroduzir
+    # via migration Alembic.
     purge_after: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        server_default=text("now() + INTERVAL '5 years'"),
     )
 
 

@@ -147,6 +147,15 @@ async def init_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
             lambda sync_conn: Base.metadata.create_all(sync_conn, checkfirst=True)
         )
 
+    # 2b. Workaround: `server_default=text("now() + INTERVAL '5 years'")`
+    # no model `perfis_internos.purge_after` quebra DDL (text não é
+    # castable para timestamptz). Adiciona o default via ALTER TABLE.
+    # Sprint 1+: reintroduzir via migration Alembic.
+    await db.execute(sql_text(
+        f"ALTER TABLE {settings.db_schema}.perfis_internos "
+        f"ALTER COLUMN purge_after SET DEFAULT now() + INTERVAL '5 years'"
+    ))
+
     # 3. Verifica resultado
     tables = [
         r[0]
