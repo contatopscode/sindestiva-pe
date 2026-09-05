@@ -211,13 +211,16 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
 
     async def upsert(sql: str, params: dict, label: str) -> str:
         """INSERT ... ON CONFLICT DO NOTHING. Retorna 'created' ou 'skipped'."""
+        import traceback
         try:
             result = await db.execute(sql_text(sql + " ON CONFLICT DO NOTHING"), params)
             await db.commit()
             status = "created" if result.rowcount > 0 else "skipped"
         except Exception as exc:  # noqa: BLE001
             await db.rollback()
-            status = f"error: {exc!s}"
+            # Retorna traceback COMPLETO para debug via API
+            tb = traceback.format_exc()
+            status = f"error: {type(exc).__name__}: {exc!s} | SQL: {sql[:60]}... | TB: {tb[-200:]}"
         results[status if status in ("created", "skipped") else "errors"].append(label)
         return status
 
