@@ -240,16 +240,16 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
         "porto RECIFE",
     )
 
-    # 2. Turnos
+    # 2. Turnos (hora_inicio/hora_fim são TIME, não TEXT — usa CAST explícito)
     await upsert(
         "INSERT INTO lousa_main.turnos (codigo, nome_exibicao, hora_inicio, hora_fim, duracao_horas) "
-        "VALUES (:c, :n, :hi, :hf, :d)",
+        "VALUES (:c, :n, CAST(:hi AS TIME), CAST(:hf AS TIME), :d)",
         {"c": "DIURNO", "n": "Diurno (08h-16h)", "hi": "08:00:00", "hf": "16:00:00", "d": 8.0},
         "turno DIURNO",
     )
     await upsert(
         "INSERT INTO lousa_main.turnos (codigo, nome_exibicao, hora_inicio, hora_fim, duracao_horas) "
-        "VALUES (:c, :n, :hi, :hf, :d)",
+        "VALUES (:c, :n, CAST(:hi AS TIME), CAST(:hf AS TIME), :d)",
         {"c": "NOTURNO", "n": "Noturno (20h-04h)", "hi": "20:00:00", "hf": "04:00:00", "d": 8.0},
         "turno NOTURNO",
     )
