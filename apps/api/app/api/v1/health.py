@@ -111,10 +111,33 @@ async def init_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
                 values = list(col_type.enums)
                 if values:
                     vals = ", ".join(f"'{v}'" for v in values)
+                    # IF NOT EXISTS via DO block (Postgres não suporta
+                    # CREATE TYPE IF NOT EXISTS diretamente até v17)
                     await db.execute(sql_text(
-                        f"CREATE TYPE {enum_full_name} AS ENUM ({vals})"
+                        f"DO $$ BEGIN "
+                        f"  CREATE TYPE {enum_full_name} AS ENUM ({vals}); "
+                        f"EXCEPTION WHEN duplicate_object THEN null; "
+                        f"END $$;"
                     ))
                     enums_created.append(enum_full_name)
+                else:
+                    # Fallback: extrai do Python enum
+                    py_enum = getattr(col_type, "enum_class", None) or getattr(col_type, "_object_value", None)
+                    if py_enum is None and hasattr(col_type, "name"):
+                        try:
+                            from app.models.enums import ENUM_REGISTRY
+                            py_enum = ENUM_REGISTRY.get(col_type.name)
+                        except (ImportError, AttributeError):
+                            pass
+                    if py_enum is not None:
+                        vals = ", ".join(f"'{m.name}'" for m in py_enum)
+                        await db.execute(sql_text(
+                            f"DO $$ BEGIN "
+                            f"  CREATE TYPE {enum_full_name} AS ENUM ({vals}); "
+                            f"EXCEPTION WHEN duplicate_object THEN null; "
+                            f"END $$;"
+                        ))
+                        enums_created.append(enum_full_name)
     await db.commit()  # fecha transação
 
     # 2. Cria tabelas via Base.metadata (idempotente)
