@@ -8,6 +8,9 @@ from fastapi import Depends
 
 from app.api.deps import get_db
 from app.core.config import settings
+from app.core.logging import get_logger
+
+log = get_logger(__name__)
 
 router = APIRouter(prefix="/health", tags=["health"])
 
