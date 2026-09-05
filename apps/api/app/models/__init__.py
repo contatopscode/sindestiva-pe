@@ -41,6 +41,7 @@ from app.models.enums import (
     FonteEscalaEnum,
     LgpdStatusEnum,
     LgpdTipoEnum,
+    ModuloPapelEnum,
     MotivoRemanejamentoEnum,
     RoleEnum,
     SnapshotStatusEnum,
@@ -54,6 +55,7 @@ from app.models.enums import (
 from app.models.lgpd import LgpdPurgeLog, LgpdSolicitacao, TermoConsentimento
 from app.models.lousa import LayoutFingerprint, LousaCell, LousaSnapshot
 from app.models.lousa_scraping import LousaAlocacao, LousaEscalaOrigem
+from app.models.modulos import Modulo, UsuarioModulo
 from app.models.ogmo import OgmoNotificacao, OgmoWebhookEndpoint
 from app.models.perfis_internos import Dirigente, Fiscal
 from app.models.remanejamento import Remanejamento, RemanejamentoHistorico
@@ -72,6 +74,7 @@ __all__ = [
     "FonteEscalaEnum",
     "LgpdStatusEnum",
     "LgpdTipoEnum",
+    "ModuloPapelEnum",
     "MotivoRemanejamentoEnum",
     "RoleEnum",
     "SnapshotStatusEnum",
@@ -87,6 +90,9 @@ __all__ = [
     # perfis internos
     "Fiscal",
     "Dirigente",
+    # módulos (issue #14)
+    "Modulo",
+    "UsuarioModulo",
     # catalogos
     "Porto",
     "Turno",
