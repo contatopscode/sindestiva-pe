@@ -45,12 +45,26 @@ async def lifespan(app: FastAPI):
     `asyncio.create_task`.
     Sprint 6: adiciona scheduler de jobs (hash_chain_verifier 03:00,
     lgpd_purge 04:00).
+    Sprint 0+ deploy: cria schema `lousa_main` se não existir (DB
+    compartilhado no Render free tier — schema pode não estar lá).
     """
     log.info(
         "api.startup",
         env=settings.app_env,
         db_schema=settings.db_schema,
     )
+    # Sprint 0+ deploy: garante schema `lousa_main` (idempotente).
+    # Em dev local, init.sql do Docker já cria; em prod (Render) com DB
+    # compartilhado (sinapse-db), o Alembic pode falhar em criar o schema
+    # por permissão — então fazemos aqui no engine do app (que já tem o
+    # event listener de search_path aplicado em cada connect).
+    from sqlalchemy import text
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {settings.db_schema}"))
+        log.info("api.schema_ensured", schema=settings.db_schema)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("api.schema_create_failed", schema=settings.db_schema, erro=str(exc))
     # Sprint 6: inicia scheduler de jobs LGPD/auditoria
     await start_s6_scheduler()
     # Sprint 2: inicia o scheduler de scraping (interval = 15min).
