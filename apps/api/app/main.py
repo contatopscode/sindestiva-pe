@@ -111,11 +111,18 @@ app = FastAPI(
 
 
 # ---------------------------------------------------------------------------
-# CORS (Sprint 0 — DEV ONLY)
+# CORS
 # ---------------------------------------------------------------------------
-# Sprint 0: o Next.js roda em :3000 e a API em :8000 (origens diferentes).
-# Em dev, habilita CORS pros origins locais. Em produção (Sprint 1+),
-# trocar por lista explícita via env (mesmo padrão FaceGate/Córtex).
+# Dev (Next.js local): `localhost:3000/3001/3010`
+# Staging/Preview (Vercel): `*.vercel.app` (regex pega todos os preview
+#   deploys — `sindestiva-web-xxx.vercel.app`, etc)
+# Prod (Vercel custom domain): `web.lousa.pscode.ia.br`, `pwa.lousa.pscode.ia.br`
+#   (Sprint 1+ quando ativar domínios custom; por ora só Vercel temporário)
+#
+# NOTA Sprint 0+ deploy: Vercel gera URLs aleatórios por preview
+# (`sindestiva-web-<hash>-<team>.vercel.app`), então é mais robusto usar
+# `allow_origin_regex` para o domínio Vercel inteiro, em vez de listar
+# cada URL.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -123,8 +130,19 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
-        "http://localhost:3010",  # SINDESTIVA web (sindestiva-bot Sprint 4)
+        "http://localhost:3010",
         "http://127.0.0.1:3010",
+        # Vercel temporário (Sprint 0+ até ativar domínio custom)
+        "https://sindestiva-web.vercel.app",
+        "https://sindestiva-pwa.vercel.app",
+        # Domínio custom (Sprint 1+ — descomentar quando DNS estiver pronto)
+        # "https://web.lousa.pscode.ia.br",
+        # "https://pwa.lousa.pscode.ia.br",
+    ],
+    allow_origin_regex=[
+        # Preview deploys do Vercel (sindestiva-web-<hash>.vercel.app)
+        r"https://sindestiva-web[a-z0-9-]*\.vercel\.app",
+        r"https://sindestiva-pwa[a-z0-9-]*\.vercel\.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
