@@ -12,6 +12,12 @@ build/
 .turbo/
 *.tsbuildinfo
 
+# Vercel CLI local config
+.vercel/
+# Local Vercel env files (deployed via Dashboard/CLI)
+.env.local
+.env.*.local
+
 # Coverage / cache
 coverage/
 .nyc_output/
@@ -97,3 +103,5 @@ playwright/.cache/
 # ---------- Testes ----------
 coverage/
 junit.xml
+.vercel
+.env*

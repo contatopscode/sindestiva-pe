@@ -73,6 +73,12 @@ def run_migrations_offline() -> None:
 
 def do_run_migrations(connection: Connection) -> None:
     """Aplica migrations em uma conexão síncrona."""
+    # Garante que o schema `lousa_main` existe antes de qualquer migration
+    # rodar. Idempotente (`IF NOT EXISTS`). Em dev local, o init.sql do
+    # docker-compose já cria; em prod (Render), o `sinapse-db` é
+    # compartilhado com Sinapse e o schema do Sindestiva é criado aqui.
+    connection.exec_driver_sql("CREATE SCHEMA IF NOT EXISTS lousa_main")
+    connection.exec_driver_sql("SET search_path TO lousa_main, public")
     context.configure(
         connection=connection,
         target_metadata=target_metadata,

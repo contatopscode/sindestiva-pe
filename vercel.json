@@ -1,0 +1,17 @@
+{
+  "services": {
+    "sindestiva-api": {
+      "root": "apps/api",
+      "entrypoint": "app.main:app"
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": {
+        "type": "service",
+        "service": "sindestiva-api"
+      }
+    }
+  ]
+}
