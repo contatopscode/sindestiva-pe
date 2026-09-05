@@ -54,10 +54,21 @@ async def diag(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
         )).all()
     ]
     current_schema = (await db.execute(text("SELECT current_schema()"))).scalar()
+    # Lista tabelas em TODOS os schemas (para debugar se o alemic_version
+    # foi parar em public em vez de lousa_main).
+    all_tables = [
+        {"schema": r[0], "table": r[1]}
+        for r in (await db.execute(text(
+            "SELECT table_schema, table_name FROM information_schema.tables "
+            "WHERE table_schema NOT IN ('pg_catalog', 'information_schema') "
+            "ORDER BY table_schema, table_name"
+        ))).all()
+    ]
     return {
         "current_schema": current_schema,
         "expected_schema": settings.db_schema,
         "schemas": schemas,
         "tables_in_expected_schema": tables,
+        "all_tables": all_tables,
         "database_url_host": settings.database_url_async.split("@")[-1].split("/")[0],
     }
