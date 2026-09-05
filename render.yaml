@@ -1,0 +1,182 @@
+# =============================================================================
+# SINDESTIVA-PE · Render Blueprint
+#
+# Render provisiona TUDO declarativamente a partir deste arquivo.
+# Aplicar via: `render blueprint launch` (CLI) ou Dashboard → New → Blueprint.
+#
+# Provisiona:
+#  - 1 Postgres database (lousa-main) — 90d free, depois $7/mês
+#  - 1 Key Value store (Redis) — free tier permanente
+#  - 1 Web Service (sindestiva-api, FastAPI) — free tier com cold start
+#  - 1 Background Worker (sindestiva-scraper) — free tier permanente
+#
+# Vercel hospeda `apps/web` + `apps/pwa` (Next.js nativo).
+# Domínio `lousa.pscode.ia.br` é configurado separadamente (UI Render/Vercel
+# após primeiro deploy).
+#
+# NOTA: Atualizar `repo: https://github.com/contatopscode/sindestiva-pe` antes
+# de aplicar (Render precisa do repo público ou conectado via GitHub App).
+# =============================================================================
+
+services:
+  # -------------------------------------------------------------------------
+  # Web Service — API FastAPI
+  # -------------------------------------------------------------------------
+  - type: web
+    name: sindestiva-api
+    runtime: docker
+    rootDir: apps/api
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # --- App ---
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: TZ
+        value: America/Recife
+      - key: PORT
+        value: 8000
+      # --- Banco (Render Postgres) — preenchido pelo Render automaticamente
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sindestiva-db
+          property: connectionString
+      - key: DATABASE_URL_ASYNC
+        fromDatabase:
+          name: sindestiva-db
+          property: connectionString
+      # Render Postgres retorna `postgresql://`, asyncpg precisa `postgresql+asyncpg://`
+      # Por isso o serviço converte internamente em `app.core.config`.
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: sindestiva-db
+          property: role
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: sindestiva-db
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: sindestiva-db
+          property: database
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: sindestiva-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: sindestiva-db
+          property: port
+      # --- Redis (Render Key Value) ---
+      - key: REDIS_URL
+        fromKeyValue:
+          name: sindestiva-redis
+          property: redisUrl
+      # --- Auth ---
+      - key: NEXTAUTH_SECRET
+        generateValue: true  # Render gera um secret aleatório
+      - key: NEXTAUTH_URL
+        value: https://sindestiva-api.onrender.com
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      # --- TPA / Evolution API (WhatsApp) ---
+      - key: EVOLUTION_API_URL
+        sync: false  # Paulo preenche via UI (sensitive)
+      - key: EVOLUTION_API_KEY
+        sync: false
+      - key: EVOLUTION_INSTANCE
+        value: sindestiva
+      # --- OGMO ---
+      - key: OGMO_EMAIL
+        value: escalacao@ogmo-pe.com.br
+      - key: OGMO_WEBHOOK_URL
+        sync: false
+      # --- Resend (e-mail transacional) ---
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM
+        value: Lousa Sindestiva <noreply@lousa.pscode.ia.br>
+      # --- FCM (push) ---
+      - key: FCM_PROJECT_ID
+        sync: false
+      - key: FCM_PRIVATE_KEY
+        sync: false
+      - key: FCM_CLIENT_EMAIL
+        sync: false
+      # --- Scraper (compartilhado c/ worker) ---
+      - key: SCRAPER_USER_AGENT
+        value: SINDESTIVA-Lousa/1.0 (+https://lousa.pscode.ia.br)
+      - key: SCRAPER_TIMEOUT
+        value: "30"
+      - key: SCRAPER_INTERVAL
+        value: "60"
+      # --- Sentry ---
+      - key: SENTRY_DSN
+        sync: false
+
+  # -------------------------------------------------------------------------
+  # Background Worker — Scraper
+  # -------------------------------------------------------------------------
+  - type: worker
+    name: sindestiva-scraper
+    runtime: docker
+    rootDir: services/scraper
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    autoDeploy: true
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: LOG_LEVEL
+        value: info
+      - key: TZ
+        value: America/Recife
+      # --- Banco (mesmo Postgres da API) ---
+      - key: DATABASE_URL
+        fromDatabase:
+          name: sindestiva-db
+          property: connectionString
+      - key: DATABASE_URL_ASYNC
+        fromDatabase:
+          name: sindestiva-db
+          property: connectionString
+      # --- Redis (mesma instância) ---
+      - key: REDIS_URL
+        fromKeyValue:
+          name: sindestiva-redis
+          property: redisUrl
+      # --- Scraper config ---
+      - key: SCRAPER_USER_AGENT
+        value: SINDESTIVA-Lousa/1.0 (+https://lousa.pscode.ia.br)
+      - key: SCRAPER_TIMEOUT
+        value: "30"
+      - key: SCRAPER_INTERVAL
+        value: "60"
+      - key: SENTRY_DSN
+        sync: false
+
+# =============================================================================
+# Infra provisionada
+# =============================================================================
+
+databases:
+  - name: sindestiva-db
+    plan: free
+    region: oregon
+    databaseName: lousa_main
+    user: sindestiva
+    ipAllowList: []  # Apenas serviços Render acessam (default)
+
+keyValueStores:
+  - name: sindestiva-redis
+    plan: free
+    region: oregon
+    # Sem senha (Redis interno; só acessível pela rede privada Render)
