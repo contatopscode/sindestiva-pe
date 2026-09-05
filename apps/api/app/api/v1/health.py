@@ -86,6 +86,12 @@ async def init_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     # 1. Cria schema
     await db.execute(sql_text(f"CREATE SCHEMA IF NOT EXISTS {settings.db_schema}"))
 
+    # 1b. Cria extensions necessárias (gin_trgm_ops, citext, pgcrypto).
+    # Algumas tabelas têm índices GIN com `gin_trgm_ops` (DD v1 §3.7-3.8).
+    await db.execute(sql_text('CREATE EXTENSION IF NOT EXISTS "pgcrypto"'))
+    await db.execute(sql_text('CREATE EXTENSION IF NOT EXISTS "citext"'))
+    await db.execute(sql_text('CREATE EXTENSION IF NOT EXISTS "pg_trgm"'))
+
     # 2. Cria tabelas via Base.metadata
     from app.core.database import Base
     import app.models  # noqa: F401  (popula Base.metadata)
