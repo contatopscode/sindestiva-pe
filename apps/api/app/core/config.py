@@ -5,13 +5,19 @@ Defaults alinhados com a pegadinha do Mac do Paulo:
   - Postgres 17 na 5433 (NÃO 5432 — ocupado pelo Homebrew)
   - Redis 7 na 6380 (NÃO 6379)
   - Conexão via 127.0.0.1 (forçar IPv4)
+
+Decisão Sprint 0+ (Sprint 0 refactor):
+  - `database_url_sync` é DERIVADO de `database_url_async` substituindo
+    `postgresql+asyncpg://` por `postgresql+psycopg://`. Assim só
+    precisamos setar 1 env var (`DATABASE_URL_ASYNC`) em produção
+    (Render, Vercel) e o Alembic (psycopg sync) também funciona.
 """
 from __future__ import annotations
 
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,8 +46,8 @@ class Settings(BaseSettings):
         description="URL async (asyncpg) — usar em runtime FastAPI.",
     )
     database_url_sync: str = Field(
-        default="postgresql+psycopg://sindestiva:sindestiva@127.0.0.1:5433/sindestiva",
-        description="URL sync (psycopg v3) — usar em Alembic.",
+        default="",  # derivado de `database_url_async` no validator abaixo
+        description="URL sync (psycopg v3) — usar em Alembic. Se vazio, deriva de `database_url_async`.",
     )
     postgres_user: str = "sindestiva"
     postgres_password: str = "sindestiva"
@@ -86,6 +92,21 @@ class Settings(BaseSettings):
 
     # ---------- Observabilidade ----------
     sentry_dsn: str = ""
+
+    @model_validator(mode="after")
+    def _derive_database_url_sync(self) -> "Settings":
+        """Se `DATABASE_URL_SYNC` não foi setado, deriva de `DATABASE_URL_ASYNC`.
+
+        Substitui o driver `postgresql+asyncpg://` por `postgresql+psycopg://`
+        (driver sync do Alembic). Necessário em prod (Render) porque só
+        setamos `DATABASE_URL_ASYNC` no painel — duplicar a env var é fonte
+        de bug (mudou uma, esqueceu a outra).
+        """
+        if not self.database_url_sync:
+            self.database_url_sync = self.database_url_async.replace(
+                "postgresql+asyncpg://", "postgresql+psycopg://", 1
+            )
+        return self
 
 
 @lru_cache(maxsize=1)
