@@ -499,7 +499,19 @@ async def dedupe_users(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     Idempotente. Sprint 1+: mover para migration Alembic e remover.
     """
     from sqlalchemy import text as sql_text
+    from fastapi import HTTPException
 
+    try:
+        return await _dedupe_users_impl(db, sql_text)
+    except Exception as exc:  # noqa: BLE001
+        log.error("dedupe_users.failed", exc_type=type(exc).__name__, exc_msg=str(exc))
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "DEDUPE_FAILED", "message": f"{type(exc).__name__}: {exc}"},
+        ) from exc
+
+
+async def _dedupe_users_impl(db: AsyncSession, sql_text) -> dict[str, object]:
     log.info("dedupe_users.start")
 
     # 1. Listar duplicatas ANTES de deletar (para reportar).
