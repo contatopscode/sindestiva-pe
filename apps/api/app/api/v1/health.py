@@ -211,6 +211,7 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     now = dt.now(tz=timezone.utc)
     today = now.date()
     results: dict[str, list[str]] = {"created": [], "skipped": [], "errors": []}
+    error_details: dict[str, str] = {}
 
     async def upsert(sql: str, params: dict, label: str) -> str:
         """INSERT ... ON CONFLICT DO NOTHING. Retorna 'created' ou 'skipped'."""
@@ -228,6 +229,7 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
                 exc_type=type(exc).__name__,
                 exc_msg=str(exc),
             )
+            error_details[label] = f"{type(exc).__name__}: {exc}"
         results[status].append(label)
         return status
 
@@ -452,6 +454,7 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
         "created": results["created"],
         "skipped": results["skipped"],
         "errors": results["errors"],
+        "error_details": error_details,
         "test_credentials": {
             "fiscal": {"email": "paulo@pscode.ia.br", "senha": "sinapse-demo-2026"},
             "tpa": {"email": "tpa058@ogmo-pe.com.br", "senha": "sinapse-demo-2026"},
