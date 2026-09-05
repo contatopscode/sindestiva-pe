@@ -30,3 +30,34 @@ async def health(db: AsyncSession = Depends(get_db)) -> dict[str, str]:
         "env": settings.app_env,
         "db": db_status,
     }
+
+
+@router.get("/diag", summary="Diagnóstico de schema/tabelas (debug)")
+async def diag(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
+    """Lista schemas, tabelas e current_schema do DB. Usado para
+    debugar conexão em produção (Render, etc).
+    """
+    schemas = [
+        r[0]
+        for r in (await db.execute(
+            text("SELECT schema_name FROM information_schema.schemata ORDER BY schema_name")
+        )).all()
+    ]
+    tables = [
+        r[0]
+        for r in (await db.execute(
+            text(
+                "SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = :s ORDER BY table_name"
+            ),
+            {"s": settings.db_schema},
+        )).all()
+    ]
+    current_schema = (await db.execute(text("SELECT current_schema()"))).scalar()
+    return {
+        "current_schema": current_schema,
+        "expected_schema": settings.db_schema,
+        "schemas": schemas,
+        "tables_in_expected_schema": tables,
+        "database_url_host": settings.database_url_async.split("@")[-1].split("/")[0],
+    }
