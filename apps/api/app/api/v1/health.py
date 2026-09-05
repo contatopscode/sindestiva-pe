@@ -482,3 +482,65 @@ async def counts(db: AsyncSession = Depends(get_db)) -> dict[str, int]:
         n = (await db.execute(sql_text(f"SELECT COUNT(*) FROM lousa_main.{t}"))).scalar()
         result[t] = n
     return result
+
+
+@router.post("/dedupe-users", summary="Remove users duplicados (mesmo email) e adiciona UNIQUE")
+async def dedupe_users(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
+    """Limpa duplicatas de `users` criadas por runs antigos do seed (sem
+    UNIQUE constraint) e adiciona `UNIQUE` no `email` (citext).
+
+    Estratégia:
+      1. Para cada email duplicado, mantém o registro MAIS ANTIGO
+         (menor `created_at`) e deleta os outros (com seus fiscais/tpas
+         em cascata se aplicável).
+      2. Cria índice UNIQUE em `users(email)`.
+
+    Idempotente. Sprint 1+: mover para migration Alembic e remover.
+    """
+    from sqlalchemy import text as sql_text
+
+    log.info("dedupe_users.start")
+
+    # 1. Listar duplicatas ANTES de deletar (para reportar).
+    dupes = (await db.execute(sql_text(
+        "SELECT email, COUNT(*) AS n FROM lousa_main.users "
+        "WHERE email IS NOT NULL "
+        "GROUP BY email HAVING COUNT(*) > 1"
+    ))).all()
+    dupe_summary = [{"email": r[0], "count": r[1]} for r in dupes]
+
+    # 2. Deletar duplicatas (mantém o de menor created_at = mais antigo).
+    deleted = (await db.execute(sql_text(
+        "DELETE FROM lousa_main.users u "
+        "WHERE u.id NOT IN ("
+        "  SELECT MIN(id::text)::uuid FROM lousa_main.users "
+        "  WHERE email IS NOT NULL GROUP BY email"
+        ") AND u.email IS NOT NULL"
+    ))).rowcount
+    await db.commit()
+
+    # 3. Cria índice UNIQUE (IF NOT EXISTS, idempotente).
+    try:
+        await db.execute(sql_text(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email "
+            "ON lousa_main.users (email)"
+        ))
+        await db.commit()
+        unique_status = "created"
+    except Exception as exc:  # noqa: BLE001
+        await db.rollback()
+        unique_status = f"error: {exc!s}"
+
+    # 4. Counts pós-cleanup.
+    after = (await db.execute(sql_text(
+        "SELECT COUNT(*) FROM lousa_main.users"
+    ))).scalar()
+
+    log.info("dedupe_users.done", deleted=deleted, after=after)
+    return {
+        "ok": True,
+        "duplicates_found": dupe_summary,
+        "users_deleted": deleted,
+        "users_remaining": after,
+        "unique_index": unique_status,
+    }
