@@ -203,10 +203,6 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     """
     import bcrypt
     from datetime import datetime as dt, timezone
-    from app.models.enums import (
-        FainaCodigoEnum, FuncaoCodigoEnum, PortoCodigoEnum, TurnoCodigoEnum,
-        RoleEnum, UserStatusEnum,
-    )
 
     now = dt.now(tz=timezone.utc)
     today = now.date()
