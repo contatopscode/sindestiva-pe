@@ -6,8 +6,10 @@
 # detecta que o schema já está no estado atual e não faz nada.
 #
 # Decisões:
-#  - Usa `alembic upgrade head` (não `alembic stamp head`): se o schema está
-#    vazio, cria tudo; se já tem migrations, só aplica as pendentes.
+#  - Usa caminho ABSOLUTO do `alembic` no venv (`/app/.venv/bin/alembic`)
+#    em vez de `uv run alembic` — o runtime stage do Dockerfile NÃO tem
+#    o binary `uv` (só o venv copiado), e o PATH pode não incluir o venv
+#    quando tini chama o entrypoint.
 #  - Falha fast: se migrations falharem, uvicorn NÃO sobe (deploy fica
 #    vermelho, aciona alerta).
 #  - O env.py já faz CREATE SCHEMA IF NOT EXISTS lousa_main + SET search_path,
@@ -15,11 +17,13 @@
 # =============================================================================
 set -e
 
+VENV_BIN="/app/.venv/bin"
+
 echo "==> entrypoint.sh: rodando migrations Alembic..."
-uv run alembic upgrade head
+"$VENV_BIN/alembic" upgrade head
 
 echo "==> entrypoint.sh: iniciando uvicorn..."
-exec uvicorn app.main:app \
+exec "$VENV_BIN/uvicorn" app.main:app \
     --host 0.0.0.0 \
     --port "${PORT:-8000}" \
     --proxy-headers \
