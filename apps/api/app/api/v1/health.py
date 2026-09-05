@@ -83,8 +83,14 @@ async def init_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     """
     from sqlalchemy import text as sql_text
 
+    # 0. DROP schema (se existir) — reset total. Usar com cuidado.
+    # Necessário porque o `create_all` tem ordem estranha para ENUMs
+    # quando o schema já tem objetos parciais (tables órfãs com FKs para
+    # enums que ainda não foram criados).
+    await db.execute(sql_text(f"DROP SCHEMA IF EXISTS {settings.db_schema} CASCADE"))
+
     # 1. Cria schema
-    await db.execute(sql_text(f"CREATE SCHEMA IF NOT EXISTS {settings.db_schema}"))
+    await db.execute(sql_text(f"CREATE SCHEMA {settings.db_schema}"))
 
     # 1b. Cria extensions necessárias (gin_trgm_ops, citext, pgcrypto).
     # Algumas tabelas têm índices GIN com `gin_trgm_ops` (DD v1 §3.7-3.8).
@@ -92,13 +98,26 @@ async def init_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     await db.execute(sql_text('CREATE EXTENSION IF NOT EXISTS "citext"'))
     await db.execute(sql_text('CREATE EXTENSION IF NOT EXISTS "pg_trgm"'))
 
-    # 2. Cria tabelas via Base.metadata
+    # 1c. Cria ENUMs ANTES das tabelas (ordem manual, evita UndefinedObjectError).
     from app.core.database import Base
     import app.models  # noqa: F401  (popula Base.metadata)
-    # sync_conn vem do AsyncSession — usa run_sync
-    # Em vez de usar db.run_sync, executa direto:
-    await db.commit()  # fecha transação atual
+    enums_created = []
+    for table in Base.metadata.sorted_tables:
+        for column in table.columns:
+            col_type = column.type
+            # SQLAlchemy ENUM tem `name` (string) e `enums` (lista de valores).
+            if hasattr(col_type, "enums") and hasattr(col_type, "name") and col_type.name:
+                enum_full_name = f"{settings.db_schema}.{col_type.name}"
+                values = list(col_type.enums)
+                if values:
+                    vals = ", ".join(f"'{v}'" for v in values)
+                    await db.execute(sql_text(
+                        f"CREATE TYPE {enum_full_name} AS ENUM ({vals})"
+                    ))
+                    enums_created.append(enum_full_name)
+    await db.commit()  # fecha transação
 
+    # 2. Cria tabelas via Base.metadata (idempotente)
     from app.core.database import engine as _engine
     async with _engine.begin() as conn:
         await conn.run_sync(
