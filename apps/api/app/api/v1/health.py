@@ -491,9 +491,10 @@ async def dedupe_users(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
 
     Estratégia:
       1. Para cada email duplicado, mantém o registro MAIS ANTIGO
-         (menor `created_at`) e deleta os outros (com seus fiscais/tpas
-         em cascata se aplicável).
-      2. Cria índice UNIQUE em `users(email)`.
+         (menor `id` castado como uuid, = criação cronológica).
+      2. Deleta fiscais/tpas órfãos (FK ondelete=RESTRICT exige limpar
+         filhos antes de deletar o user).
+      3. Cria índice UNIQUE em `users(email)`.
 
     Idempotente. Sprint 1+: mover para migration Alembic e remover.
     """
@@ -509,17 +510,44 @@ async def dedupe_users(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     ))).all()
     dupe_summary = [{"email": r[0], "count": r[1]} for r in dupes]
 
-    # 2. Deletar duplicatas (mantém o de menor created_at = mais antigo).
-    deleted = (await db.execute(sql_text(
-        "DELETE FROM lousa_main.users u "
-        "WHERE u.id NOT IN ("
-        "  SELECT MIN(id::text)::uuid FROM lousa_main.users "
-        "  WHERE email IS NOT NULL GROUP BY email"
-        ") AND u.email IS NOT NULL"
+    # 2. Deletar fiscais/tpas dos users que serão removidos (cascata manual).
+    # Mantém o user com MENOR id (= criado primeiro).
+    fiscais_deleted = (await db.execute(sql_text(
+        "DELETE FROM lousa_main.fiscais "
+        "WHERE user_id IN ("
+        "  SELECT id FROM lousa_main.users "
+        "  WHERE email IS NOT NULL "
+        "  AND id NOT IN ("
+        "    SELECT MIN(id) FROM lousa_main.users "
+        "    WHERE email IS NOT NULL GROUP BY email"
+        "  )"
+        ")"
+    ))).rowcount
+    tpas_deleted = (await db.execute(sql_text(
+        "DELETE FROM lousa_main.tpas "
+        "WHERE user_id IN ("
+        "  SELECT id FROM lousa_main.users "
+        "  WHERE email IS NOT NULL "
+        "  AND id NOT IN ("
+        "    SELECT MIN(id) FROM lousa_main.users "
+        "    WHERE email IS NOT NULL GROUP BY email"
+        "  )"
+        ")"
     ))).rowcount
     await db.commit()
 
-    # 3. Cria índice UNIQUE (IF NOT EXISTS, idempotente).
+    # 3. Deletar users duplicados.
+    deleted = (await db.execute(sql_text(
+        "DELETE FROM lousa_main.users "
+        "WHERE email IS NOT NULL "
+        "AND id NOT IN ("
+        "  SELECT MIN(id) FROM lousa_main.users "
+        "  WHERE email IS NOT NULL GROUP BY email"
+        ")"
+    ))).rowcount
+    await db.commit()
+
+    # 4. Cria índice UNIQUE (IF NOT EXISTS, idempotente).
     try:
         await db.execute(sql_text(
             "CREATE UNIQUE INDEX IF NOT EXISTS uq_users_email "
@@ -531,7 +559,7 @@ async def dedupe_users(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
         await db.rollback()
         unique_status = f"error: {exc!s}"
 
-    # 4. Counts pós-cleanup.
+    # 5. Counts pós-cleanup.
     after = (await db.execute(sql_text(
         "SELECT COUNT(*) FROM lousa_main.users"
     ))).scalar()
@@ -540,6 +568,8 @@ async def dedupe_users(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
     return {
         "ok": True,
         "duplicates_found": dupe_summary,
+        "fiscais_deleted": fiscais_deleted,
+        "tpas_deleted": tpas_deleted,
         "users_deleted": deleted,
         "users_remaining": after,
         "unique_index": unique_status,
