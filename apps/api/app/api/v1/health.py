@@ -523,14 +523,15 @@ async def _dedupe_users_impl(db: AsyncSession, sql_text) -> dict[str, object]:
     dupe_summary = [{"email": r[0], "count": r[1]} for r in dupes]
 
     # 2. Deletar fiscais/tpas dos users que serão removidos (cascata manual).
-    # Mantém o user com MENOR id (= criado primeiro).
+    # Mantém o user com MENOR id::text (= criado primeiro; MIN(uuid) não existe
+    # no Postgres, então ordenamos pelo id lexicográfico via text).
     fiscais_deleted = (await db.execute(sql_text(
         "DELETE FROM lousa_main.fiscais "
         "WHERE user_id IN ("
         "  SELECT id FROM lousa_main.users "
         "  WHERE email IS NOT NULL "
-        "  AND id NOT IN ("
-        "    SELECT MIN(id) FROM lousa_main.users "
+        "  AND id::text NOT IN ("
+        "    SELECT MIN(id::text) FROM lousa_main.users "
         "    WHERE email IS NOT NULL GROUP BY email"
         "  )"
         ")"
@@ -540,8 +541,8 @@ async def _dedupe_users_impl(db: AsyncSession, sql_text) -> dict[str, object]:
         "WHERE user_id IN ("
         "  SELECT id FROM lousa_main.users "
         "  WHERE email IS NOT NULL "
-        "  AND id NOT IN ("
-        "    SELECT MIN(id) FROM lousa_main.users "
+        "  AND id::text NOT IN ("
+        "    SELECT MIN(id::text) FROM lousa_main.users "
         "    WHERE email IS NOT NULL GROUP BY email"
         "  )"
         ")"
@@ -552,8 +553,8 @@ async def _dedupe_users_impl(db: AsyncSession, sql_text) -> dict[str, object]:
     deleted = (await db.execute(sql_text(
         "DELETE FROM lousa_main.users "
         "WHERE email IS NOT NULL "
-        "AND id NOT IN ("
-        "  SELECT MIN(id) FROM lousa_main.users "
+        "AND id::text NOT IN ("
+        "  SELECT MIN(id::text) FROM lousa_main.users "
         "  WHERE email IS NOT NULL GROUP BY email"
         ")"
     ))).rowcount
