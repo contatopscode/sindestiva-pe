@@ -6,6 +6,12 @@ Endpoint temporário para visualização durante a Fase de Construção
 end-to-end do Centro de Comando.
 
 Endpoint real autenticado: `GET /api/v1/lousa/atual` (em lousa.py).
+
+Sprint 2+: o scraper popula `LousaEscalaOrigem` + `LousaAlocacao`
+(arquitetura nova) ao invés de `LousaSnapshot` + `LousaCell`
+(arquitetura Sprint 0). O endpoint faz fallback: se não há
+LousaSnapshot, agrega as alocações de LousaAlocacao para o
+(porto, turno, data) solicitado.
 """
 from __future__ import annotations
 
@@ -17,7 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.core.logging import get_logger
-from app.models import Faina, Funcao, LousaCell, LousaSnapshot, Porto, Tpa, Turno
+from app.models import Faina, Funcao, LousaAlocacao, LousaCell, LousaSnapshot, Porto, Tpa, Turno
+from app.models import LousaEscalaOrigem
 from app.models.enums import CellStatusEnum, SnapshotStatusEnum
 
 router = APIRouter(prefix="/lousa/public", tags=["lousa-public"])
@@ -54,7 +61,7 @@ async def preview(
         select(Funcao).where(Funcao.is_active.is_(True)).order_by(Funcao.ordem_lousa)
     )).scalars().all()
 
-    # Snapshot mais recente
+    # Snapshot mais recente (arquitetura Sprint 0)
     stmt_s = (
         select(LousaSnapshot)
         .where(LousaSnapshot.porto_id == porto_obj.id, LousaSnapshot.turno_id == turno_obj.id)
@@ -65,7 +72,16 @@ async def preview(
 
     cells: list[dict] = []
     total_tpas = 0
+    snapshot_meta: dict = {
+        "id": None,
+        "scraped_at": None,
+        "status": None,
+        "total_celulas": 0,
+        "total_tpas_escalados": 0,
+    }
+
     if snapshot is not None:
+        # Sprint 0: leu do LousaSnapshot
         from sqlalchemy.orm import selectinload
         stmt_c = (
             select(LousaCell)
@@ -94,17 +110,74 @@ async def preview(
                 "data_referencia": c.data_referencia.isoformat(),
             })
         total_tpas = sum(1 for c in cells if c["tpa_id"])
+        snapshot_meta = {
+            "id": str(snapshot.id),
+            "scraped_at": snapshot.scraped_at.isoformat(),
+            "status": snapshot.status.value,
+            "total_celulas": snapshot.total_celulas,
+            "total_tpas_escalados": snapshot.total_tpas_escalados,
+        }
+    else:
+        # Sprint 2+: fallback para LousaAlocacao (tabela que o scraper popula).
+        # Pega alocações mais recentes para (porto, turno, data) do dia ou a
+        # última disponível.
+        log.info("lousa_public.fallback_alocacao", porto=porto, turno=turno)
+        for ref_date in (date.today(), date.today() - timedelta(days=1)):
+            stmt_a = (
+                select(LousaAlocacao)
+                .where(
+                    LousaAlocacao.porto_id == porto_obj.id,
+                    LousaAlocacao.turno_id == turno_obj.id,
+                    LousaAlocacao.data_referencia == ref_date,
+                )
+                .order_by(LousaAlocacao.scraped_at.desc())
+            )
+            alocacoes_db = (await db.execute(stmt_a)).scalars().all()
+            if alocacoes_db:
+                # Encontra o scraped_at mais recente (snapshot virtual)
+                latest_scraped = max(a.scraped_at for a in alocacoes_db)
+                # Tabela temporária id->tpa info (resolvida uma vez pra evitar N+1)
+                matriculas = {a.trabalhador_matricula for a in alocacoes_db if a.trabalhador_matricula}
+                tpa_by_mat: dict[str, Tpa] = {}
+                if matriculas:
+                    tpa_rows = (await db.execute(
+                        select(Tpa).where(Tpa.matricula_ogmo.in_(matriculas))
+                    )).scalars().all()
+                    tpa_by_mat = {t.matricula_ogmo: t for t in tpa_rows}
+                # Escala origem mais recente
+                latest_escala = (await db.execute(
+                    select(LousaEscalaOrigem)
+                    .where(LousaEscalaOrigem.id.in_({a.escala_origem_id for a in alocacoes_db}))
+                    .order_by(LousaEscalaOrigem.scraped_at.desc())
+                    .limit(1)
+                )).scalar_one_or_none()
+                for a in alocacoes_db:
+                    tpa_obj = tpa_by_mat.get(a.trabalhador_matricula) if a.trabalhador_matricula else None
+                    cells.append({
+                        "id": str(a.id),
+                        "faina_id": str(a.faina_id),
+                        "funcao_id": str(a.funcao_id),
+                        "cais": None,
+                        "tpa_id": str(tpa_obj.id) if tpa_obj else None,
+                        "tpa_nome": tpa_obj.nome_completo if tpa_obj else None,
+                        "tpa_matricula": a.trabalhador_matricula,
+                        "status": "NORMAL",
+                        "data_referencia": a.data_referencia.isoformat(),
+                    })
+                total_tpas = sum(1 for c in cells if c["tpa_id"])
+                snapshot_meta = {
+                    "id": str(latest_escala.id) if latest_escala else None,
+                    "scraped_at": latest_scraped.isoformat(),
+                    "status": latest_escala.status.value if latest_escala else "SUCESSO",
+                    "total_celulas": len(alocacoes_db),
+                    "total_tpas_escalados": total_tpas,
+                }
+                break
 
     return {
         "porto": {"id": str(porto_obj.id), "codigo": porto_obj.codigo, "nome": porto_obj.nome_completo},
         "turno": {"id": str(turno_obj.id), "codigo": turno_obj.codigo, "nome": turno_obj.nome_exibicao},
-        "snapshot": {
-            "id": str(snapshot.id) if snapshot else None,
-            "scraped_at": snapshot.scraped_at.isoformat() if snapshot else None,
-            "status": snapshot.status.value if snapshot else None,
-            "total_celulas": snapshot.total_celulas if snapshot else 0,
-            "total_tpas_escalados": snapshot.total_tpas_escalados if snapshot else 0,
-        },
+        "snapshot": snapshot_meta,
         "fainas": [
             {"id": str(f.id), "codigo": f.codigo, "nome": f.nome_exibicao,
              "cor_hex": f.cor_hex, "ordem": f.ordem_lousa}
