@@ -69,19 +69,6 @@ export function LousaTable({ fainas, funcoes, cells, onCellClick }: LousaTablePr
     return m;
   }, [cells]);
 
-  // Indexa fainas e funções por id.
-  const fainasById = useMemo(() => {
-    const m = new Map<string, Faina>();
-    for (const f of fainas) m.set(f.id, f);
-    return m;
-  }, [fainas]);
-
-  const funcoesById = useMemo(() => {
-    const m = new Map<string, Funcao>();
-    for (const fn of funcoes) m.set(fn.id, fn);
-    return m;
-  }, [funcoes]);
-
   // Agrupa funções por categoria preservando ordem.
   const funcoesPorCategoria = useMemo(() => {
     const out = new Map<FuncaoCategoria, Funcao[]>();

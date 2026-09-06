@@ -26,8 +26,6 @@ import type {
   OgmoNotificacao,
   AuditEvent,
   UserSession,
-  FuncaoCategoria,
-  FainaCategoria,
 } from "./tipos";
 
 // ---- Fainas (catálogo estático do seed) ----------------------------------

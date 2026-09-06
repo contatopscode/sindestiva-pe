@@ -219,7 +219,7 @@ export async function getRemanejamentos(filters?: {
   }
 }
 
-export async function createRemanejamento(input: unknown): Promise<RemanejamentoItem> {
+export async function createRemanejamento(_input: unknown): Promise<RemanejamentoItem> {
   // Sprint 5: POST /api/v1/remanejamentos
   return new Promise((resolve) => {
     setTimeout(() => {
