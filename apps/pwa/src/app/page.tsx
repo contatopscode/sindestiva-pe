@@ -25,7 +25,7 @@ const MATRICULAS_DEMO = [
 ];
 
 export default function HomePage() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://sindestiva-api.onrender.com";
   const [matricula, setMatricula] = useState(MATRICULAS_DEMO[1]);
   const [data, setData] = useState<TpaEscala | null>(null);
   const [loading, setLoading] = useState(true);
