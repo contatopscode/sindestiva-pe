@@ -30,7 +30,7 @@ import type {
 
 // ---- Configuração ---------------------------------------------------------
 
-const DEFAULT_API_URL = "http://127.0.0.1:8000";
+const DEFAULT_API_URL = "https://sindestiva-api.onrender.com";
 
 /** Base URL da API. Configurável via `NEXT_PUBLIC_API_URL` no .env do web. */
 export const API_URL: string =
