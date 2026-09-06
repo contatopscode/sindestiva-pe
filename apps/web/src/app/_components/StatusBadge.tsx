@@ -6,9 +6,11 @@
 //   - Erro / NACK / Ausente→ vermelho
 //   - SENT / Info          → ciano
 //   - Remanejado           → roxo
+//
+// Sem "use client" — funções puras (toneForCellStatus etc.) são usadas em
+// server components (ex: /tpa/escala). Componente StatusBadge em si só usa
+// className puro, sem estado/efeitos, também funciona no server.
 // =============================================================================
-
-"use client";
 
 import type { ReactNode } from "react";
 import type { CellStatus, SnapshotStatus } from "@/lib/tipos";
