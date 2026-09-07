@@ -98,7 +98,8 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
+  // `as const` evita conflito de tipo com RouteImpl<string> em Next 15+.
   matcher: [
     "/((?!api|_next/static|_next/image|favicon.ico).*)",
-  ],
+  ] as const,
 };
