@@ -1,0 +1,3 @@
+# Manter .env.production (Vercel CLI respeita .gitignore por padrão)
+# Vou comentar a regra de .gitignore pro .env.production
+!/.env.production

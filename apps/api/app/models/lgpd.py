@@ -150,7 +150,8 @@ class LgpdSolicitacao(Base, TimestampMixin):
     purge_after: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        server_default=text("now() + INTERVAL '5 years'"),
+        # server_default omitido — ver perfis_internos.py para rationale.
+        # Adicionado via ALTER TABLE no init endpoint.
     )
 
 

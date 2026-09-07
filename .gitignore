@@ -95,6 +95,9 @@ infra/docker/traefik/letsencrypt/acme.json
 # ---------- Next.js ----------
 next-env.d.ts
 
+# ---------- Git worktrees (OMC / hermes-squad) ----------
+.worktrees/
+
 # ---------- Playwright ----------
 test-results/
 playwright-report/
