@@ -163,16 +163,36 @@ def _normalizar_funcao(texto: str) -> tuple[str, str]:
 
 
 def _parse_html(html: str) -> list[CelulaBruta]:
-    """Extrai (faina, função, matrícula) de cada linha de TPA no HTML."""
+    """Extrai (faina, função, matrícula) de cada linha de TPA no HTML.
+
+    Agrega múltiplas matrículas para a mesma (faina, função) em uma
+    única `CelulaBruta` com matriculas separadas por vírgula. Necessário
+    porque `lousa_alocacao` tem UNIQUE `(escala_origem_id, faina_id,
+    funcao_id)` (Sprint 2 T2-08) — 1 célula por (origem, faina, função).
+    A lousa real tem múltiplos TPAs na mesma função (ex: 6 trabalhadores
+    de porão num mesmo terno).
+    """
     matches = REGEX_TPA_ROW.findall(html)
-    celulas: list[CelulaBruta] = []
+    agregado: dict[tuple[str, str], list[str]] = {}
     for funcao_nome, _nome, matricula, _ord, _extra in matches:
         funcao_codigo, faina_codigo = _normalizar_funcao(funcao_nome)
+        chave = (faina_codigo, funcao_codigo)
+        agregado.setdefault(chave, []).append(matricula.strip())
+
+    celulas: list[CelulaBruta] = []
+    for (faina_codigo, funcao_codigo), matriculas in agregado.items():
+        # Junta matriculas, dedup, ordena. Mantém ordem de inserção.
+        seen: set[str] = set()
+        uniq: list[str] = []
+        for m in matriculas:
+            if m not in seen:
+                seen.add(m)
+                uniq.append(m)
         celulas.append(
             CelulaBruta(
                 faina_codigo=faina_codigo,
                 funcao_codigo=funcao_codigo,
-                trabalhador_matricula=matricula.strip(),
+                trabalhador_matricula=",".join(uniq),
                 turno_codigo="",  # turno vem do periodo no caller
             )
         )
