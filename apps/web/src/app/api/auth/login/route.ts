@@ -63,6 +63,13 @@ export async function POST(req: NextRequest) {
     sameSite: "lax",
     path: "/",
     maxAge: COOKIE_MAX_AGE,
+    // `Domain=.pscode.ia.br` faz o cookie ser compartilhado entre
+    // web.lousa.pscode.ia.br e api.lousa.pscode.ia.br (essencial — CORS
+    // precisa do cookie indo junto). Em dev, não aplica (hostnames diferentes
+    // de .lousa.pscode.ia.br).
+    ...(process.env.NODE_ENV === "production"
+      ? { domain: ".pscode.ia.br" }
+      : {}),
   });
 
   return NextResponse.json({ ok: true, role: data.user.role });
