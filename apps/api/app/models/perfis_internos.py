@@ -90,21 +90,13 @@ class Fiscal(Base, TimestampMixin, SoftDeleteMixin):
         foreign_keys=[user_id],
     )
 
-    # Retenção específica: 5 anos (D2) — sobrescreve o default do mixin
-    # (que é 24m). O DDL da migration 0001 já reflete isso via
-    # `server_default=now() + INTERVAL '5 years'`. Aqui só ajustamos
-    # a metadata do SQLAlchemy para alinhar.
-    #
-    # NOTA Sprint 0+ deploy: o SQLAlchemy 2 wrappa `text("now() + INTERVAL '5 years'")`
-    # em `'now() + INTERVAL 5 years'` (string literal) no DDL, e o
-    # Postgres não consegue fazer cast para timestamptz. Workaround:
-    # omitir `server_default` aqui e adicionar via SQL raw no init
-    # endpoint (ver app/api/v1/health.py init_db). Sprint 1+: reintroduzir
-    # via migration Alembic.
-    purge_after: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-    )
+    # Retenção: herdada do SoftDeleteMixin (5 anos via `default` Python-side).
+    # Não precisa override aqui — o mixin já calcula `now() + 5 years`
+    # no INSERT. Manter esta nota para o DPO entender que fiscais têm
+    # retenção diferenciada (5a vs 24m do mixin default) — a migration
+    # 0001 reflete isso no DDL via ALTER TABLE.
+    # (Override removido: gerava INSERT com purge_after=NULL e quebrava
+    # o seed. Sprint 1+: reintroduzir via Alembic para 24m se necessário.)
 
 
 # ---------------------------------------------------------------------------
