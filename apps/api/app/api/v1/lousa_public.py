@@ -119,60 +119,65 @@ async def preview(
         }
     else:
         # Sprint 2+: fallback para LousaAlocacao (tabela que o scraper popula).
-        # Pega alocações mais recentes para (porto, turno, data) do dia ou a
-        # última disponível.
+        # Pega a escala_origem MAIS RECENTE para (porto, turno) e usa só as
+        # alocações dela — isso garante 1 cell por (faina, funcao) e mantém
+        # consistência entre requests (cada scrape gera uma nova escala_origem).
         log.info("lousa_public.fallback_alocacao", porto=porto, turno=turno)
         for ref_date in (date.today(), date.today() - timedelta(days=1)):
+            # 1. Achar a escala_origem mais recente (a "snapshot virtual")
+            latest_escala = (await db.execute(
+                select(LousaEscalaOrigem)
+                .where(
+                    LousaEscalaOrigem.porto_id == porto_obj.id,
+                    LousaEscalaOrigem.turno_id == turno_obj.id,
+                    LousaEscalaOrigem.data_referencia == ref_date,
+                    LousaEscalaOrigem.status == "SUCESSO",
+                )
+                .order_by(LousaEscalaOrigem.scraped_at.desc())
+                .limit(1)
+            )).scalar_one_or_none()
+            if latest_escala is None:
+                continue
+            # 2. Pegar alocações SÓ dessa escala (94 rows esperados, 1 por faina×funcao)
             stmt_a = (
                 select(LousaAlocacao)
-                .where(
-                    LousaAlocacao.porto_id == porto_obj.id,
-                    LousaAlocacao.turno_id == turno_obj.id,
-                    LousaAlocacao.data_referencia == ref_date,
-                )
+                .where(LousaAlocacao.escala_origem_id == latest_escala.id)
                 .order_by(LousaAlocacao.scraped_at.desc())
             )
             alocacoes_db = (await db.execute(stmt_a)).scalars().all()
-            if alocacoes_db:
-                # Encontra o scraped_at mais recente (snapshot virtual)
-                latest_scraped = max(a.scraped_at for a in alocacoes_db)
-                # Tabela temporária id->tpa info (resolvida uma vez pra evitar N+1)
-                matriculas = {a.trabalhador_matricula for a in alocacoes_db if a.trabalhador_matricula}
-                tpa_by_mat: dict[str, Tpa] = {}
-                if matriculas:
-                    tpa_rows = (await db.execute(
-                        select(Tpa).where(Tpa.matricula_ogmo.in_(matriculas))
-                    )).scalars().all()
-                    tpa_by_mat = {t.matricula_ogmo: t for t in tpa_rows}
-                # Escala origem mais recente
-                latest_escala = (await db.execute(
-                    select(LousaEscalaOrigem)
-                    .where(LousaEscalaOrigem.id.in_({a.escala_origem_id for a in alocacoes_db}))
-                    .order_by(LousaEscalaOrigem.scraped_at.desc())
-                    .limit(1)
-                )).scalar_one_or_none()
-                for a in alocacoes_db:
-                    tpa_obj = tpa_by_mat.get(a.trabalhador_matricula) if a.trabalhador_matricula else None
-                    cells.append({
-                        "id": str(a.id),
-                        "faina_id": str(a.faina_id),
-                        "funcao_id": str(a.funcao_id),
-                        "cais": None,
-                        "tpa_id": str(tpa_obj.id) if tpa_obj else None,
-                        "tpa_nome": tpa_obj.nome_completo if tpa_obj else None,
-                        "tpa_matricula": a.trabalhador_matricula,
-                        "status": "NORMAL",
-                        "data_referencia": a.data_referencia.isoformat(),
-                    })
-                total_tpas = sum(1 for c in cells if c["tpa_id"])
-                snapshot_meta = {
-                    "id": str(latest_escala.id) if latest_escala else None,
-                    "scraped_at": latest_scraped.isoformat(),
-                    "status": latest_escala.status.value if latest_escala else "SUCESSO",
-                    "total_celulas": len(alocacoes_db),
-                    "total_tpas_escalados": total_tpas,
-                }
-                break
+            if not alocacoes_db:
+                continue
+            # 3. Resolver TPAs em batch (1 query pra N matriculas)
+            matriculas = {a.trabalhador_matricula for a in alocacoes_db if a.trabalhador_matricula}
+            tpa_by_mat: dict[str, Tpa] = {}
+            if matriculas:
+                tpa_rows = (await db.execute(
+                    select(Tpa).where(Tpa.matricula_ogmo.in_(matriculas))
+                )).scalars().all()
+                tpa_by_mat = {t.matricula_ogmo: t for t in tpa_rows}
+            # 4. Construir cells (já deduplicadas pela FK da escala_origem)
+            for a in alocacoes_db:
+                tpa_obj = tpa_by_mat.get(a.trabalhador_matricula) if a.trabalhador_matricula else None
+                cells.append({
+                    "id": str(a.id),
+                    "faina_id": str(a.faina_id),
+                    "funcao_id": str(a.funcao_id),
+                    "cais": None,
+                    "tpa_id": str(tpa_obj.id) if tpa_obj else None,
+                    "tpa_nome": tpa_obj.nome_completo if tpa_obj else None,
+                    "tpa_matricula": a.trabalhador_matricula,
+                    "status": "NORMAL",
+                    "data_referencia": a.data_referencia.isoformat(),
+                })
+            total_tpas = sum(1 for c in cells if c["tpa_id"])
+            snapshot_meta = {
+                "id": str(latest_escala.id),
+                "scraped_at": latest_escala.scraped_at.isoformat(),
+                "status": latest_escala.status.value,
+                "total_celulas": len(alocacoes_db),
+                "total_tpas_escalados": total_tpas,
+            }
+            break
 
     return {
         "porto": {"id": str(porto_obj.id), "codigo": porto_obj.codigo, "nome": porto_obj.nome_completo},
