@@ -28,29 +28,44 @@ export default async function RootLayout({
 }: {
   children: ReactNode;
 }) {
-  // Server-side auth gate (Sprint B — Sprint 1 colocava em middleware mas
-  // dava erro de tipo RouteImpl<string> no Next 15.5+).
-  // Fazemos aqui, antes do HTML ser enviado.
-  // Validação REAL é server-side (chama /api/v1/auth/me).
-  const { cookies } = await import("next/headers");
+  // Gate server-side (substitui middleware.ts — incompatível com Next 15.5+).
+  // Para o gate em /login (rota pública), criamos apps/web/src/app/login/layout.tsx
+  // que NÃO chama este layout. O gate aqui só bloqueia rotas autenticadas.
+  const { cookies, headers } = await import("next/headers");
   const cookieStore = await cookies();
+  const hdrs = await headers();
   const token = cookieStore.get("sindestiva_token")?.value;
+  // `next-url` header tem a rota original (sem query).
+  const originalPath = hdrs.get("x-invoke-path") ?? hdrs.get("next-url") ?? "";
 
+  // Pula gate em /login (rota pública).
+  // Se chegou sem cookie, redireciona pro /login com next=pathname.
   if (!token) {
-    redirect("/login?next=/centro-comando");
+    if (originalPath.startsWith("/login")) {
+      // Deixa renderizar normal (página /login)
+    } else {
+      const nextParam = originalPath ? `?next=${encodeURIComponent(originalPath)}` : "?next=/centro-comando";
+      redirect(`/login${nextParam}`);
+    }
   }
 
-  // Valida token chamando /me — bypassa cache
-  try {
-    const r = await fetch(`${API}/api/v1/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    });
-    if (!r.ok) {
-      redirect("/login?next=/centro-comando&reason=expired");
+  // Valida token chamando /me
+  if (token) {
+    try {
+      const r = await fetch(`${API}/api/v1/auth/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      if (!r.ok) {
+        if (originalPath.startsWith("/login")) {
+          // /login renderiza mesmo com token inválido (logout)
+        } else {
+          redirect(`/login?next=${encodeURIComponent(originalPath || "/centro-comando")}&reason=expired`);
+        }
+      }
+    } catch {
+      // Falha de rede: deixa passar
     }
-  } catch {
-    // Falha de rede: deixa passar (cliente vai detectar 401 nos fetches)
   }
 
   return (
