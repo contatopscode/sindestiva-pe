@@ -167,8 +167,16 @@ regex fallback, fingerprint de layout). A página muda sem aviso — risco R2
 do plano. Mitigação: hash SHA-256 do HTML bruto; se divergir do último
 conhecido, alerta em < 5 min no canal `#scraper-alerts` (WhatsApp + e-mail).
 
-O **EscalaNet/Recife** (PHP simples) é raspado com **HTTPX** direto, mais
-estável.
+O **EscalaNet/Recife** (PHP simples, OGMO Recife) é raspado com **HTTPX**
+direto. **URL real** (corrigida em 07/09/2026 — a URL antiga
+`http://escalanet.recife.gov.br` não resolve DNS, foi descontinuada):
+
+    POST http://www.ogmo-recife.org.br/EscalaNet/RelatorioResultadoEscala.php
+    body: categoria=01&data=DD/MM/YYYY&periodo={46|47|48|49}&navio=&funcao=
+
+Períodos: 46=0800/1400 (DIURNO), 47=1400/2000 (DIURNO), 48=2000/0200
+(NOTURNO), 49=0200/0800 (NOTURNO). Mapeamento PT-BR→código em
+`apps/api/app/scrapers/escalanet.py` (ESCALANET_FUNCAO_PARA_CODIGO).
 
 O ciclo é **cron a cada 60s** durante operação (06h-22h), idempotente
 (`INSERT ... ON CONFLICT DO UPDATE` em `lousa_snapshot`). Cada scrape vira
@@ -176,9 +184,9 @@ uma linha em `lousa_snapshot` com timestamp, hash do HTML e contagem de
 células. O Centro de Comando consome via `GET /api/v1/lousa?porto=X&turno=Y`
 e recebe updates via **WebSocket** (Redis Pub/Sub → FastAPI → Next.js).
 
-Matcher de TPAs (Sprint 2, T2-05): cruza matrícula OGMO com cadastro interno
-do Sindicato (mock no MVP, integração real com o cadastro do Sindicato
-quando houver).
+Matcher de TPAs (Sprint 2, T2-05): cruza matrícula OGMO (numérica, ex:
+`300443`, `162`) com cadastro interno do Sindicato (mock no MVP,
+integração real com o cadastro do Sindicato quando houver).
 
 ---
 
@@ -278,16 +286,27 @@ quando houver).
 
 ---
 
-## 12. Status atual (Sprint 0 — em curso · 01-07/09/2026)
+## 12. Status atual (Sprint A — desbloqueio · 07/09/2026)
 
-- ✅ Plano de implementação v1.0 gerado e aguardando aprovação de Josias
-- ✅ Protótipo HTML v0.1 pronto
-- ✅ Cronograma executivo 45 dias pronto
-- 🆕 **Este repo criado** (modo privado, sem push pro GitHub)
-- ⏳ CCT 2024-2026 a obter
-- ⏳ Advogado trabalhista a contratar (parecer LGPD)
-- ⏳ Manoel Costa (fiscal-piloto) a contatar para visita a Suape
-- ⏳ VPS Hetzner + domínio `lousa.pscode.ia.br` a provisionar
-- ⏳ Repo no GitHub: `contatopscode/lousa-sindestiva` (criar após aprovação)
+### 🟢 Online em produção
+- **API** `https://sindestiva-api.onrender.com` — 60+ endpoints, OpenAPI/Swagger, `/docs` ativo
+- **Web (Centro de Comando)** `https://sindestiva-web.vercel.app` — 7 rotas (centro-comando, remanejamentos, ogmo, auditoria, bi, tpa, home)
+- **PWA TPA** `https://sindestiva-pwa.vercel.app` — 1 página demo (Sprint 0 — Sprint C vai completar)
+- **Schema DB** migrado (3 versions Alembic) + `Base.metadata.create_all` idempotente
+- **Scraping TPA/Suape** ✅ ~94-113 células/dia
+- **Scraping EscalaNet/Recife** ✅ corrigido nesta Sprint A (era 100% falha — URL antiga não resolvia DNS)
 
-**Próximo marco (M1):** "Centro de Comando autenticado" — fim Sprint 1 (20/09/2026).
+### 🔴 Pendências críticas (Sprint A em andamento)
+- ⏳ Seeds em prod (`apps/api/scripts/run-seeds.sh`) — Paulo roda no Shell do Render
+- ⏳ Provisionar `*.lousa.pscode.ia.br` (DNS Cloudflare + domínios Vercel/Render)
+- ⏳ Validar com Manoel Costa se a estrutura Recife capturada bate com a do Sindicato
+- ⏳ RESEND_API_KEY no Render (e-mail OGMO parado)
+
+### 📋 Próximos marcos
+- **M1** "Centro de Comando autenticado" — fim Sprint B (20/09/2026) — NextAuth + RBAC
+- **M2** "PWA completo p/ TPA" — fim Sprint C (04/10/2026) — 4 abas + SW + manifest
+- **M3** "Piloto Manoel Costa em Suape" — fim Sprint D (18/10/2026) — scraping dedicado + alertas + LGPD purge rodando
+
+### 📄 Documentos do projeto
+- [`DIAGNOSTICO-FUNCIONAL-2026-09-07.md`](./DIAGNOSTICO-FUNCIONAL-2026-09-07.md) — diagnóstico + plano de melhorias 4 sprints
+- [`SINDESTIVA-PE-PLANO-IMPLEMENTACAO-2026-09-01.md`](./SINDESTIVA-PE-PLANO-IMPLEMENTACAO-2026-09-01.md) — plano executivo v1.0 (1090 linhas, 18 sprints, 86 HUs)

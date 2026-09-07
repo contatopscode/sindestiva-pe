@@ -1,7 +1,19 @@
 # SINDESTIVA-PE · Guia de deploy (Vercel + Render)
 
-> Última atualização: 05/09/2026 · mesmo padrão usado em **Sinapse** (Suporte
+> Última atualização: **07/09/2026** · mesmo padrão usado em **Sinapse** (Suporte
 > Gerencial, deploy em Vercel + Render).
+>
+> ⚠️ **URLs reais em produção** (verificadas 07/09/2026):
+>
+> | Serviço | URL real | Status |
+> |---|---|---|
+> | API (Render) | `https://sindestiva-api.onrender.com` | 🟢 vivo |
+> | Web (Vercel) | `https://sindestiva-web.vercel.app` | 🟢 vivo |
+> | PWA (Vercel) | `https://sindestiva-pwa.vercel.app` | 🟢 vivo |
+> | Docs Swagger | `https://sindestiva-api.onrender.com/docs` | 🟢 vivo |
+>
+> Os subdomínios `*.lousa.pscode.ia.br` ainda **não foram provisionados**
+> (A.4 do plano de melhorias — DNS pendente em Cloudflare).
 
 ## Arquitetura de produção
 
