@@ -135,12 +135,13 @@ app.add_middleware(
         # Vercel temporário (Sprint 0+ até ativar domínio custom)
         "https://sindestiva-web.vercel.app",
         "https://sindestiva-pwa.vercel.app",
-        # Domínio custom (Sprint 1+ — descomentar quando DNS estiver pronto)
-        # "https://web.lousa.pscode.ia.br",
-        # "https://pwa.lousa.pscode.ia.br",
+        # Domínios custom (Sprint A+ — DNS provisionado em 07/09/2026)
+        "https://web.lousa.pscode.ia.br",
+        "https://pwa.lousa.pscode.ia.br",
+        "https://api.lousa.pscode.ia.br",  # p/ health-check cross-origin
     ],
     # CORS Middleware do Starlette/FastAPI aceita UMA string regex (não lista).
-    # Junta com alternation `|` para cobrir web+pwa num único padrão.
+    # Cobre previews temporários da Vercel.
     allow_origin_regex=(
         r"https://sindestiva-(web|pwa)[a-z0-9-]*\.vercel\.app"
     ),
