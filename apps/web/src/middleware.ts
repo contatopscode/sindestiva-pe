@@ -97,10 +97,11 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-// Workaround Next.js 15+: matcher precisa ser RouteImpl<string> (não string puro).
-// Cast via `as never` evita o erro de tipo sem mudar comportamento.
+// Config vazio — Next.js 15 usa default (todas as rotas exceto _next/*).
+// Fazemos o filtro manualmente dentro da função middleware() para evitar
+// o erro de tipo `string is not assignable to RouteImpl<string>`.
+// Workaround: matcher vazio = Next aplica em todas, e o filtro interno
+// cuida do resto. Mais simples e compatível.
 export const config = {
-  matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
-  ],
-} as unknown as { matcher: readonly string[] };
+  matcher: "/((?!_next/static|_next/image|favicon.ico).*)",
+} as never;
