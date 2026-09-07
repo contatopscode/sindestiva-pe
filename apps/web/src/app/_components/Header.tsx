@@ -7,9 +7,17 @@
 
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { logout, getCurrentUser } from "@/lib/api";
+import { logout } from "@/lib/api";
 import { useEffect, useState } from "react";
-import type { UserSession } from "@/lib/tipos";
+
+interface SessionUser {
+  id: string;
+  email: string | null;
+  telefone: string | null;
+  role: string;
+  fiscal_id?: string;
+  tpa_id?: string;
+}
 
 const TITLES: Record<string, string> = {
   "/centro-comando": "Centro de Comando",
@@ -21,21 +29,28 @@ const TITLES: Record<string, string> = {
   "/tpa/perfil": "PWA · Perfil",
   "/ogmo": "Fila de Notificação OGMO",
   "/auditoria": "Auditoria & Integridade",
+  "/bi": "BI & Dashboards",
 };
 
 export function Header(): ReactNode {
   const pathname = usePathname();
-  const [user, setUser] = useState<UserSession | null>(null);
+  const [user, setUser] = useState<SessionUser | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    setUser(getCurrentUser());
+    // Busca user via API (cookie httpOnly). 401 → null (middleware já redirecionou).
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data && typeof data === "object" && "id" in data) setUser(data as SessionUser);
+      })
+      .catch(() => undefined);
   }, []);
 
   const title = TITLES[pathname] ?? "SINDESTIVA-PE";
-  const initials = (user?.nome ?? "P S")
-    .split(" ")
+  const initials = (user?.email ?? user?.telefone ?? "PS")
+    .split(/[@.\s]/)
     .map((n) => n[0])
     .slice(0, 2)
     .join("")
@@ -43,7 +58,6 @@ export function Header(): ReactNode {
 
   return (
     <header className="header flex h-[60px] items-center gap-6 border-b border-[#1e3a52] bg-[#0a1929] px-6 sticky top-0 z-50">
-      {/* Brand */}
       <div className="flex items-center gap-3 min-w-[216px]">
         <div className="grid h-9 w-9 place-items-center rounded-md bg-gradient-to-br from-[#d4a574] to-[#b8884f] text-sm font-extrabold text-[#0a1929]">
           S
@@ -54,18 +68,12 @@ export function Header(): ReactNode {
         </div>
       </div>
 
-      {/* DEMO badge — remover quando Sprint 1 autenticar */}
-      <div className="rounded bg-[#d4a574]/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#d4a574]">
-        Demo · Sprint 4 UI
-      </div>
-
       <div className="flex-1" />
 
-      {/* User + logout */}
       {mounted && user && (
         <div className="flex items-center gap-3">
           <div className="text-right leading-tight">
-            <div className="text-[12px] font-semibold text-[#e8eef4]">{user.nome}</div>
+            <div className="text-[12px] font-semibold text-[#e8eef4]">{user.email ?? "—"}</div>
             <div className="text-[10px] uppercase tracking-wider text-[#94a8bd]">
               {user.role}
             </div>

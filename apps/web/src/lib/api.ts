@@ -1,24 +1,21 @@
 // =============================================================================
-// SINDESTIVA-PE · API client + mock fallback
-// Wrapper de fetch com:
-//   - base URL configurável via NEXT_PUBLIC_API_URL (default 127.0.0.1:8000)
-//   - header Authorization: Bearer <jwt> (lido do localStorage)
-//   - redirect pra /login em 401
-//   - fallback pra MOCK quando API offline (console.log pra debug)
+// SINDESTIVA-PE · API client (Sprint B)
 //
-// TODO Sprint 1: trocar `localStorage` por sessão NextAuth + httpOnly cookie.
-// TODO Sprint 1: padronizar erros com `Problem Details (RFC 7807)` que a API já
-//                emite — capturar `detail` e mapear pra UI.
+// Mudanças vs Sprint 0:
+//   - Auth via cookie httpOnly `sindestiva_token` (não localStorage).
+//     JWT nunca toca o browser → imune a XSS.
+//   - fetch envia `credentials: 'include'` para o cookie ir junto.
+//   - Removidos fallbacks para MOCK_* (Sprint 1 + tá com dados reais).
+//   - Erro 401 → clear cookie + redirect /login (sem reload).
+//
 // =============================================================================
 
 import type { Porto, Turno } from "@sindestiva/shared";
-import { getMockLousaPreview, MOCK_REMANEJAMENTOS, MOCK_OGMO, MOCK_AUDIT, MOCK_SESSION } from "./mock";
 import type {
   LousaPreviewResponse,
   RemanejamentoItem,
   OgmoNotificacao,
   AuditEvent,
-  UserSession,
   BIKpis,
   RemanejamentosPorDia,
   TopRemanejados,
@@ -30,58 +27,45 @@ import type {
 
 // ---- Configuração ---------------------------------------------------------
 
-const DEFAULT_API_URL = "https://sindestiva-api.onrender.com";
+const DEFAULT_API_URL = "https://api.lousa.pscode.ia.br";
 
-/** Base URL da API. Configurável via `NEXT_PUBLIC_API_URL` no .env do web. */
+/** Base URL da API. Configurável via `NEXT_PUBLIC_API_URL` no .env. */
 export const API_URL: string =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) ||
   DEFAULT_API_URL;
 
-const STORAGE_KEY_TOKEN = "sindestiva.jwt";
-const STORAGE_KEY_USER = "sindestiva.user";
+// ---- Auth (cookie httpOnly, gerenciado server-side) -------------------------
 
-// ---- Auth helpers ---------------------------------------------------------
-
-export function setToken(token: string | null) {
+/** Limpa o cookie httpOnly e redireciona pra /login. Chamado em 401. */
+export async function logout(): Promise<void> {
   if (typeof window === "undefined") return;
-  if (token === null) {
-    window.localStorage.removeItem(STORAGE_KEY_TOKEN);
-  } else {
-    window.localStorage.setItem(STORAGE_KEY_TOKEN, token);
-  }
-}
-
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(STORAGE_KEY_TOKEN);
-}
-
-export function setUser(user: UserSession | null) {
-  if (typeof window === "undefined") return;
-  if (user === null) {
-    window.localStorage.removeItem(STORAGE_KEY_USER);
-  } else {
-    window.localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
-  }
-}
-
-export function getUser(): UserSession | null {
-  if (typeof window === "undefined") return null;
-  const raw = window.localStorage.getItem(STORAGE_KEY_USER);
-  if (!raw) return null;
   try {
-    return JSON.parse(raw) as UserSession;
+    await fetch("/api/auth/logout", { method: "POST" });
   } catch {
-    return null;
+    /* noop */
   }
+  window.location.href = "/login";
 }
 
-export function logout() {
-  setToken(null);
-  setUser(null);
-  if (typeof window !== "undefined") {
-    window.location.href = "/login";
+/** Faz login server-side via proxy /api/auth/login (seta cookie httpOnly). */
+export async function login(email: string, password: string): Promise<{
+  ok: boolean;
+  error?: string;
+  role?: string;
+}> {
+  if (typeof window === "undefined") return { ok: false };
+  const r = await fetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+    credentials: "include",
+  });
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({ error: "Erro desconhecido" }));
+    return { ok: false, error: data.error };
   }
+  const data = (await r.json()) as { ok: boolean; role?: string };
+  return data;
 }
 
 // ---- Fetch wrapper --------------------------------------------------------
@@ -110,9 +94,9 @@ export interface ApiOptions {
 }
 
 /**
- * Fetch com auth, timeout e tratamento de erro padronizado.
- * Lança `ApiError` em status >= 400. Em status 401 + auto-redirect, manda
- * pro /login (a menos que `noRedirect` seja true).
+ * Fetch com auth via cookie httpOnly, timeout e tratamento de erro padronizado.
+ * Lança `ApiError` em status >= 400. Em status 401 + auto-redirect, chama
+ * `logout()` (que zera cookie via /api/auth/logout e vai pro /login).
  */
 export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const { method = "GET", body, noAuth = false, noRedirect = false, timeoutMs = 8000 } = opts;
@@ -123,10 +107,6 @@ export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<
     "Content-Type": "application/json",
     Accept: "application/json",
   };
-  if (!noAuth) {
-    const token = getToken();
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
 
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
@@ -139,6 +119,7 @@ export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: ac.signal,
       credentials: "include",
+      mode: "cors",
     });
   } catch (err) {
     clearTimeout(timer);
@@ -147,19 +128,19 @@ export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<
   }
   clearTimeout(timer);
 
-  if (res.status === 401 && !noRedirect) {
-    setToken(null);
-    setUser(null);
-    if (typeof window !== "undefined") {
-      window.location.href = "/login";
-    }
+  if (res.status === 401 && !noAuth && !noRedirect) {
+    await logout();
   }
 
   if (!res.ok) {
     let detail = res.statusText;
     try {
-      const j = (await res.json()) as { detail?: string };
-      if (j?.detail) detail = j.detail;
+      const j = (await res.json()) as { detail?: unknown };
+      if (j?.detail) {
+        detail = typeof j.detail === "string"
+          ? j.detail
+          : JSON.stringify(j.detail);
+      }
     } catch {
       /* body não é JSON */
     }
@@ -174,102 +155,62 @@ export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<
 
 /**
  * GET /api/v1/lousa/public/preview?porto=X&turno=Y
- *
- * Em Sprint 0 é público (sem auth). Sprint 1 vira autenticado
- * (renomear pra /lousa/atual).
- *
- * Fallback: se API offline, retorna mock determinístico + log.
+ * Endpoint público (sem auth). Retorna a lousa mais recente do scraper.
  */
 export async function getLousaPreview(
   porto: Porto,
   turno: Turno,
-  useMockIfOffline = true,
 ): Promise<LousaPreviewResponse> {
-  try {
-    return await apiFetch<LousaPreviewResponse>(
-      `/api/v1/lousa/public/preview?porto=${porto}&turno=${turno}`,
-      { noAuth: true, timeoutMs: 4000 },
-    );
-  } catch (err) {
-    if (!useMockIfOffline) throw err;
-    if (typeof console !== "undefined") {
-      console.warn(`[MOCK] usando dados locais (API offline): ${(err as Error).message}`);
-    }
-    return getMockLousaPreview(porto, turno);
-  }
+  return apiFetch<LousaPreviewResponse>(
+    `/api/v1/lousa/public/preview?porto=${porto}&turno=${turno}`,
+    { noAuth: true, timeoutMs: 6000 },
+  );
 }
 
-// ---- Endpoints de Remanejamento (Sprint 0 = mock) ------------------------
+// ---- Endpoints de Remanejamento (Sprint 5+) -----------------------------
 
-/** Lista remanejamentos do turno/data. Sprint 5 implementa de verdade. */
 export async function getRemanejamentos(filters?: {
-  turno?: Turno;
-  data?: string;
+  skip?: number;
+  limit?: number;
+  status?: string;
 }): Promise<RemanejamentoItem[]> {
-  try {
-    return await apiFetch<RemanejamentoItem[]>("/api/v1/remanejamentos", {
-      body: filters as unknown as Record<string, string>,
-      method: "GET",
-    });
-  } catch {
-    if (typeof console !== "undefined") {
-      console.warn("[MOCK] usando remanejamentos locais");
-    }
-    return MOCK_REMANEJAMENTOS;
-  }
+  const params = new URLSearchParams();
+  if (filters?.skip !== undefined) params.set("skip", String(filters.skip));
+  if (filters?.limit !== undefined) params.set("limit", String(filters.limit));
+  if (filters?.status) params.set("status", filters.status);
+  const q = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch<RemanejamentoItem[]>(`/api/v1/remanejamentos${q}`);
 }
 
-export async function createRemanejamento(_input: unknown): Promise<RemanejamentoItem> {
-  // Sprint 5: POST /api/v1/remanejamentos
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      const novo: RemanejamentoItem = {
-        id: `rem-${Date.now()}`,
-        data_hora: new Date().toISOString(),
-        tpa_removido_nome: "(novo)",
-        tpa_removido_matricula: "000",
-        funcao_codigo: "CM_GERAL",
-        faina_codigo: "PRODUCAO",
-        motivo: "(criado via UI mock)",
-        base_legal: "CCT 2024-2026 · Cláusula 7ª",
-        status: "PEND",
-        created_by: MOCK_SESSION.nome,
-        hash_evento: `mock-${Math.random().toString(36).slice(2, 10)}`,
-      };
-      resolve(novo);
-    }, 400);
+export async function createRemanejamento(
+  payload: Record<string, unknown>,
+): Promise<RemanejamentoItem> {
+  return apiFetch<RemanejamentoItem>("/api/v1/remanejamentos", {
+    method: "POST",
+    body: payload,
   });
 }
 
 // ---- OGMO -----------------------------------------------------------------
 
 export async function getOgmoNotificacoes(): Promise<OgmoNotificacao[]> {
-  try {
-    return await apiFetch<OgmoNotificacao[]>("/api/v1/ogmo/notificacoes");
-  } catch {
-    if (typeof console !== "undefined") console.warn("[MOCK] usando OGMO local");
-    return MOCK_OGMO;
-  }
+  return apiFetch<OgmoNotificacao[]>("/api/v1/ogmo/notificacoes");
 }
 
 // ---- Auditoria ------------------------------------------------------------
 
 export async function getAuditEvents(limit = 50): Promise<AuditEvent[]> {
-  try {
-    return await apiFetch<AuditEvent[]>(`/api/v1/auditoria/eventos?limit=${limit}`);
-  } catch {
-    if (typeof console !== "undefined") console.warn("[MOCK] usando auditoria local");
-    return MOCK_AUDIT.slice(0, limit);
-  }
+  return apiFetch<AuditEvent[]>(`/api/v1/auditoria/eventos?limit=${limit}`);
 }
 
-/** Verifica integridade da hash chain. Sprint 6 implementa. */
-export async function verifyHashChain(): Promise<{ ok: boolean; verificados: number; quebrados: number }> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({ ok: true, verificados: MOCK_AUDIT.length, quebrados: 0 });
-    }, 600);
-  });
+/** Verifica integridade da hash chain (Sprint 6 — já implementado na API). */
+export async function verifyHashChain(): Promise<{
+  integro: boolean;
+  total_eventos: number;
+  primeiro_evento_com_falha: number | null;
+  duracao_ms: number;
+}> {
+  return apiFetch("/api/v1/auditoria/verificar-hash-chain", { method: "POST" });
 }
 
 // ---- BI & Dashboards (Sprint 7) -------------------------------------------
@@ -315,11 +256,10 @@ export async function getBIInsights(periodoDias: PeriodoDias = 30): Promise<Insi
 
 /** Dispara download do PDF do BI. */
 export async function downloadBIPDF(periodoDias: PeriodoDias = 30): Promise<void> {
-  const token = getToken();
   const url = `${API_URL}/api/v1/bi/export-pdf?periodo_dias=${periodoDias}`;
   const res = await fetch(url, {
     method: "GET",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
@@ -333,11 +273,4 @@ export async function downloadBIPDF(periodoDias: PeriodoDias = 30): Promise<void
   a.click();
   a.remove();
   URL.revokeObjectURL(a.href);
-}
-
-// ---- Sessão (mock) --------------------------------------------------------
-
-export function getCurrentUser(): UserSession {
-  const stored = getUser();
-  return stored ?? MOCK_SESSION;
 }
