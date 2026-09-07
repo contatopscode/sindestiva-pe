@@ -73,7 +73,11 @@ export async function POST(req: NextRequest) {
   };
 
   // Constrói Set-Cookie com `Domain=.pscode.ia.br` (cookies() ignorado).
-  const res = NextResponse.json({ ok: true, role: data.user.role });
+  const res = NextResponse.json({
+    ok: true,
+    role: data.user.role,
+    access_token: data.access_token,  // client-side também usa (Authorization header)
+  });
   res.headers.append(
     "Set-Cookie",
     buildCookieValue({ access_token: data.access_token }),

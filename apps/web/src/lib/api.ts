@@ -27,39 +27,62 @@ import type {
 
 // ---- Configuração ---------------------------------------------------------
 
-// IMPORTANTE: o front chama `/__sindestiva/*` no MESMO host (Vercel).
-// O Next.js reescreve (next.config.mjs → rewrites) pra
-// `https://api.lousa.pscode.ia.br/api/v1/*` server-side, onde o cookie
-// `sindestiva_token` (setado em web.lousa...) é automaticamente
-// forwardado no header Cookie. Solução p/ cookies 3rd-party.
+// IMPORTANTE: o front chama a API diretamente via cookie httpOnly.
+// Browser compartilha cookies entre subdomínios do mesmo parent domain
+// **APENAS** se o cookie foi setado com `Domain=.parent.tld`. Como o
+// Next.js 15 stripou nosso `Domain=.pscode.ia.br`, o cookie fica
+// scoped a `web.lousa.pscode.ia.br` e NÃO vai pra `api.lousa...`.
 //
-// OBS: `/__sindestiva/*` foi escolhido (com prefixo `__`) para não
-// colidir com API routes Next.js em `/api/*`.
-const DEFAULT_PROXY_URL = "/__sindestiva";
+// Workaround atual (MVP): após login, salvamos o JWT em sessionStorage
+// (client-side only) e apiFetch adiciona no header `Authorization`. O
+// cookie httpOnly é mantido como fallback p/ middlewares server-side.
+//
+// Trade-off: token em sessionStorage é vulnerável a XSS (mesmo nível do
+// localStorage antigo). Sprint D migra p/ BFF completo (proxy server-side
+// sem expor token no browser).
 
-/** Base URL p/ chamadas de API no mesmo host (via Next.js rewrite). */
+const DEFAULT_API_URL = "https://api.lousa.pscode.ia.br";
+
+/** Base URL absoluta da API. Variável NEXT_PUBLIC_API_URL sobrescreve em dev. */
 export const API_URL: string =
-  DEFAULT_PROXY_URL;
-
-/** URL absoluta da API (p/ downloads, compartilhamento, etc.). */
-export const API_ABSOLUTE_URL: string =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) ||
-  "https://api.lousa.pscode.ia.br";
+  DEFAULT_API_URL;
+
+/** Mesma URL absoluta (sem proxy no MVP). */
+export const API_ABSOLUTE_URL = API_URL;
+
+// Storage key p/ JWT em sessionStorage (client-side).
+const TOKEN_STORAGE_KEY = "sindestiva.jwt";
+
+export function setToken(token: string | null): void {
+  if (typeof window === "undefined") return;
+  if (token === null) {
+    window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+  } else {
+    window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+  }
+}
+
+function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
+}
 
 // ---- Auth (cookie httpOnly, gerenciado server-side) -------------------------
 
-/** Limpa o cookie httpOnly e redireciona pra /login. Chamado em 401. */
+/** Limpa token (sessionStorage + cookie httpOnly) e redireciona. */
 export async function logout(): Promise<void> {
   if (typeof window === "undefined") return;
+  setToken(null);
   try {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
   } catch {
     /* noop */
   }
   window.location.href = "/login";
 }
 
-/** Faz login server-side via proxy /api/auth/login (seta cookie httpOnly). */
+/** Faz login no proxy server-side, salva JWT em sessionStorage. */
 export async function login(email: string, password: string): Promise<{
   ok: boolean;
   error?: string;
@@ -76,7 +99,12 @@ export async function login(email: string, password: string): Promise<{
     const data = await r.json().catch(() => ({ error: "Erro desconhecido" }));
     return { ok: false, error: data.error };
   }
-  const data = (await r.json()) as { ok: boolean; role?: string };
+  const data = (await r.json()) as { ok: boolean; role?: string; access_token?: string };
+  // Proxy devolve access_token (além de ok/role). Salva em sessionStorage
+  // p/ apiFetch usar via Authorization header.
+  if (data.access_token) {
+    setToken(data.access_token);
+  }
   return data;
 }
 
@@ -106,9 +134,11 @@ export interface ApiOptions {
 }
 
 /**
- * Fetch com auth via cookie httpOnly, timeout e tratamento de erro padronizado.
- * Lança `ApiError` em status >= 400. Em status 401 + auto-redirect, chama
- * `logout()` (que zera cookie via /api/auth/logout e vai pro /login).
+ * Fetch com auth via Authorization header (Sprint B).
+ *
+ * Token vem do `sessionStorage` (setado pelo flow de login). Cookie
+ * httpOnly continua válido p/ server components, mas não viaja
+ * cross-domain no browser — então usamos Authorization header aqui.
  */
 export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const { method = "GET", body, noAuth = false, noRedirect = false, timeoutMs = 8000 } = opts;
@@ -120,6 +150,12 @@ export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<
     Accept: "application/json",
   };
 
+  // Token em sessionStorage → Authorization header (cross-domain safe).
+  if (!noAuth) {
+    const token = getStoredToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+  }
+
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), timeoutMs);
 
@@ -130,7 +166,6 @@ export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
       signal: ac.signal,
-      credentials: "include",
       mode: "cors",
     });
   } catch (err) {
