@@ -97,11 +97,7 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-// Next.js 15+ tem incompatibilidade de tipo com matcher strings.
-// Workaround verificado: usar `as const` no array resolve.
-// (Issue: https://github.com/vercel/next.js/issues/...)
-export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
-} as never;
+// Sem export `config` — Next.js 15.5+ tipa `matcher: string[]` como
+// `RouteImpl<string>` (união complexa incompatível com string nu).
+// Como não declaramos matcher, Next aplica em TODAS as rotas;
+// pulamos /api, /_next, /login internamente na função middleware().
