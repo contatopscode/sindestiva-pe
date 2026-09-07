@@ -64,20 +64,20 @@ export default function AuditoriaPage(): ReactNode {
       {verify && (
         <div
           className={`mb-4 rounded-md border p-3 text-[12px] ${
-            verify.ok && verify.quebrados === 0
+            verify.integro
               ? "border-[#5dbb7d]/40 bg-[#5dbb7d]/10 text-[#5dbb7d]"
               : "border-[#e04a4a]/40 bg-[#e04a4a]/10 text-[#e04a4a]"
           }`}
         >
-          {verify.ok && verify.quebrados === 0 ? (
+          {verify.integro ? (
             <>
-              ✓ <strong>Integridade OK</strong> · {verify.verificados} eventos verificados ·
-              nenhum elo quebrado
+              ✓ <strong>Integridade OK</strong> · {verify.total_eventos} eventos verificados ·
+              {verify.duracao_ms} ms · nenhum elo quebrado
             </>
           ) : (
             <>
-              ❌ <strong>Quebra detectada</strong> · {verify.quebrados} elos comprometidos de{" "}
-              {verify.verificados}
+              ❌ <strong>Quebra detectada</strong> · primeiro evento quebrado em #
+              {verify.primeiro_evento_com_falha} de {verify.total_eventos}
             </>
           )}
         </div>

@@ -6,17 +6,17 @@
 
 "use client";
 
-import { Suspense, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { RemanejamentoModal } from "../_components/RemanejamentoModal";
 import type { Porto, Turno } from "@sindestiva/shared";
-import { getCurrentUser } from "@/lib/api";
 
 function NovoRemanejamentoContent(): ReactNode {
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(true);
   const [porto] = useState<Porto>("SUAPE");
   const [turno] = useState<Turno>("DIURNO");
+  const [userEmail, setUserEmail] = useState<string>("—");
 
   const prefill = {
     tpa_id: searchParams.get("tpa") ?? undefined,
@@ -24,7 +24,12 @@ function NovoRemanejamentoContent(): ReactNode {
     funcao_codigo: searchParams.get("funcao") ?? undefined,
   };
 
-  const user = getCurrentUser();
+  useEffect(() => {
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setUserEmail(d.email ?? "—"); })
+      .catch(() => undefined);
+  }, []);
 
   if (!open) {
     return (
@@ -52,7 +57,7 @@ function NovoRemanejamentoContent(): ReactNode {
         <div>
           <h1 className="section-title">Novo Remanejamento</h1>
           <p className="section-subtitle">
-            Operador: <span className="font-mono text-[#d4a574]">{user.nome}</span>
+            Operador: <span className="font-mono text-[#d4a574]">{userEmail}</span>
           </p>
         </div>
       </div>
