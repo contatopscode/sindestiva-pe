@@ -21,9 +21,10 @@ const API = process.env.NEXT_PUBLIC_API_URL || "https://api.lousa.pscode.ia.br";
 
 async function proxy(
   req: NextRequest,
-  pathParts: string[],
+  ctx: { params: Promise<{ path: string[] }> },
 ): Promise<Response> {
-  const fullPath = pathParts.join("/");
+  const { path } = await ctx.params;
+  const fullPath = path.join("/");
   const url = `${API}/api/v1/${fullPath}${req.nextUrl.search}`;
   const cookieStore = await cookies();
   const tokenCookie = cookieStore.get("sindestiva_token")?.value;
@@ -70,13 +71,20 @@ async function proxy(
   });
 }
 
-export const GET = proxy;
-export const POST = proxy;
-export const PUT = proxy;
-export const PATCH = proxy;
-export const DELETE = proxy;
-export const HEAD = proxy;
-export const OPTIONS = proxy;
+function handler(
+  req: NextRequest,
+  ctx: { params: Promise<{ path: string[] }> },
+): Promise<Response> {
+  return proxy(req, ctx);
+}
+
+export const GET = handler;
+export const POST = handler;
+export const PUT = handler;
+export const PATCH = handler;
+export const DELETE = handler;
+export const HEAD = handler;
+export const OPTIONS = handler;
 
 // Re-exporta o tipo p/ inferência em runtime.
 export type ProxyFn = typeof proxy;
