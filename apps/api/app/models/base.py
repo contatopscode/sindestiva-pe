@@ -13,12 +13,14 @@ Aqui só reexportamos + adicionamos os mixins.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+
+UTC = timezone.utc
 
 
 # ---------------------------------------------------------------------------
@@ -65,10 +67,13 @@ class SoftDeleteMixin:
     purge_after: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
-        # server_default omitido — ver perfis_internos.py para rationale
-        # (SQLAlchemy wrappa em string literal no DDL, Postgres não
-        # consegue fazer cast para timestamptz). Adicionado via ALTER
-        # TABLE no init endpoint.
+        # `default` Python-side (não `server_default`): SQLAlchemy calcula
+        # no INSERT a partir daqui. server_default omitido por causa do
+        # bug do Postgres com cast de text() → timestamptz (Sprint 1+,
+        # reintroduzir via Alembic).
+        # `default` aqui é uma função (não um valor) para que seja
+        # avaliada a cada INSERT — LGPD: 5 anos de retenção.
+        default=lambda: datetime.now(tz=UTC) + timedelta(days=5 * 365),
     )
 
 
