@@ -59,12 +59,28 @@ async def _executar_seed(modulo_nome: str, fn_nome: str = "seed") -> dict:
     Idempotente: cada seed usa upsert por chave natural (email, código).
     Retorna o dict que o seed emite (totais por entidade).
     """
-    # Garante que `apps/api/scripts` está no sys.path (é onde estão os
-    # scripts — fora do pacote `app`).
-    scripts_dir = Path(__file__).resolve().parents[3] / "scripts"
-    if str(scripts_dir) not in sys.path:
-        sys.path.insert(0, str(scripts_dir))
+    # Tenta vários caminhos possíveis para `scripts/` (cwd do Render = /app).
+    candidates = [
+        Path(__file__).resolve().parents[3]
+        / "scripts",  # /app/scripts (apps/api/scripts)
+        Path("/app/scripts"),  # cwd /app (Render)
+        Path.cwd() / "apps" / "api" / "scripts",  # cwd raiz do repo
+        Path.cwd() / "scripts",  # cwd /app/apps/api
+    ]
+    scripts_dir: Path | None = None
+    for c in candidates:
+        if c.is_dir():
+            scripts_dir = c
+            break
+    if scripts_dir is None:
+        tried = ", ".join(str(c) for c in candidates)
+        raise RuntimeError(f"Diretório scripts/ não encontrado. Procurou em: {tried}")
 
+    scripts_str = str(scripts_dir)
+    if scripts_str not in sys.path:
+        sys.path.insert(0, scripts_str)
+
+    log.info("admin._executar_seed.import", modulo=modulo_nome, scripts_dir=scripts_str)
     modulo = importlib.import_module(modulo_nome)
     fn = getattr(modulo, fn_nome, None)
     if fn is None:

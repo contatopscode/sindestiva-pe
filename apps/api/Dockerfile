@@ -84,6 +84,8 @@ COPY --chown=appuser:appuser alembic ./alembic
 COPY --chown=appuser:appuser alembic.ini ./
 COPY --chown=appuser:appuser entrypoint.sh ./
 COPY --chown=appuser:appuser pyproject.toml uv.lock README.md ./
+# Scripts one-shot (rodar seeds via /api/v1/admin/run-seeds).
+COPY --chown=appuser:appuser scripts ./scripts
 
 USER appuser
 
