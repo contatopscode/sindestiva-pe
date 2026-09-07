@@ -309,9 +309,77 @@ except Exception:
 " 2>&1 | head -1)
 echo "  top remanejados: $top_count TPA(s)"
 
-# ---- 13. RESUMO -----------------------------------------------------------
+# ---- 13. LOGIN FLOW (Sprint B — cookie httpOnly) --------------------
 
-title "13. RESUMO"
+title "13. LOGIN FLOW · SPRINT B"
+WEB_API="https://web.lousa.pscode.ia.br"
+
+# 13.1 — /login (rota pública) renderiza
+check "WEB /login renderiza" "200" "$(curl -sS --max-time 10 -o /dev/null -w "%{http_code}" "$WEB_API/login")"
+# Acessa direto o /api/auth/login do WEB (que é route handler Next.js).
+# Esse handler proxy-a p/ API + seta cookie httpOnly `sindestiva_token`.
+
+# 13.2 — Login Paulo via proxy WEB → cookie httpOnly
+out=$(curl -sS --max-time 30 -i -c /tmp/sindestiva_cookies.txt -X POST \
+  "$WEB_API/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$PAULO_EMAIL\",\"password\":\"$PASSWORD\"}")
+echo "$out" | head -1 | grep -q "200" && ok "WEB login Paulo · 200" || bad "WEB login Paulo · esperado 200"
+
+# Cookie file deve ter o sindestiva_token
+if grep -q "sindestiva_token" /tmp/sindestiva_cookies.txt 2>/dev/null; then
+  ok "Cookie sindestiva_token setado"
+else
+  bad "Cookie sindestiva_token AUSENTE"
+fi
+
+# 13.3 — /api/auth/me com cookie
+me=$(curl -sS --max-time 15 -b /tmp/sindestiva_cookies.txt "$WEB_API/api/auth/me" 2>&1)
+if echo "$me" | grep -q "DIRIGENTE"; then
+  ok "GET /api/auth/me (com cookie) · retorna DIRIGENTE"
+else
+  bad "GET /api/auth/me (com cookie) · role errado: $(echo "$me" | head -c 100)"
+fi
+
+# 13.4 — /api/auth/me SEM cookie
+check "GET /api/auth/me s/ cookie · 401" "401" "$(curl -sS --max-time 10 -o /dev/null -w "%{http_code}" "$WEB_API/api/auth/me")"
+
+# 13.5 — /centro-comando (rota protegida) com cookie
+cc=$(curl -sS --max-time 15 -b /tmp/sindestiva_cookies.txt -o /dev/null -w "%{http_code}" \
+  "$WEB_API/centro-comando")
+check "GET /centro-comando c/ cookie · 200" "200" "$cc"
+
+# 13.6 — logout zera cookie
+curl -sS --max-time 10 -b /tmp/sindestiva_cookies.txt -c /tmp/sindestiva_cookies.txt \
+  -X POST "$WEB_API/api/auth/logout" >/dev/null 2>&1
+if grep -q "sindestiva_token" /tmp/sindestiva_cookies.txt 2>/dev/null; then
+  bad "Logout NÃO removeu cookie"
+else
+  ok "Logout removeu cookie"
+fi
+
+# ---- 14. TPA OTP (Sprint B — WhatsApp Evolution API) -----------
+
+title "14. TPA OTP · SPRINT B"
+# Solicita OTP — TPA-001 (João Silva, cpf=11122233396, tel=+5581988880001)
+out=$(http_post /api/v1/auth/tpa/otp/solicitar '{"cpf":"11122233396","matricula_ogmo":"TPA-001"}')
+sent=$(jget sent "$out")
+destino=$(jget destino_whatsapp "$out")
+expires=$(jget expires_in_seconds "$out")
+check "TPA OTP · sent=true" "True" "$sent"
+echo "  destino: $destino · expira em ${expires}s"
+if [ "$sent" = "True" ]; then
+  ok "WhatsApp MSG enviado p/ João Silva (TPA-001)"
+fi
+
+# CPF inexistente — deve retornar sent=false (sem revelar)
+out=$(http_post /api/v1/auth/tpa/otp/solicitar '{"cpf":"00000000000","matricula_ogmo":"TPA-INEXISTENTE"}')
+sent=$(jget sent "$out")
+check "TPA OTP · CPF inexistente" "False" "$sent"
+
+# ---- 15. RESUMO -----------------------------------------------------------
+
+title "15. RESUMO"
 printf "${BOLD}Resultado: %d ok · %d falhas${RESET}\n" "$PASS" "$FAIL"
 hr
 if [ "$FAIL" -eq 0 ]; then
