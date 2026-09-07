@@ -134,7 +134,7 @@ async def test_whatsapp(
         texto: corpo da msg. Default placeholder.
     """
     _check_admin_token(x_admin_token)
-    from app.services.evolution import send_text  # noqa: PLC0415
+    from app.services.evolution import send_text
 
     numero_dest = numero or "5581999990001"
     texto_dest = texto or "🔧 SINDESTIVA-PE · teste Evolution API via admin endpoint."
