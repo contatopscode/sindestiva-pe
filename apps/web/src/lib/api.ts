@@ -27,14 +27,15 @@ import type {
 
 // ---- Configuração ---------------------------------------------------------
 
-// IMPORTANTE: o front chama `/api-proxy/*` no MESMO host (Vercel).
+// IMPORTANTE: o front chama `/__sindestiva/*` no MESMO host (Vercel).
 // O Next.js reescreve (next.config.mjs → rewrites) pra
 // `https://api.lousa.pscode.ia.br/api/v1/*` server-side, onde o cookie
 // `sindestiva_token` (setado em web.lousa...) é automaticamente
 // forwardado no header Cookie. Solução p/ cookies 3rd-party.
 //
-// Para usos diretos (PDF download etc.), use API_URL abaixo.
-const DEFAULT_PROXY_URL = "/api-proxy";
+// OBS: `/__sindestiva/*` foi escolhido (com prefixo `__`) para não
+// colidir com API routes Next.js em `/api/*`.
+const DEFAULT_PROXY_URL = "/__sindestiva";
 
 /** Base URL p/ chamadas de API no mesmo host (via Next.js rewrite). */
 export const API_URL: string =
@@ -267,7 +268,7 @@ export async function getBIInsights(periodoDias: PeriodoDias = 30): Promise<Insi
 
 /** Dispara download do PDF do BI. */
 export async function downloadBIPDF(periodoDias: PeriodoDias = 30): Promise<void> {
-  // Download via proxy (mesmo host) — não envia cookie cross-domain.
+  // Download via proxy (mesmo host) — sem isso, cookie cross-domain não viaja.
   const url = `${API_URL}/bi/export-pdf?periodo_dias=${periodoDias}`;
   const res = await fetch(url, {
     method: "GET",
