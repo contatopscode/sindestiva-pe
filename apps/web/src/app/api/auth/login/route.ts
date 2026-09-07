@@ -11,6 +11,23 @@ const API = process.env.NEXT_PUBLIC_API_URL || "https://api.lousa.pscode.ia.br";
 const COOKIE_NAME = "sindestiva_token";
 const COOKIE_MAX_AGE = 8 * 60 * 60;
 
+function buildCookieValue(data: { access_token: string }): string {
+  // Set-Cookie cru (Next.js cookies().set() pode ignorar campos extras
+  // como `domain` em algumas versões — montar na mão dá controle total).
+  const parts = [
+    `${COOKIE_NAME}=${data.access_token}`,
+    `Path=/`,
+    `Max-Age=${COOKIE_MAX_AGE}`,
+    `HttpOnly`,
+    `SameSite=Lax`,
+  ];
+  if (process.env.NODE_ENV === "production") {
+    parts.push("Secure");
+    parts.push("Domain=.pscode.ia.br"); // compartilha entre web.lousa.pscode.ia.br e api.lousa.pscode.ia.br
+  }
+  return parts.join("; ");
+}
+
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
     email?: string;
@@ -55,21 +72,11 @@ export async function POST(req: NextRequest) {
     user: { role: string; id: string; email: string | null };
   };
 
-  const cookieOpts: Parameters<Awaited<ReturnType<typeof cookies>>["set"]>[1] = {
-    name: COOKIE_NAME,
-    value: data.access_token,
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: COOKIE_MAX_AGE,
-  };
-  // `Domain=.pscode.ia.br` faz o cookie ser compartilhado entre
-  // web.lousa.pscode.ia.br e api.lousa.pscode.ia.br. Em dev não aplica.
-  if (process.env.NODE_ENV === "production") {
-    (cookieOpts as { domain?: string }).domain = ".pscode.ia.br";
-  }
-  (await cookies()).set(cookieOpts);
-
-  return NextResponse.json({ ok: true, role: data.user.role });
+  // Constrói Set-Cookie com `Domain=.pscode.ia.br` (cookies() ignorado).
+  const res = NextResponse.json({ ok: true, role: data.user.role });
+  res.headers.append(
+    "Set-Cookie",
+    buildCookieValue({ access_token: data.access_token }),
+  );
+  return res;
 }
