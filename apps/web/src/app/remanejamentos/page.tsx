@@ -1,20 +1,28 @@
 // =============================================================================
-// SINDESTIVA-PE · /remanejamentos — lista de remanejamentos
-// Sprint 0/4 mock; Sprint 5 (T5-09) implementa filtros + paginação real.
+// SINDESTIVA-PE · /remanejamentos — lista de remanejamentos (Sprint B)
+// Agora client component (busca via apiFetch + useEffect).
 // =============================================================================
 
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, useState, type ReactNode } from "react";
 import { getRemanejamentos } from "@/lib/api";
+import type { RemanejamentoItem } from "@/lib/tipos";
 import { RemanejamentosTable } from "./_components/RemanejamentosTable";
 
-export const metadata = {
-  title: "Remanejamentos · SINDESTIVA-PE",
-};
+export default function RemanejamentosPage(): ReactNode {
+  const [items, setItems] = useState<RemanejamentoItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export default async function RemanejamentosPage(): Promise<ReactNode> {
-  const items = await getRemanejamentos();
+  useEffect(() => {
+    setLoading(true);
+    getRemanejamentos()
+      .then((data) => { setItems(data); setLoading(false); })
+      .catch((err) => { setError(err.message ?? "Erro"); setLoading(false); });
+  }, []);
 
-  // KPIs (réplica T5-09)
+  // KPIs (réplica T5-09) — usa a lista carregada do servidor.
   const total = items.length;
   const pendentes = items.filter((r) => r.status === "PEND").length;
   const enviados = items.filter((r) => r.status === "SENT").length;
@@ -31,26 +39,37 @@ export default async function RemanejamentosPage(): Promise<ReactNode> {
         </div>
       </div>
 
-      <div className="kpi-row">
-        <div className="kpi-card">
-          <div className="kpi-label">Total</div>
-          <div className="kpi-value">{total}</div>
+      {loading && <div className="loading">Carregando remanejamentos…</div>}
+      {error && (
+        <div className="login-error" role="alert">
+          ⚠ {error}
         </div>
-        <div className="kpi-card amber">
-          <div className="kpi-label">Pendentes</div>
-          <div className="kpi-value">{pendentes}</div>
-        </div>
-        <div className="kpi-card cyan">
-          <div className="kpi-label">Enviados (SENT)</div>
-          <div className="kpi-value">{enviados}</div>
-        </div>
-        <div className="kpi-card green">
-          <div className="kpi-label">Confirmados (ACK)</div>
-          <div className="kpi-value">{ack}</div>
-        </div>
-      </div>
+      )}
 
-      <RemanejamentosTable items={items} />
+      {!loading && !error && (
+        <>
+          <div className="kpi-row">
+            <div className="kpi-card">
+              <div className="kpi-label">Total</div>
+              <div className="kpi-value">{total}</div>
+            </div>
+            <div className="kpi-card amber">
+              <div className="kpi-label">Pendentes</div>
+              <div className="kpi-value">{pendentes}</div>
+            </div>
+            <div className="kpi-card cyan">
+              <div className="kpi-label">Enviados (SENT)</div>
+              <div className="kpi-value">{enviados}</div>
+            </div>
+            <div className="kpi-card green">
+              <div className="kpi-label">Confirmados (ACK)</div>
+              <div className="kpi-value">{ack}</div>
+            </div>
+          </div>
+
+          <RemanejamentosTable items={items} />
+        </>
+      )}
     </div>
   );
 }
