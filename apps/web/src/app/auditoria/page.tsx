@@ -25,7 +25,12 @@ const KIND_LABEL: Record<AuditEvent["kind"], { label: string; tone: "green" | "a
 
 export default function AuditoriaPage(): ReactNode {
   const [items, setItems] = useState<AuditEvent[] | null>(null);
-  const [verify, setVerify] = useState<{ ok: boolean; verificados: number; quebrados: number } | null>(null);
+  const [verify, setVerify] = useState<{
+    integro: boolean;
+    total_eventos: number;
+    primeiro_evento_com_falha: number | null;
+    duracao_ms: number;
+  } | null>(null);
   const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
