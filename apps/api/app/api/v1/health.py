@@ -390,70 +390,97 @@ async def seed_db(db: AsyncSession = Depends(get_db)) -> dict[str, object]:
             "tpa João da Silva (OG-058)",
         )
 
-    # 9. Lousa_escala_origem (hoje, SUAPE+DIURNO)
+    # 9. Lousa_escala_origem + alocações para (SUAPE|RECIFE) × (DIURNO|NOTURNO).
+    # Cria 1 escala_origem por (porto, turno) e 10 alocações de teste cada.
     suape_id = (await db.execute(sql_text(
         "SELECT id FROM lousa_main.portos WHERE codigo = 'SUAPE'"
+    ))).scalar()
+    recife_id = (await db.execute(sql_text(
+        "SELECT id FROM lousa_main.portos WHERE codigo = 'RECIFE'"
     ))).scalar()
     diurno_id = (await db.execute(sql_text(
         "SELECT id FROM lousa_main.turnos WHERE codigo = 'DIURNO'"
     ))).scalar()
+    noturno_id = (await db.execute(sql_text(
+        "SELECT id FROM lousa_main.turnos WHERE codigo = 'NOTURNO'"
+    ))).scalar()
 
-    if suape_id and diurno_id:
+    # Alocações de teste (10 por combinação porto×turno)
+    alocacoes_teste = [
+        ("PRODUCAO", "MANDO_01", "OG-058"),
+        ("PRODUCAO", "MANDO_02", "OG-100"),
+        ("PRODUCAO", "MANDO_03", "OG-133"),
+        ("SALARIO", "MANDO_01", "OG-058"),
+        ("SALARIO", "TERNO_01", "OG-200"),
+        ("SACARIA", "MANDO_01", "OG-058"),
+        ("SACARIA", "TECNICA_01", "OG-300"),
+        ("VEICULO", "TECNICA_06", "OG-400"),
+        ("CADASTRO", "VIGIA_01", "OG-500"),
+        ("SUPLEMENTAR", "MANDO_06", "OG-058"),
+    ]
+    # Alocações específicas de RECIFE (portuários do Recife Antigo)
+    alocacoes_recife = [
+        ("PRODUCAO", "MANDO_01", "OG-700"),
+        ("PRODUCAO", "TERNO_03", "OG-711"),
+        ("SALARIO", "MANDO_02", "OG-722"),
+        ("SACARIA", "TERNO_01", "OG-733"),
+        ("VEICULO", "TECNICA_07", "OG-744"),
+        ("DIVERSOS", "MANDO_03", "OG-755"),
+        ("CADASTRO", "VIGIA_02", "OG-766"),
+        ("SUPLEMENTAR", "MANDO_04", "OG-777"),
+        ("PRODUCAO", "TECNICA_02", "OG-788"),
+        ("SACARIA", "MANDO_06", "OG-799"),
+    ]
+
+    for porto_id, porto_cod, turno_id, turno_cod, alloc_list, fonte, url_origem in [
+        (suape_id,  "SUAPE",  diurno_id,  "DIURNO",  alocacoes_teste,    "TPA",       "http://tpa.ogmosuape.com.br/web/lousa_estiva"),
+        (suape_id,  "SUAPE",  noturno_id, "NOTURNO", alocacoes_teste,    "TPA",       "http://tpa.ogmosuape.com.br/web/lousa_estiva"),
+        (recife_id, "RECIFE", diurno_id,  "DIURNO",  alocacoes_recife,   "ESCALANET", "http://escalanet.recife.gov.br/publico/escala?porto=recife"),
+        (recife_id, "RECIFE", noturno_id, "NOTURNO", alocacoes_recife,   "ESCALANET", "http://escalanet.recife.gov.br/publico/escala?porto=recife"),
+    ]:
+        if not (porto_id and turno_id):
+            continue
         await upsert(
             "INSERT INTO lousa_main.lousa_escala_origem (fonte, porto_id, turno_id, "
             "data_referencia, url_origem, content_hash, payload_jsonb, duracao_ms, status) "
-            "VALUES ('TPA'::fonte_escala_enum, :p, :t, :d, :url, :hash, '{}'::jsonb, 1200, "
+            f"VALUES ('{fonte}'::fonte_escala_enum, :p, :t, :d, :url, :hash, '{{}}'::jsonb, 1200, "
             "'SUCESSO'::status_scraping_enum)",
-            {"p": suape_id, "t": diurno_id, "d": today,
-             "url": "http://tpa.ogmosuape.com.br/web/lousa_estiva",
-             "hash": "a" * 64},
-            "lousa_escala_origem (SUAPE+DIURNO)",
+            {"p": porto_id, "t": turno_id, "d": today,
+             "url": url_origem, "hash": "a" * 64},
+            f"lousa_escala_origem ({porto_cod}+{turno_cod})",
         )
+        # Pega o ID da escala recém-criada
+        escala_id = (await db.execute(sql_text(
+            "SELECT id FROM lousa_main.lousa_escala_origem "
+            "WHERE fonte = :fonte AND data_referencia = :d AND porto_id = :p AND turno_id = :t "
+            "ORDER BY created_at DESC LIMIT 1"
+        ), {"fonte": fonte, "d": today, "p": porto_id, "t": turno_id})).scalar()
 
-    # 10. Lousa_alocacao (10 alocações de teste)
-    escala_id = (await db.execute(sql_text(
-        "SELECT id FROM lousa_main.lousa_escala_origem "
-        "WHERE fonte = 'TPA' AND data_referencia = :d "
-        "ORDER BY created_at DESC LIMIT 1"
-    ), {"d": today})).scalar()
-
-    if escala_id and suape_id and diurno_id:
-        alocacoes_teste = [
-            ("PRODUCAO", "MANDO_01", "OG-058"),
-            ("PRODUCAO", "MANDO_02", "OG-100"),
-            ("PRODUCAO", "MANDO_03", "OG-133"),
-            ("SALARIO", "MANDO_01", "OG-058"),
-            ("SALARIO", "TERNO_01", "OG-200"),
-            ("SACARIA", "MANDO_01", "OG-058"),
-            ("SACARIA", "TECNICA_01", "OG-300"),
-            ("VEICULO", "TECNICA_06", "OG-400"),
-            ("CADASTRO", "VIGIA_01", "OG-500"),
-            ("SUPLEMENTAR", "MANDO_06", "OG-058"),
-        ]
-        for faina, funcao, mat in alocacoes_teste:
-            faina_id = (await db.execute(sql_text(
-                "SELECT id FROM lousa_main.fainas WHERE codigo = :c"
-            ), {"c": faina})).scalar()
-            funcao_id = (await db.execute(sql_text(
-                "SELECT id FROM lousa_main.funcoes WHERE codigo = :c"
-            ), {"c": funcao})).scalar()
-            if faina_id and funcao_id:
-                categoria = funcao.split("_")[0]  # MANDO/TERNO/TECNICA/VIGIA
-                fk_mando = 1 if categoria == "MANDO" else None
-                fk_terno = 1 if categoria == "TERNO" else None
-                fk_tecnica = 1 if categoria == "TECNICA" else None
-                fk_vigia = 1 if categoria == "VIGIA" else None
-                await upsert(
-                    "INSERT INTO lousa_main.lousa_alocacao (escala_origem_id, porto_id, "
-                    "turno_id, faina_id, funcao_id, data_referencia, trabalhador_matricula, "
-                    "fk_mando, fk_terno, fk_tecnica, fk_vigia, scraped_at, created_at) "
-                    "VALUES (:e, :p, :t, :fa, :fu, :d, :mat, :m, :te, :tc, :v, :now, :now)",
-                    {"e": escala_id, "p": suape_id, "t": diurno_id,
-                     "fa": faina_id, "fu": funcao_id, "d": today, "mat": mat,
-                     "m": fk_mando, "te": fk_terno, "tc": fk_tecnica, "v": fk_vigia,
-                     "now": now},
-                    f"alocacao {faina}+{funcao}+{mat}",
-                )
+        if escala_id:
+            for faina, funcao, mat in alloc_list:
+                faina_id = (await db.execute(sql_text(
+                    "SELECT id FROM lousa_main.fainas WHERE codigo = :c"
+                ), {"c": faina})).scalar()
+                funcao_id = (await db.execute(sql_text(
+                    "SELECT id FROM lousa_main.funcoes WHERE codigo = :c"
+                ), {"c": funcao})).scalar()
+                if faina_id and funcao_id:
+                    categoria = funcao.split("_")[0]  # MANDO/TERNO/TECNICA/VIGIA
+                    fk_mando = 1 if categoria == "MANDO" else None
+                    fk_terno = 1 if categoria == "TERNO" else None
+                    fk_tecnica = 1 if categoria == "TECNICA" else None
+                    fk_vigia = 1 if categoria == "VIGIA" else None
+                    await upsert(
+                        "INSERT INTO lousa_main.lousa_alocacao (escala_origem_id, porto_id, "
+                        "turno_id, faina_id, funcao_id, data_referencia, trabalhador_matricula, "
+                        "fk_mando, fk_terno, fk_tecnica, fk_vigia, scraped_at, created_at) "
+                        "VALUES (:e, :p, :t, :fa, :fu, :d, :mat, :m, :te, :tc, :v, :now, :now)",
+                        {"e": escala_id, "p": porto_id, "t": turno_id,
+                         "fa": faina_id, "fu": funcao_id, "d": today, "mat": mat,
+                         "m": fk_mando, "te": fk_terno, "tc": fk_tecnica, "v": fk_vigia,
+                         "now": now},
+                        f"alocacao {porto_cod}+{turno_cod} {faina}+{funcao}+{mat}",
+                    )
 
     return {
         "ok": True,
