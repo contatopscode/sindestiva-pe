@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     user: { role: string; id: string; email: string | null };
   };
 
-  (await cookies()).set({
+  const cookieOpts: Parameters<Awaited<ReturnType<typeof cookies>>["set"]>[1] = {
     name: COOKIE_NAME,
     value: data.access_token,
     httpOnly: true,
@@ -63,14 +63,13 @@ export async function POST(req: NextRequest) {
     sameSite: "lax",
     path: "/",
     maxAge: COOKIE_MAX_AGE,
-    // `Domain=.pscode.ia.br` faz o cookie ser compartilhado entre
-    // web.lousa.pscode.ia.br e api.lousa.pscode.ia.br (essencial — CORS
-    // precisa do cookie indo junto). Em dev, não aplica (hostnames diferentes
-    // de .lousa.pscode.ia.br).
-    ...(process.env.NODE_ENV === "production"
-      ? { domain: ".pscode.ia.br" }
-      : {}),
-  });
+  };
+  // `Domain=.pscode.ia.br` faz o cookie ser compartilhado entre
+  // web.lousa.pscode.ia.br e api.lousa.pscode.ia.br. Em dev não aplica.
+  if (process.env.NODE_ENV === "production") {
+    (cookieOpts as { domain?: string }).domain = ".pscode.ia.br";
+  }
+  (await cookies()).set(cookieOpts);
 
   return NextResponse.json({ ok: true, role: data.user.role });
 }
