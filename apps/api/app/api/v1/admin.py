@@ -119,6 +119,41 @@ async def debug_env() -> dict:
 
 
 @router.post(
+    "/test-whatsapp",
+    summary="[ADMIN] Envia msg de teste via WhatsApp (Evolution API)",
+)
+async def test_whatsapp(
+    numero: str | None = None,
+    texto: str | None = None,
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+) -> dict:
+    """Dispara msg WhatsApp via Evolution API para validar integração end-to-end.
+
+    Args (query):
+        numero: destinatário (formato BR ou E.164). Default `5581999990001` (Paulo).
+        texto: corpo da msg. Default placeholder.
+    """
+    _check_admin_token(x_admin_token)
+    from app.services.evolution import send_text  # noqa: PLC0415
+
+    numero_dest = numero or "5581999990001"
+    texto_dest = texto or "🔧 SINDESTIVA-PE · teste Evolution API via admin endpoint."
+    log.warning("admin.test_whatsapp.invocado", numero=numero_dest)
+
+    result = await send_text(numero_dest, texto_dest)
+    log.warning(
+        "admin.test_whatsapp.resultado",
+        sucesso=result["success"],
+        erro=result.get("error"),
+    )
+    return {
+        "numero_destino": numero_dest,
+        "texto_enviado": texto_dest,
+        **result,
+    }
+
+
+@router.post(
     "/fix-purge-after-default",
     summary="[ADMIN] Adiciona DEFAULT now()+5y em colunas purge_after NOT NULL",
 )
