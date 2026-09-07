@@ -13,6 +13,7 @@ vezes quiser.
 PORTA: 5442 (pegadinha Mac Paulo) — se estiver rodando em outro lugar,
 ajusta DATABASE_URL_ASYNC no .env.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -117,11 +118,22 @@ async def _upsert_user(db: AsyncSession, data: dict) -> User:
 
 
 async def _ensure_fiscal(db: AsyncSession, user: User, data: dict) -> Fiscal:
-    """Vincula perfil Fiscal ao user (1:1). Cria se não existir."""
+    """Vincula perfil Fiscal ao user (1:1). Cria se não existir.
+
+    Busca por `user_id` PRIMEIRO (caso já vinculado) e, se não achar,
+    busca por `cpf` (caso o Fiscal exista de uma tentativa anterior
+    mas sem user vinculado — comum em reruns parciais de seeds).
+    """
     stmt = select(Fiscal).where(Fiscal.user_id == user.id)
-    result = await db.execute(stmt)
-    fiscal = result.scalar_one_or_none()
+    fiscal = (await db.execute(stmt)).scalar_one_or_none()
     if fiscal is None:
+        # Tentativa 2: já existe Fiscal com esse CPF (sem user)?
+        stmt_cpf = select(Fiscal).where(Fiscal.cpf == data["cpf"])
+        fiscal = (await db.execute(stmt_cpf)).scalar_one_or_none()
+        if fiscal is not None:
+            fiscal.user_id = user.id
+            await db.flush()
+            return fiscal
         from app.models import Porto, Turno  # noqa: PLC0415
 
         # Pega porto + turno default (Suape + Diurno)
@@ -149,11 +161,21 @@ async def _ensure_fiscal(db: AsyncSession, user: User, data: dict) -> Fiscal:
 
 
 async def _ensure_dirigente(db: AsyncSession, user: User, data: dict) -> Dirigente:
-    """Vincula perfil Dirigente ao user (1:1). Cria se não existir."""
+    """Vincula perfil Dirigente ao user (1:1). Cria se não existir.
+
+    Mesma lógica do `_ensure_fiscal`: tenta por `user_id`, depois por
+    `cpf` (rerun-safe), depois cria.
+    """
     stmt = select(Dirigente).where(Dirigente.user_id == user.id)
-    result = await db.execute(stmt)
-    dirigente = result.scalar_one_or_none()
+    dirigente = (await db.execute(stmt)).scalar_one_or_none()
     if dirigente is None:
+        stmt_cpf = select(Dirigente).where(Dirigente.cpf == data["cpf"])
+        dirigente = (await db.execute(stmt_cpf)).scalar_one_or_none()
+        if dirigente is not None:
+            dirigente.user_id = user.id
+            dirigente.is_dpo = data.get("is_dpo", False) or dirigente.is_dpo
+            await db.flush()
+            return dirigente
         from datetime import date  # noqa: PLC0415
 
         dirigente = Dirigente(
@@ -173,8 +195,12 @@ async def _ensure_dirigente(db: AsyncSession, user: User, data: dict) -> Dirigen
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="SINDESTIVA-PE · seed 3 users iniciais")
-    parser.add_argument("--dry-run", action="store_true", help="Imprime plano sem conectar")
+    parser = argparse.ArgumentParser(
+        description="SINDESTIVA-PE · seed 3 users iniciais"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Imprime plano sem conectar"
+    )
     args = parser.parse_args()
 
     print(f"🌱 SINDESTIVA-PE · seed users (env={settings.app_env})")
