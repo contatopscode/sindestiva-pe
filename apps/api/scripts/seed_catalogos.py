@@ -24,7 +24,6 @@ from datetime import date, time
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,9 +31,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # (precisa sys.path) quanto como módulo.
 sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent.parent))
 
-from app.core.config import settings  # noqa: E402
-from app.core.database import session_scope  # noqa: E402
-from app.models import (  # noqa: E402
+from app.core.config import settings
+from app.core.database import session_scope
+from app.models import (
     Faina,
     FeriadoNacional,
     Funcao,
