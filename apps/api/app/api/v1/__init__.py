@@ -16,9 +16,11 @@ Routers expostos:
   - /dpo            → dashboard DPO + export Art. 18 (Sprint 6 T6-10/12)
   - /bi             → BI & Dashboards — Sprint 7 (kpis/por-dia/top/insights/pdf)
 """
+
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    admin,
     auditoria,
     auth,
     bi,
@@ -46,5 +48,6 @@ api_v1_router.include_router(auditoria.router)
 api_v1_router.include_router(lgpd.router)
 api_v1_router.include_router(dpo.router)
 api_v1_router.include_router(bi.router)  # Sprint 7
+api_v1_router.include_router(admin.router)  # Sprint A — one-shot ops
 
 __all__ = ["api_v1_router"]

@@ -12,6 +12,7 @@ Decisão Sprint 0+ (Sprint 0 refactor):
     precisamos setar 1 env var (`DATABASE_URL_ASYNC`) em produção
     (Render, Vercel) e o Alembic (psycopg sync) também funciona.
 """
+
 from __future__ import annotations
 
 from functools import lru_cache
@@ -93,8 +94,13 @@ class Settings(BaseSettings):
     # ---------- Observabilidade ----------
     sentry_dsn: str = ""
 
+    # ---------- Admin (one-shot operations) ----------
+    # Token compartilhado para endpoints admin (run-seeds, etc).
+    # Header esperado: X-Admin-Token. Se vazio, endpoint retorna 503.
+    admin_seed_token: str = ""
+
     @model_validator(mode="after")
-    def _derive_database_url_sync(self) -> "Settings":
+    def _derive_database_url_sync(self) -> Settings:
         """Se `DATABASE_URL_SYNC` não foi setado, deriva de `DATABASE_URL_ASYNC`.
 
         Substitui o driver `postgresql+asyncpg://` por `postgresql+psycopg://`
