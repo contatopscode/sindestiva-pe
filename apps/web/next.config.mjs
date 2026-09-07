@@ -2,8 +2,9 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@sindestiva/shared", "@sindestiva/ui"],
-  // Next 15.5+: typedRoutes é top-level (era experimental).
-  typedRoutes: true,
+  // typedRoutes: desabilitado até resolver incompatibilidade com Next 15.5+.
+  // Quando habilitado: rotas em `redirect()` exigem RouteImpl<string> (união complexa).
+  // typedRoutes: true,
   // Sem output: 'export' porque PWA precisa de API routes pra auth.
 };
 
