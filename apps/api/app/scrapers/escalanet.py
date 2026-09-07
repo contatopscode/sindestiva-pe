@@ -190,8 +190,14 @@ async def _raspar_periodo(
     turno_codigo: str,
     *,
     http_client: _HttpGet | None = None,
-) -> list[CelulaBruta]:
-    """Raspa 1 período do EscalaNet e retorna as células com turno_codigo setado."""
+) -> tuple[list[CelulaBruta], bool]:
+    """Raspa 1 período. Retorna (celulas, layout_mudou).
+
+    layout_mudou=True só quando a resposta HTTP **não tem a estrutura
+    esperada** (HTML mudou, OGMO tirou do ar, etc.). Quando o turno
+    simplesmente ainda não foi processado pelo OGMO (sem TPAs escalados
+    no horário), retorna (celulas=[], layout_mudou=False).
+    """
     form_data = {
         "categoria": ESCALANET_CATEGORIA,
         "data": data.strftime("%d/%m/%Y"),
@@ -225,9 +231,20 @@ async def _raspar_periodo(
             periodo=periodo_codigo,
             erro=str(exc),
         )
-        return []
+        return [], True  # erro de rede = sinal de layout mudou
 
     duracao = int((time.monotonic() - t0) * 1000)
+
+    # Marcador de "resposta OK": página de relatório tem o título fixo.
+    layout_ok = "Resultado da Escalação" in html
+    if not layout_ok:
+        log.warning(
+            "scraper_escalanet.layout_mudou",
+            periodo=periodo_codigo,
+            html_size=len(html),
+        )
+        return [], True
+
     celulas_brutas = _parse_html(html)
     # CelulaBruta é frozen + slots → recria com turno_codigo setado.
     celulas = [
@@ -246,7 +263,7 @@ async def _raspar_periodo(
         celulas=len(celulas),
         duracao_ms=duracao,
     )
-    return celulas
+    return celulas, False
 
 
 async def raspar_por_data(
@@ -285,24 +302,23 @@ async def raspar_por_data(
     layout_mudou = False
 
     for periodo_codigo, turno_codigo, _rotulo in ESCALANET_PERIODOS:
-        celulas_p = await _raspar_periodo(
+        celulas_p, layout_mudou_p = await _raspar_periodo(
             data,
             periodo_codigo,
             turno_codigo,
             http_client=http_client,
         )
         celulas_total.extend(celulas_p)
-        if not celulas_p:
-            # 3+ períodos vazios = sinal de layout mudou.
-            layout_mudou = layout_mudou or len(celulas_p) == 0
+        # layout_mudou só é True se a estrutura HTML em si mudou.
+        # Período sem TPAs (turno ainda não começou) = layout OK, sem dados.
+        if layout_mudou_p:
+            layout_mudou = True
 
     duracao = int((time.monotonic() - t0) * 1000)
-    html_bruto = "\n<!-- ESCALANET PERIODO -->\n".join(
-        [f"periodo={p}" for p, _, _ in ESCALANET_PERIODOS]
-    )
+    html_bruto = html_bruto_total or "<!-- escalanet: 4 periodos raspados -->"
     return EscalaBruta(
-        html_bruto=html_bruto_total or html_bruto,
-        content_hash=hash_conteudo(html_bruto_total or html_bruto),
+        html_bruto=html_bruto,
+        content_hash=hash_conteudo(html_bruto),
         celulas=celulas_total,
         duracao_ms=duracao,
         url_origem=ESCALANET_RELATORIO_URL,
