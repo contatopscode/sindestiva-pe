@@ -42,6 +42,7 @@ class OgmoNotificacaoRead(OgmoNotificacaoBase):
 
 
 class EnviarNotificacaoRequest(BaseModel):
-    canal: CanalNotificacaoEnum = CanalNotificacaoEnum.EMAIL
+    canal: CanalNotificacaoEnum = CanalNotificacaoEnum.WHATSAPP
     destinatario_email: str | None = None
+    destinatario_whatsapp: str | None = None
     destinatario_webhook_id: UUID | None = None

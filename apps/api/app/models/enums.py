@@ -12,6 +12,7 @@ Helper `pg_enum()`: converte o `Enum` Python em `sqlalchemy.Enum` com
 SQLAlchemy 2 não consegue mapear RoleEnum (Python) ↔ role_enum (Postgres)
 e quebra em runtime + Alembic autogenerate.
 """
+
 from __future__ import annotations
 
 import enum
@@ -66,6 +67,7 @@ def pg_enum(python_enum: type[enum.Enum]) -> SAEnum:
 # Auth / RBAC (DD v1 §3.1, §3.2)
 # ---------------------------------------------------------------------------
 
+
 class RoleEnum(str, enum.Enum):
     """3 roles no MVP. RBAC detalhado fica em `packages/shared/rbac.ts`."""
 
@@ -87,6 +89,7 @@ class UserStatusEnum(str, enum.Enum):
 # Perfis de negócio (DD v1 §3.3, §3.4, §3.5)
 # ---------------------------------------------------------------------------
 
+
 class TpaStatusEnum(str, enum.Enum):
     ATIVO = "ATIVO"
     AFASTADO = "AFASTADO"
@@ -103,6 +106,7 @@ class FiscalStatusEnum(str, enum.Enum):
 # ---------------------------------------------------------------------------
 # Lousa (DD v1 §3.12, §3.13)
 # ---------------------------------------------------------------------------
+
 
 class SnapshotStatusEnum(str, enum.Enum):
     OK = "OK"
@@ -121,6 +125,7 @@ class CellStatusEnum(str, enum.Enum):
 # ---------------------------------------------------------------------------
 # Remanejamento (DD v1 §3.14, §3.15)
 # ---------------------------------------------------------------------------
+
 
 class MotivoRemanejamentoEnum(str, enum.Enum):
     ATESTADO_MEDICO = "ATESTADO_MEDICO"
@@ -146,8 +151,10 @@ class StatusRemanejamentoEnum(str, enum.Enum):
 # Notificação OGMO (DD v1 §3.16, §3.17)
 # ---------------------------------------------------------------------------
 
+
 class CanalNotificacaoEnum(str, enum.Enum):
-    EMAIL = "EMAIL"
+    WHATSAPP = "WHATSAPP"  # Evolution API — canal primário no MVP
+    EMAIL = "EMAIL"  # fallback SMTP/Resend (legado)
     WEBHOOK = "WEBHOOK"
     PAINEL_OGMO = "PAINEL_OGMO"
 
@@ -163,6 +170,7 @@ class StatusNotificacaoEnum(str, enum.Enum):
 # ---------------------------------------------------------------------------
 # LGPD (DD v1 §3.19, §3.23)
 # ---------------------------------------------------------------------------
+
 
 class TermoMetodoEnum(str, enum.Enum):
     PRIMEIRO_LOGIN = "PRIMEIRO_LOGIN"
@@ -190,6 +198,7 @@ class LgpdStatusEnum(str, enum.Enum):
 # ---------------------------------------------------------------------------
 # Scraping (Sprint 2 — lousa_escala_origem, lousa_alocacao)
 # ---------------------------------------------------------------------------
+
 
 class FonteEscalaEnum(str, enum.Enum):
     """Fonte do scrape da lousa.

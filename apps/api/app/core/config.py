@@ -69,12 +69,17 @@ class Settings(BaseSettings):
     jwt_expires_in: str = "8h"
 
     # ---------- TPA / OTP (WhatsApp via Evolution API) ----------
+    # Mesmo padrão do Becker (ecommerce-becker), instância Vigilia hospedada
+    # em https://evolution-evolution-api.vcli1q.easypanel.host.
     evolution_api_url: str = "http://localhost:8080"
     evolution_api_key: str = ""
-    evolution_instance: str = "sindestiva"
+    evolution_instance: str = "Vigilia"
 
     # ---------- OGMO ----------
-    ogmo_email: str = "escalacao@ogmo-pe.com.br"
+    # Canal primário no MVP é WhatsApp (Evolution API), não e-mail.
+    # `ogmo_whatsapp` recebe o número do OGMO com DDI (ex: 55819...).
+    ogmo_email: str = "escalacao@ogmo-pe.com.br"  # legado, mantido p/ fallback
+    ogmo_whatsapp: str = ""  # DD + DDD + número, ex: 5581999990001
     ogmo_webhook_url: str = ""
 
     # ---------- E-mail (Resend) ----------
