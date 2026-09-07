@@ -79,6 +79,27 @@ async def _executar_seed(modulo_nome: str, fn_nome: str = "seed") -> dict:
 # ---------------------------------------------------------------------------
 
 
+@router.get(
+    "/debug/env",
+    summary="[DEBUG] Mostra quais env vars críticas estão configuradas",
+)
+async def debug_env() -> dict:
+    """Diagnóstico: retorna bool para cada env var crítica.
+
+    Útil pra confirmar que `ADMIN_SEED_TOKEN` (e outros) chegaram
+    no processo. Nunca expõe valores, só presença/configuração.
+    """
+    return {
+        "admin_seed_token_set": bool(settings.admin_seed_token),
+        "admin_seed_token_len": len(settings.admin_seed_token),
+        "app_env": settings.app_env,
+        "resend_api_key_set": bool(settings.resend_api_key),
+        "evolution_api_key_set": bool(settings.evolution_api_key),
+        "nextauth_secret_set": bool(settings.nextauth_secret),
+        "ogmo_webhook_url_set": bool(settings.ogmo_webhook_url),
+    }
+
+
 @router.post(
     "/run-seeds",
     summary="[ADMIN] Roda seed_catalogos + seed_users + seed_tpas (idempotente)",
