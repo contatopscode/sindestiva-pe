@@ -183,11 +183,11 @@ export async function getRemanejamentos(filters?: {
 }
 
 export async function createRemanejamento(
-  payload: Record<string, unknown>,
+  payload: unknown,
 ): Promise<RemanejamentoItem> {
   return apiFetch<RemanejamentoItem>("/api/v1/remanejamentos", {
     method: "POST",
-    body: payload,
+    body: payload as Record<string, unknown> | undefined,
   });
 }
 
