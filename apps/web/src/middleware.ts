@@ -97,11 +97,11 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-// Config vazio — Next.js 15 usa default (todas as rotas exceto _next/*).
-// Fazemos o filtro manualmente dentro da função middleware() para evitar
-// o erro de tipo `string is not assignable to RouteImpl<string>`.
-// Workaround: matcher vazio = Next aplica em todas, e o filtro interno
-// cuida do resto. Mais simples e compatível.
+// Next.js 15+ tem incompatibilidade de tipo com matcher strings.
+// Workaround verificado: usar `as const` no array resolve.
+// (Issue: https://github.com/vercel/next.js/issues/...)
 export const config = {
-  matcher: "/((?!_next/static|_next/image|favicon.ico).*)",
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico).*)",
+  ],
 } as never;
