@@ -71,6 +71,7 @@ select = [
 ignore = [
     "TRY003",  # mensagens de exception longas são OK neste domínio
     "PLR0913", # DI com muitos parâmetros
+    "B008",    # FastAPI Depends() em default é idiomático
 ]
 
 [tool.ruff.lint.per-file-ignores]

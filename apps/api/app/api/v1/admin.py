@@ -17,8 +17,10 @@ import importlib
 import sys
 from pathlib import Path
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_db
 from app.core.config import settings
 from app.core.logging import get_logger
 
@@ -114,6 +116,63 @@ async def debug_env() -> dict:
         "nextauth_secret_set": bool(settings.nextauth_secret),
         "ogmo_webhook_url_set": bool(settings.ogmo_webhook_url),
     }
+
+
+@router.post(
+    "/fix-purge-after-default",
+    summary="[ADMIN] Adiciona DEFAULT now()+5y em colunas purge_after NOT NULL",
+)
+async def fix_purge_after_default(
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Adiciona `DEFAULT now() + INTERVAL '5 years'` em todas as colunas
+    `purge_after` que estão NOT NULL sem default.
+
+    Workaround pro bug introduzido em `fe23ab1`: removemos
+    `server_default` dos models pq Postgres não faz cast de `text()`
+    para `timestamptz`. O default deveria ter sido adicionado via ALTER
+    TABLE no `/init`, mas o schema já estava criado em prod sem o
+    default — resultado: qualquer INSERT em dirigentes/fiscais/etc falha.
+
+    Endpoint idempotente — ALTER COLUMN SET DEFAULT não falha se já existe.
+
+    NÃO droca nenhuma tabela, NÃO altera dados existentes (só metadata).
+    """
+    from sqlalchemy import text as sql_text
+
+    schema = settings.db_schema
+    _check_admin_token(x_admin_token)
+    log.warning("admin.fix_purge_after.invocado")
+
+    purge_tables = [
+        r[0]
+        for r in (
+            await db.execute(
+                sql_text(
+                    "SELECT table_name FROM information_schema.columns "
+                    "WHERE table_schema = :s AND column_name = 'purge_after'"
+                ),
+                {"s": schema},
+            )
+        ).all()
+    ]
+
+    fixadas: list[str] = []
+    for table_name in purge_tables:
+        await db.execute(
+            sql_text(
+                f"ALTER TABLE {schema}.{table_name} "
+                f"ALTER COLUMN purge_after SET DEFAULT now() + INTERVAL '5 years'"
+            )
+        )
+        fixadas.append(table_name)
+        log.info("admin.fix_purge_after.applied", table=table_name)
+
+    # Commit (estamos numa sessão por request do FastAPI).
+    await db.commit()
+    log.warning("admin.fix_purge_after.ok", fixadas=fixadas)
+    return {"ok": True, "schema": schema, "fixadas": fixadas}
 
 
 @router.post(
