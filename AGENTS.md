@@ -286,21 +286,27 @@ integração real com o cadastro do Sindicato quando houver).
 
 ---
 
-## 12. Status atual (Sprint A — desbloqueio · 07/09/2026)
+## 12. Status atual (Sprint A — desbloqueio · 07/09/2026 · **CONCLUÍDA**)
 
 ### 🟢 Online em produção
 - **API** `https://sindestiva-api.onrender.com` — 60+ endpoints, OpenAPI/Swagger, `/docs` ativo
 - **Web (Centro de Comando)** `https://sindestiva-web.vercel.app` — 7 rotas (centro-comando, remanejamentos, ogmo, auditoria, bi, tpa, home)
 - **PWA TPA** `https://sindestiva-pwa.vercel.app` — 1 página demo (Sprint 0 — Sprint C vai completar)
-- **Schema DB** migrado (3 versions Alembic) + `Base.metadata.create_all` idempotente
+- **Schema DB** migrado (3 versions Alembic) + `Base.metadata.create_all` idempotente + `/admin/fix-purge-after-default` aplicado
 - **Scraping TPA/Suape** ✅ ~94-113 células/dia
-- **Scraping EscalaNet/Recife** ✅ corrigido nesta Sprint A (era 100% falha — URL antiga não resolvia DNS)
+- **Scraping EscalaNet/Recife** ✅ 8 células agregadas de 24 TPAs reais (4 períodos: 46/47/48/49)
+- **Seeds rodadas em prod** ✅ (Paulo/Manoel/Josias + TPA-001/TPA-002 + 8 catálogos) via endpoint `/admin/run-seeds`
+- **Login validado** ✅ Paulo/Manoel/Josias autenticam; TPA-001 retorna escala
 
-### 🔴 Pendências críticas (Sprint A em andamento)
-- ⏳ Seeds em prod (`apps/api/scripts/run-seeds.sh`) — Paulo roda no Shell do Render
-- ⏳ Provisionar `*.lousa.pscode.ia.br` (DNS Cloudflare + domínios Vercel/Render)
-- ⏳ Validar com Manoel Costa se a estrutura Recife capturada bate com a do Sindicato
-- ⏳ RESEND_API_KEY no Render (e-mail OGMO parado)
+### 🟡 Validação Manoel Costa (07/09/2026)
+- ✅ Estrutura Recife (PRODUCAO como faina default) **validada** com Manoel Costa
+- Captura atual: ~24 TPAs/dia do EscalaNet (período 46 = 0800/1400, manhã ativa)
+- Demais períodos (47/48/49) são vazios por design (turnos ainda não processados pelo OGMO)
+
+### 🔴 Pendências (próxima sprint)
+- Provisionar `*.lousa.pscode.ia.br` (DNS Cloudflare + domínios Vercel/Render) — guia em `DEPLOY.md §DNS`
+- `RESEND_API_KEY` no Render (e-mail OGMO parado) — chave em https://resend.com (free 3k/mês)
+- `EVOLUTION_API_KEY` no Render (OTP WhatsApp do TPA)
 
 ### 📋 Próximos marcos
 - **M1** "Centro de Comando autenticado" — fim Sprint B (20/09/2026) — NextAuth + RBAC
@@ -310,3 +316,8 @@ integração real com o cadastro do Sindicato quando houver).
 ### 📄 Documentos do projeto
 - [`DIAGNOSTICO-FUNCIONAL-2026-09-07.md`](./DIAGNOSTICO-FUNCIONAL-2026-09-07.md) — diagnóstico + plano de melhorias 4 sprints
 - [`SINDESTIVA-PE-PLANO-IMPLEMENTACAO-2026-09-01.md`](./SINDESTIVA-PE-PLANO-IMPLEMENTACAO-2026-09-01.md) — plano executivo v1.0 (1090 linhas, 18 sprints, 86 HUs)
+
+### 🛠 Endpoints admin one-shot (Sprint A — auth via `X-Admin-Token`)
+- `POST /api/v1/admin/run-seeds` — roda 3 seeds idempotentes
+- `POST /api/v1/admin/fix-purge-after-default` — aplica `now() + 5y` em `purge_after` de todas as tabelas
+- `GET /api/v1/admin/debug/env` — diagnóstico bool de env vars críticas

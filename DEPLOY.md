@@ -44,13 +44,28 @@
 
 ## Domínios (post-deploy)
 
-| Subdomínio              | Hospedagem | Serviço       |
-|-------------------------|------------|---------------|
-| `web.lousa.pscode.ia.br`| Vercel     | `apps/web`    |
-| `pwa.lousa.pscode.ia.br`| Vercel     | `apps/pwa`    |
-| `api.lousa.pscode.ia.br`| Render     | `apps/api`    |
+| Subdomínio              | Hospedagem | Serviço       | Status (07/09/2026) |
+|-------------------------|------------|---------------|--------------------|
+| `web.lousa.pscode.ia.br`| Vercel     | `apps/web`    | 🟢 vivo, TLS OK   |
+| `pwa.lousa.pscode.ia.br`| Vercel     | `apps/pwa`    | 🟢 vivo, TLS OK   |
+| `api.lousa.pscode.ia.br`| Render     | `apps/api`    | 🟢 vivo, TLS OK   |
 
-URL padrão Render (antes de domínio custom): `https://sindestiva-api.onrender.com`.
+URLs padrão (auto-gerados pelos provedores, continuam funcionando):
+- API Render: `https://sindestiva-api.onrender.com`
+- Web Vercel: `https://sindestiva-web.vercel.app`
+- PWA Vercel: `https://sindestiva-pwa.vercel.app`
+
+## DNS provisionado em 07/09/2026
+
+3 CNAMEs na zona `pscode.ia.br` (Cloudflare) + domínios custom nos 3 projetos:
+
+| Subdomínio              | CNAME aponta para              |
+|-------------------------|--------------------------------|
+| `web.lousa.pscode.ia.br`| `cname.vercel-dns.com`         |
+| `pwa.lousa.pscode.ia.br`| `cname.vercel-dns.com`         |
+| `api.lousa.pscode.ia.br`| `sindestiva-api.onrender.com`  |
+
+Certs TLS emitidos automaticamente (Let's Encrypt via Vercel/Render).
 
 ## Passo-a-passo
 
