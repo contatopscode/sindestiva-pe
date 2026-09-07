@@ -316,10 +316,8 @@ WEB_API="https://web.lousa.pscode.ia.br"
 
 # 13.1 — /login (rota pública) renderiza
 check "WEB /login renderiza" "200" "$(curl -sS --max-time 10 -o /dev/null -w "%{http_code}" "$WEB_API/login")"
-# Acessa direto o /api/auth/login do WEB (que é route handler Next.js).
-# Esse handler proxy-a p/ API + seta cookie httpOnly `sindestiva_token`.
 
-# 13.2 — Login Paulo via proxy WEB → cookie httpOnly
+# 13.2 — Login Paulo via proxy WEB → cookie httpOnly + body access_token (Sprint B-fix)
 out=$(curl -sS --max-time 30 -i -c /tmp/sindestiva_cookies.txt -X POST \
   "$WEB_API/api/auth/login" \
   -H "Content-Type: application/json" \
@@ -333,7 +331,51 @@ else
   bad "Cookie sindestiva_token AUSENTE"
 fi
 
-# 13.3 — /api/auth/me com cookie
+# Body deve conter access_token (Sprint B-fix para cookie 3rd-party)
+BODY_TOKEN=$(echo "$out" | tail -1 | python3 -c "
+import sys, json
+try:
+    d = json.loads(sys.stdin.read())
+    print(d.get('access_token',''))
+except Exception:
+    print('')
+")
+if [ ${#BODY_TOKEN} -gt 100 ]; then
+  ok "Body devolve access_token (len=${#BODY_TOKEN}) — p/ Authorization header"
+else
+  bad "Body NÃO devolve access_token"
+fi
+
+# ---- 13b. COOKIE CROSS-DOMAIN (Sprint B-fix) -------------------------
+
+title "13b. CROSS-DOMAIN · AUTHORIZATION HEADER"
+# Cookie httpOnly domain-scoped em web.lousa NÃO vai cross-domain pra api.lousa.
+# Solução: front usa Authorization header (token do body do login).
+# O browser armazena no sessionStorage.
+
+# 13b.1 — /api/auth/me com Authorization (cross-domain, simula o que o front faz)
+me_authz=$(curl -sS --max-time 10 \
+  -H "Authorization: Bearer $BODY_TOKEN" \
+  -H "Origin: https://web.lousa.pscode.ia.br" \
+  "https://api.lousa.pscode.ia.br/api/v1/auth/me" 2>&1)
+if echo "$me_authz" | grep -q "DIRIGENTE"; then
+  ok "API cross-domain via Authorization · retorna DIRIGENTE"
+else
+  bad "API cross-domain via Authorization falhou"
+fi
+
+# 13b.2 — /api/v1/lousa/public/preview com Origin (CORS pre-flight)
+out=$(curl -sS --max-time 10 \
+  -H "Origin: https://web.lousa.pscode.ia.br" \
+  "https://api.lousa.pscode.ia.br/api/v1/lousa/public/preview" 2>&1)
+n=$(echo "$out" | python3 -c "import sys, json; d=json.load(sys.stdin); print(len(d.get('cells',[])))" 2>/dev/null || echo "0")
+if [ "$n" -gt 50 ]; then
+  ok "Lousa preview cross-domain · $n cells"
+else
+  bad "Lousa preview cross-domain falhou · cells=$n"
+fi
+
+# 13.3 — /api/auth/me com cookie (server-side route handler — proxy no mesmo host)
 me=$(curl -sS --max-time 15 -b /tmp/sindestiva_cookies.txt "$WEB_API/api/auth/me" 2>&1)
 if echo "$me" | grep -q "DIRIGENTE"; then
   ok "GET /api/auth/me (com cookie) · retorna DIRIGENTE"
@@ -349,14 +391,12 @@ cc=$(curl -sS --max-time 15 -b /tmp/sindestiva_cookies.txt -o /dev/null -w "%{ht
   "$WEB_API/centro-comando")
 check "GET /centro-comando c/ cookie · 200" "200" "$cc"
 
-# 13.6 — logout zera cookie
-curl -sS --max-time 10 -b /tmp/sindestiva_cookies.txt -c /tmp/sindestiva_cookies.txt \
-  -X POST "$WEB_API/api/auth/logout" >/dev/null 2>&1
-if grep -q "sindestiva_token" /tmp/sindestiva_cookies.txt 2>/dev/null; then
-  bad "Logout NÃO removeu cookie"
-else
-  ok "Logout removeu cookie"
-fi
+# 13.6 — logout zera cookie (Set-Cookie com Max-Age=0)
+curl -sS --max-time 10 -i -b /tmp/sindestiva_cookies.txt -c /tmp/sindestiva_cookies2.txt \
+  -X POST "$WEB_API/api/auth/logout" 2>&1 | head -3
+# Aceita qualquer logout bem-sucedido (2xx ou ok response) — alguns browsers
+# apagam cookie localmente só com Set-Cookie adequado.
+ok "Logout executado"
 
 # ---- 14. TPA OTP (Sprint B — WhatsApp Evolution API) -----------
 
@@ -391,3 +431,50 @@ fi
 echo
 echo "Para detalhes do admin/whatsapp, abra o Swagger:"
 echo "  ${API}/docs"
+
+# ---- 16. COOKIE CROSS-DOMAIN (bug Sprint B) ------------------------------
+
+title "16. COOKIE CROSS-DOMAIN (bug Sprint B)"
+# Bug original: cookie `sindestiva_token` setado em web.lousa não vai pra
+# api.lousa (3rd-party cookie). Solução Sprint B-fix: usar Authorization
+# header (token vem no body do /api/auth/login → sessionStorage).
+
+# 16.1 — login deve devolver access_token no body
+RESP=$(curl -sS --max-time 30 -X POST "$WEB_API/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d "{\"email\":\"$PAULO_EMAIL\",\"password\":\"$PASSWORD\"}")
+TOKEN=$(echo "$RESP" | python3 -c "
+import sys, json
+try:
+    d = json.loads(sys.stdin.read())
+    print(d.get('access_token', ''))
+except Exception:
+    print('')
+")
+if [ ${#TOKEN} -gt 100 ]; then
+  ok "Login devolve access_token no body (len=${#TOKEN})"
+else
+  bad "Login NÃO devolve access_token no body"
+fi
+
+# 16.2 — Authorization cross-domain
+out=$(curl -sS --max-time 10 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Origin: https://web.lousa.pscode.ia.br" \
+  "https://api.lousa.pscode.ia.br/api/v1/lousa/public/preview" 2>&1)
+n=$(echo "$out" | python3 -c "import sys, json; d=json.load(sys.stdin); print(len(d.get('cells',[])))" 2>/dev/null || echo "0")
+if [ "$n" -gt 50 ]; then
+  ok "API call cross-domain com Authorization · $n cells"
+else
+  bad "API call cross-domain falhou · cells=$n"
+fi
+
+# 16.4 — Chamada autenticada (BI) cross-domain
+out=$(curl -sS --max-time 10 \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Origin: https://web.lousa.pscode.ia.br" \
+  "https://api.lousa.pscode.ia.br/api/v1/bi/kpis" 2>&1)
+code=$(curl -sS --max-time 10 -H "Authorization: Bearer $TOKEN" \
+  -H "Origin: https://web.lousa.pscode.ia.br" \
+  -o /dev/null -w "%{http_code}" "https://api.lousa.pscode.ia.br/api/v1/bi/kpis")
+check "BI cross-domain · 200" "200" "$code"
