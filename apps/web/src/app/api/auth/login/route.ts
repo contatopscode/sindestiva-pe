@@ -2,9 +2,8 @@
  * POST /api/auth/login
  *
  * Server-side proxy que chama a API de prod, seta cookie httpOnly
- * `sindestiva_token` e retorna {ok, role}.
+ * `sindestiva_token` e retorna {ok, role, access_token}.
  */
-import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://api.lousa.pscode.ia.br";
