@@ -195,15 +195,19 @@ FERIADOS: list[dict[str, Any]] = [
 async def _upsert(db: AsyncSession, model: type, rows: list[dict], conflict: str) -> int:
     """Insere `rows` no model com ON CONFLICT DO NOTHING. Retorna # inseridos.
 
-    Usa o `pg_insert` no `Table` subjacente (não em text()) pra que o
-    SQLAlchemy 2 consiga compilar a query com o tipo correto das colunas
-    (essencial pra CITEXT, TIMESTAMP WITH TIME ZONE, etc).
+    Sem `index_elements` para capturar QUALQUER violação de unique
+    constraint — modelos como `Funcao` e `Faina` têm UNIQUE em
+    `codigo` E em `ordem_lousa`; se o seed rodar 2x e houver conflito
+    em qualquer uma, precisamos ignorar.
     """
     if not rows:
         return 0
     table = model.__table__
     stmt = pg_insert(table).values(rows)
-    stmt = stmt.on_conflict_do_nothing(index_elements=[conflict])
+    # `index_elements=[conflict]` foi removido — com ele, ON CONFLICT só
+    # capturava a UNIQUE do `conflict`, deixando passar conflitos em
+    # outras UNIQUE constraints (ex: uq_funcoes_ordem).
+    stmt = stmt.on_conflict_do_nothing()
     result = await db.execute(stmt)
     # Heurística: pg_insert com asyncpg pode não retornar rowcount preciso.
     return result.rowcount if result.rowcount is not None else len(rows)
