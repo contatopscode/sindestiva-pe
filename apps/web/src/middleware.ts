@@ -97,9 +97,10 @@ export function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
+// Workaround Next.js 15+: matcher precisa ser RouteImpl<string> (não string puro).
+// Cast via `as never` evita o erro de tipo sem mudar comportamento.
 export const config = {
-  // `as const` evita conflito de tipo com RouteImpl<string> em Next 15+.
   matcher: [
     "/((?!api|_next/static|_next/image|favicon.ico).*)",
-  ] as const,
-};
+  ],
+} as unknown as { matcher: readonly string[] };
