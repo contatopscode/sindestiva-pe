@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SINDESTIVA-PE · PWA icon (source) — versão limpa, sem texto
+  Gerado como PNG (192, 512, apple-touch 180, favicon 32) via ImageMagick.
+  Tema: portuário-industrial — fundo azul gradiente + âncora dourada.
+  Sem dependência de font (texto vai no nome do app, exibido pelo SO).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f2438"/>
+      <stop offset="100%" stop-color="#061321"/>
+    </linearGradient>
+    <radialGradient id="anchorGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#d4a574" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#d4a574" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background gradient -->
+  <rect width="512" height="512" fill="url(#bgGrad)"/>
+
+  <!-- Soft glow atrás da âncora -->
+  <circle cx="256" cy="256" r="240" fill="url(#anchorGlow)"/>
+
+  <!-- Âncora marítima — centralizada -->
+  <g transform="translate(256, 256)" fill="none" stroke="#d4a574" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Anel no topo -->
+    <circle cx="0" cy="-150" r="22"/>
+    <!-- Haste vertical -->
+    <line x1="0" y1="-128" x2="0" y2="135"/>
+    <!-- Travessa horizontal -->
+    <line x1="-65" y1="-90" x2="65" y2="-90"/>
+    <!-- Braços curvados -->
+    <path d="M -170 90 Q -170 175 0 175 Q 170 175 170 90"/>
+    <!-- Pontas dos braços -->
+    <line x1="-170" y1="90" x2="-200" y2="20"/>
+    <line x1="170" y1="90" x2="200" y2="20"/>
+  </g>
+
+  <!-- Anel decorativo (não-essencial, dá profundidade) -->
+  <circle cx="256" cy="256" r="200" fill="none" stroke="#d4a574" stroke-width="2" stroke-opacity="0.25"/>
+</svg>
