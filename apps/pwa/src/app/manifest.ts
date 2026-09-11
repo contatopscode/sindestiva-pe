@@ -11,6 +11,10 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    // P0.5 (code-review F-001): `id` identifica unicamente a aplicação pra
+    // analytics de install (boa prática PWA — evita contagem duplicada quando
+    // browser trata URLs com query strings diferentes como apps separados).
+    id: "/?source=pwa",
     name: "Lousa Digital · TPA",
     short_name: "TPA",
     description:
