@@ -56,15 +56,15 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0
 
 # Cria usuário não-root
-RUN addgroup --system --gid 1001 nodejs \
-    && adduser --system --uid 1001 --home-dir /app --shell /sbin/nologin nextjs
+RUN addgroup --system sindestiva-web \
+    && adduser -D -H -u 1001 -G sindestiva-web sindestiva-web
 
 # Copia output standalone (server.js + node_modules filtrado)
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=sindestiva-web:sindestiva-web /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=sindestiva-web:sindestiva-web /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=sindestiva-web:sindestiva-web /app/apps/web/public ./apps/web/public
 
-USER nextjs
+USER sindestiva-web
 EXPOSE 3000
 
 # Health check (Alpine não tem curl; wget vem built-in)

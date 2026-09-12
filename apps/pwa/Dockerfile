@@ -53,15 +53,15 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     HOSTNAME=0.0.0.0
 
-RUN addgroup --system --gid 1001 nodejs \
-    && adduser --system --uid 1001 --home-dir /app --shell /sbin/nologin nextjs
+RUN addgroup --system sindestiva-pwa \
+    && adduser -D -H -u 1001 -G sindestiva-pwa sindestiva-pwa
 
 # Standalone output (já inclui sw.js gerado por next-pwa em public/)
-COPY --from=builder --chown=nextjs:nodejs /app/apps/pwa/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/pwa/.next/static ./apps/pwa/.next/static
-COPY --from=builder --chown=nextjs:nodejs /app/apps/pwa/public ./apps/pwa/public
+COPY --from=builder --chown=sindestiva-pwa:sindestiva-pwa /app/apps/pwa/.next/standalone ./
+COPY --from=builder --chown=sindestiva-pwa:sindestiva-pwa /app/apps/pwa/.next/static ./apps/pwa/.next/static
+COPY --from=builder --chown=sindestiva-pwa:sindestiva-pwa /app/apps/pwa/public ./apps/pwa/public
 
-USER nextjs
+USER sindestiva-pwa
 EXPOSE 3001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
