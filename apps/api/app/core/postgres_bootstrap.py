@@ -52,6 +52,58 @@ def alembic_bin_path() -> str:
     return shutil.which("alembic") or "/app/.venv/bin/alembic"
 
 
+def database_fingerprint(
+    engine: Engine,
+    *,
+    schema: str | None = None,
+) -> dict[str, str | None]:
+    """Identifica o banco usado na verificação pós-migrate (mesma URL do Alembic)."""
+    db_schema = schema or settings.db_schema
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                "SELECT current_database()::text, current_user::text, "
+                "current_setting('search_path')::text"
+            ),
+        ).one()
+        has_version = conn.execute(
+            text(
+                "SELECT EXISTS ("
+                "  SELECT 1 FROM information_schema.tables "
+                "  WHERE table_schema = :schema AND table_name = 'alembic_version'"
+                ")"
+            ),
+            {"schema": db_schema},
+        ).scalar()
+    return {
+        "database": row[0],
+        "user": row[1],
+        "search_path": row[2],
+        "alembic_version_table_exists": str(bool(has_version)),
+    }
+
+
+def scan_alembic_log_for_errors(log_text: str) -> list[str]:
+    """Extrai linhas de erro mesmo quando o CLI retorna rc=0 (rollback silencioso)."""
+    needles = (
+        "Traceback",
+        "ERROR",
+        "UndefinedObject",
+        "UndefinedTable",
+        "ProgrammingError",
+        "InternalError",
+        "failed",
+    )
+    hits: list[str] = []
+    for line in log_text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if any(n in stripped for n in needles):
+            hits.append(stripped[:500])
+    return hits[:20]
+
+
 def run_alembic_cli(
     *args: str,
     cwd: str = "/app",
@@ -106,12 +158,16 @@ def detect_schema_drift(
 
 def ensure_tables_via_metadata(
     engine: Engine,
+    *,
+    schema: str | None = None,
 ) -> None:
     """Fallback DDL when Alembic thinks it is at head but tables are missing."""
     from app.core.database import Base
     import app.models  # noqa: F401
 
+    db_schema = schema or settings.db_schema
     with engine.begin() as conn:
+        conn.execute(text(f"SET search_path TO {db_schema}, public"))
         Base.metadata.create_all(conn, checkfirst=True)
 
 
@@ -152,6 +208,7 @@ def run_migrations_with_drift_repair(
         upgrade_res = run_alembic_cli("upgrade", "head", cwd=cwd)
         logs.append(upgrade_res.combined_log)
         actions.append("upgrade:head")
+        log_errors = scan_alembic_log_for_errors(upgrade_res.combined_log)
         if upgrade_res.returncode != 0:
             return {
                 "ok": False,
@@ -161,10 +218,34 @@ def run_migrations_with_drift_repair(
                 "missing_before": missing_before,
                 "missing_after": list_missing_critical_tables(engine, schema=schema),
                 "log_tail": "\n".join(logs)[-3000:],
+                "alembic_log_errors": log_errors,
+                "db_fingerprint": database_fingerprint(engine, schema=schema),
                 "error": f"alembic upgrade head failed (rc={upgrade_res.returncode})",
             }
 
         missing_after = list_missing_critical_tables(engine, schema=schema)
+        revision_after = get_alembic_revision(engine, schema=schema)
+        fingerprint = database_fingerprint(engine, schema=schema)
+
+        if missing_after and upgrade_res.returncode == 0:
+            hint = (
+                "alembic upgrade reported success but critical tables are missing "
+                "(historically: async run_sync without commit rolled back DDL)"
+            )
+            return {
+                "ok": False,
+                "repaired_drift": bool(before["drift"]),
+                "actions": actions,
+                "revision_before": revision_before,
+                "revision_after": revision_after,
+                "missing_before": missing_before,
+                "missing_after": missing_after,
+                "log_tail": "\n".join(logs)[-3000:],
+                "alembic_log_errors": log_errors,
+                "db_fingerprint": fingerprint,
+                "error": hint,
+            }
+
         if missing_after:
             try:
                 ensure_tables_via_metadata(engine)
@@ -185,6 +266,8 @@ def run_migrations_with_drift_repair(
             "missing_before": missing_before,
             "missing_after": missing_after,
             "log_tail": "\n".join(logs)[-3000:],
+            "alembic_log_errors": log_errors,
+            "db_fingerprint": fingerprint,
             "error": None if ok else "critical tables still missing after migrate/repair",
         }
     finally:

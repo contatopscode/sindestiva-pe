@@ -27,9 +27,17 @@ def main() -> int:
     if not result.get("ok"):
         err = result.get("error") or "migrate/repair failed"
         print(f"ERRO: {err}", file=sys.stderr)
+        fp = result.get("db_fingerprint")
+        if fp:
+            print(f"DB fingerprint: {fp}", file=sys.stderr)
         tail = result.get("log_tail")
         if tail:
             print(tail[-2000:], file=sys.stderr)
+        alembic_errs = result.get("alembic_log_errors")
+        if alembic_errs:
+            print("Alembic log errors:", file=sys.stderr)
+            for line in alembic_errs:
+                print(f"  {line}", file=sys.stderr)
         return 1
     return 0
 
