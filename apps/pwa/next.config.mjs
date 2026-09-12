@@ -18,9 +18,10 @@ const withPWA = withPWAInit({
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ["@sindestiva/shared", "@sindestiva/ui"],
-  experimental: {
-    typedRoutes: true,
-  },
+  // Coolify/docker: gera output standalone. Em prod, o next-pwa gera
+  // public/sw.js no build time ANTES do output standalone ser gerado,
+  // então o SW é incluído automaticamente na imagem.
+  output: "standalone",
 };
 
 export default withPWA(nextConfig);
