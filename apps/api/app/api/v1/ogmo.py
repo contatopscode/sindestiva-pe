@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,11 +16,43 @@ from app.api.deps import get_db
 from app.core.security import get_current_user_id, oauth2_scheme
 from app.core.logging import get_logger
 from app.models import OgmoNotificacao
-from app.schemas.ogmo import EnviarNotificacaoRequest
+from app.schemas.ogmo import EnviarNotificacaoRequest, OgmoNotificacaoRead
 from app.services.ogmo_notifier import OgmoNotifierError, enviar_email
 
 router = APIRouter(prefix="/ogmo", tags=["ogmo"])
 log = get_logger(__name__)
+
+
+def _user_id_or_401(token: Annotated[str | None, Depends(oauth2_scheme)]) -> str:
+    user_id = get_current_user_id(token=token)
+    if user_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "AUTH_REQUIRED", "message": "Autenticação obrigatória."},
+        )
+    return user_id
+
+
+@router.get(
+    "/notificacoes",
+    response_model=list[OgmoNotificacaoRead],
+    summary="Lista notificações OGMO (fila)",
+)
+async def list_notificacoes(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[str, Depends(_user_id_or_401)],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+) -> list[OgmoNotificacaoRead]:
+    """Fila do Centro de Comando — mais recentes primeiro."""
+    stmt = (
+        select(OgmoNotificacao)
+        .order_by(OgmoNotificacao.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    rows = list((await db.execute(stmt)).scalars().all())
+    return [OgmoNotificacaoRead.model_validate(r) for r in rows]
 
 
 @router.post(

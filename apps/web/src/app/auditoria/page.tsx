@@ -6,9 +6,11 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { getAuditEvents, verifyHashChain } from "@/lib/api";
+import { getAuditEvents, verifyHashChain, ApiError } from "@/lib/api";
 import type { AuditEvent } from "@/lib/tipos";
 import { StatusBadge } from "@/app/_components/StatusBadge";
+import { EmptyState } from "@/app/_components/EmptyState";
+import { shortHashPrefix } from "@/lib/api-mappers";
 
 const KIND_LABEL: Record<AuditEvent["kind"], { label: string; tone: "green" | "amber" | "red" | "cyan" | "purple" | "gold" | "muted" }> = {
   SCRAPING_OK:         { label: "Scraping OK",   tone: "green" },
@@ -25,6 +27,7 @@ const KIND_LABEL: Record<AuditEvent["kind"], { label: string; tone: "green" | "a
 
 export default function AuditoriaPage(): ReactNode {
   const [items, setItems] = useState<AuditEvent[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [verify, setVerify] = useState<{
     integro: boolean;
     total_eventos: number;
@@ -34,7 +37,15 @@ export default function AuditoriaPage(): ReactNode {
   const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
-    getAuditEvents(50).then(setItems);
+    setLoadError(null);
+    getAuditEvents(50)
+      .then(setItems)
+      .catch((err) => {
+        const msg =
+          err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Erro";
+        setLoadError(msg);
+        setItems([]);
+      });
   }, []);
 
   async function onVerify() {
@@ -88,13 +99,25 @@ export default function AuditoriaPage(): ReactNode {
         </div>
       )}
 
+      {loadError && (
+        <div className="login-error mb-4" role="alert">
+          ⚠ {loadError}
+        </div>
+      )}
+
       {items === null ? (
         <div className="loading">Carregando eventos…</div>
-      ) : (
+      ) : items.length === 0 && !loadError ? (
+        <EmptyState
+          icon="🔗"
+          title="Nenhum evento de auditoria ainda"
+          description="Logins, scrapes e remanejamentos passam a gerar eventos append-only na hash chain assim que a operação começar."
+        />
+      ) : items.length === 0 ? null : (
         <div className="rounded-lg border border-[#1e3a52] bg-[#0f2438]">
           <ol className="divide-y divide-[#1e3a52]">
             {items.map((e) => {
-              const meta = KIND_LABEL[e.kind];
+              const meta = KIND_LABEL[e.kind] ?? { label: e.kind, tone: "muted" as const };
               return (
                 <li key={e.id} className="p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -111,11 +134,15 @@ export default function AuditoriaPage(): ReactNode {
                       <div className="mt-2 grid grid-cols-1 gap-1 text-[10px] text-[#5f7a92] md:grid-cols-2">
                         <div>
                           <span className="text-[#94a8bd]">hash_evento:</span>{" "}
-                          <span className="font-mono text-[#d4a574]">{e.hash_evento.slice(0, 16)}…</span>
+                          <span className="font-mono text-[#d4a574]">
+                            {shortHashPrefix(e.hash_evento)}
+                          </span>
                         </div>
                         <div>
                           <span className="text-[#94a8bd]">hash_anterior:</span>{" "}
-                          <span className="font-mono text-[#d4a574]">{e.hash_anterior.slice(0, 16)}…</span>
+                          <span className="font-mono text-[#d4a574]">
+                            {shortHashPrefix(e.hash_anterior)}
+                          </span>
                         </div>
                       </div>
                     </div>
