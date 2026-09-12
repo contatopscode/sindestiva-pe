@@ -29,6 +29,10 @@
 # =============================================================================
 set -e
 
+# Garante imports `app.*` nos scripts (mesmo layout que uvicorn em /app).
+cd /app
+export PYTHONPATH=/app
+
 VENV_BIN="/app/.venv/bin"
 
 echo "==> [0/5] Postgres bootstrap (schema + extensions pg_trgm/citext/pgcrypto)..."
