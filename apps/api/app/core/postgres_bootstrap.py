@@ -228,10 +228,16 @@ def run_migrations_with_drift_repair(
         fingerprint = database_fingerprint(engine, schema=schema)
 
         if missing_after and upgrade_res.returncode == 0:
+            version_exists = fingerprint.get("alembic_version_table_exists") == "True"
             hint = (
                 "alembic upgrade reported success but critical tables are missing "
-                "(historically: async run_sync without commit rolled back DDL)"
+                "(uncommitted outer transaction: use engine.begin() in env.py)"
             )
+            if not version_exists and "Running upgrade" in upgrade_res.combined_log:
+                hint = (
+                    "alembic logged Running upgrade but lousa_main.alembic_version "
+                    "was not created — migration DDL was rolled back (check env.py commit)"
+                )
             return {
                 "ok": False,
                 "repaired_drift": bool(before["drift"]),
