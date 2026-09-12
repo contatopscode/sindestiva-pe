@@ -4,11 +4,11 @@ ATENÇÃO — pega-dica cross-projeto (MEMORY do coder agent):
     NUNCA usar `asyncio.run()` dentro de lifespan FastAPI — quebra em
     prod porque o event loop já está ativo.
 
-ATENÇÃO — Coolify HOM (2026-09): NÃO usar `async_engine` + `run_sync` aqui.
-    Sem `await connection.commit()` após `run_sync`, o SQLAlchemy 2 faz
-    ROLLBACK de todo o DDL ao fechar a conexão async — Alembic loga
-    "Running upgrade 0001→0003" mas `portos` / `alembic_version` somem.
-    Migrations online rodam com engine **sync** (`postgresql+psycopg://`).
+ATENÇÃO — Coolify HOM (2026-09):
+    1) NÃO usar `async_engine` + `run_sync` sem `await connection.commit()`.
+    2) NÃO usar só `engine.connect()` — no SQLAlchemy 2 o `__exit__` dá
+       ROLLBACK na transação externa; use `engine.begin()` para COMMIT.
+    Migrations online: sync `create_engine` + `with connectable.begin()`.
 
 Convenção: target_metadata = `app.models.base.Base.metadata`.
 Schema target = `lousa_main` (default do init.sql do container).
@@ -90,12 +90,13 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 def run_migrations_online() -> None:
-    """Modo online — psycopg sync engine (DDL persiste após commit)."""
+    """Modo online — sync engine; `begin()` faz COMMIT ao sair com sucesso."""
     connectable = create_engine(
         settings.database_url_sync,
         poolclass=pool.NullPool,
     )
-    with connectable.connect() as connection:
+    # SA 2: `connect().__exit__` rollback — `begin().__exit__` commit.
+    with connectable.begin() as connection:
         do_run_migrations(connection)
     connectable.dispose()
 
