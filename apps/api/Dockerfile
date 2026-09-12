@@ -65,6 +65,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 \
     libcairo2 libpangoft2-1.0-0 \
     fonts-liberation fonts-noto-color-emoji \
+    # wget: healthcheck opcional no Coolify (HEALTHCHECK embutido usa Python)
+    wget \
     # tini para sinais (SIGTERM limpo pro uvicorn)
     tini \
     && rm -rf /var/lib/apt/lists/*

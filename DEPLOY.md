@@ -228,6 +228,8 @@ Vantagem: custo fixo, sem surpresa de "free tier expirou".
 
 | Sintoma | Causa provável | Fix |
 |---|---|---|
+| Build web: `apps/web/public: not found` no `COPY` final | Pasta `public/` ausente no repo (Next não cria no builder) | Manter `apps/web/public/` no git (`.gitkeep` ou assets); contexto Docker = raiz do monorepo |
+| Healthcheck da API no Coolify (curl/wget) falha | UI do Coolify não usa o `HEALTHCHECK` do Dockerfile | Desabilitar healthcheck no resource **ou** comando `wget -qO- http://127.0.0.1:8000/health`; a imagem já valida `/health` via Python no `HEALTHCHECK` embutido |
 | Build falha em `pnpm install` | Repo privado + sem PAT | Adicionar token GitHub no Coolify |
 | `api` unhealthy após deploy | Migrations falharam | Ver logs do `api`; `alembic upgrade head` manual via Shell |
 | 502 Bad Gateway | SSL não emitido ainda | Esperar 30-60s após primeiro deploy |
