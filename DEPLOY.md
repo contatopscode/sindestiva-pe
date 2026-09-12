@@ -4,7 +4,43 @@
 >
 > ⚠️ **Em migração** — Vercel/Render ainda ativos até Go-Live validar.
 
-## Arquitetura de produção (Coolify)
+## Arquitetura alvo (TARGET — Coolify)
+
+Redesign em andamento: **homologação (HOM) primeiro**, depois produção (PROD).
+Checklist operacional: [`infra/coolify/README.md`](./infra/coolify/README.md).
+
+| Aspecto | Homologação (`homolog`) | Produção (`production`) |
+|---|---|---|
+| **Branch Git** | `homolog` | `main` |
+| **Environment Coolify** | `homolog` | `production` |
+| **Domínios** | `api.hom.lousa.pscode.ia.br`, `web.hom.lousa…`, `pwa.hom.lousa…` | `api.lousa.pscode.ia.br`, `web.lousa…`, `pwa.lousa…` |
+| **Banco / Redis** | Instâncias dedicadas no env HOM (não compartilhar com PROD) | Instâncias dedicadas no env PROD |
+
+**Resources no Coolify (alvo):** um **Application** (ou Database) por componente — não um único Docker Compose:
+
+1. `postgres` — Postgres 17 (`lousa_main`)
+2. `redis` — Redis 7
+3. `api` — FastAPI (`apps/api/Dockerfile`, porta **8000**)
+4. `web` — Centro de Comando (`apps/web/Dockerfile`, porta **3000**)
+5. `pwa` — PWA TPA (`apps/pwa/Dockerfile`, porta **3001**)
+
+O serviço `scraper` do compose **não** entra no alvo: o loop de raspagem roda no **lifespan da API** (`apps/api/app/jobs/scraping_job.py`, iniciado em `app/main.py`). Logs de scraping → container **api**.
+
+**Fases de migração**
+
+| Fase | Entrega |
+|---|---|
+| **0** | Branch `homolog` no GitHub; documentação TARGET (este arquivo + `infra/coolify/`) |
+| **1** | Coolify: projeto com env `homolog`; apps separados; deploy da branch `homolog` |
+| **2** | DNS `*.hom.lousa.pscode.ia.br`; smoke tests (health, login, lousa) |
+| **3** | Replicar stack no env `production` (branch `main`, domínios `*.lousa`) |
+| **4** | Cutover: desativar Vercel/Render; webhooks `main` / `homolog` separados |
+| **5** | Manter `infra/docker-compose.coolify.yml` só como **legado/fallback** local ou emergência |
+
+## Arquitetura legado (fallback — Docker Compose único)
+
+> **Status:** resource atual no Coolify (se existir) ou bootstrap rápido.
+> **Não remover** `infra/docker-compose.coolify.yml` — referência e plano B.
 
 ```
                           ┌─────────────────────────────────┐
@@ -50,11 +86,12 @@
 
 1. Acesse `http://2.25.218.138:8000`
 2. **+ New Project** → Name: `SINDESTIVA-PE`, Description: `Lousa Digital · SINDESTIVA-PE`
-3. Crie 1 environment: `production`
+3. **Alvo:** dois environments — `homolog` (branch `homolog`) e `production` (branch `main`).
+4. **Legado (abaixo):** um único environment `production` + 1 resource Docker Compose.
 
-### 2. Criar 1 service (Docker Compose)
+### 2. Legado — 1 resource (Docker Compose)
 
-No projeto criado:
+No projeto criado (modo fallback, ver seção TARGET):
 
 1. **+ New Resource** → tipo **"Docker Compose"** (não "Application")
 2. **Source**: GitHub App (Coolify já tem) ou HTTPS + PAT (se repo privado)
@@ -161,10 +198,10 @@ Coolify gera webhook URL automaticamente (em Settings → Webhooks). Adicione no
 1. GitHub repo → Settings → Webhooks → **Add webhook**
 2. **Payload URL**: `https://2.25.218.138:8000/api/v1/deploy/webhook/<uuid>/<token>`
 3. **Content type**: `application/json`
-4. **Events**: só `Push` em `main`
+4. **Events**: `Push` — no alvo, webhook em `main` (PROD) e outro em `homolog` (HOM)
 5. ✅ Active
 
-Push em `main` → Coolify rebuilda automaticamente.
+Push na branch configurada no resource → Coolify rebuilda automaticamente.
 
 ## Pós-deploy — verificação
 
