@@ -20,7 +20,7 @@
    │  Centro de     │         │  TPA PWA       │         │  FastAPI       │
    │  Comando       │         │                │         │  + migrations  │
    │  Next.js 15    │         │  Next.js 15    │         │  + seed        │
-   │                │         │  PWA           │         │  + scraper cron│
+   │                │         │  PWA           │         │  + scraping loop (lifespan) │
    └───────┬────────┘         └────────┬───────┘         └───────┬────────┘
            │                          │                          │
            └──────────────────────────┼──────────────────────────┘
@@ -181,9 +181,21 @@ curl -I https://web.lousa.pscode.ia.br
 curl https://pwa.lousa.pscode.ia.br/manifest.webmanifest | jq
 # → {"name":"Lousa Digital · TPA",...}
 
-# 4. Scraping rodando
-# Coolify → scraper service → Logs
-# Esperado: "scraping_service.upsert ... celulas=N ..."
+# 4. Scraping rodando (orquestração real = container `api`, NÃO `scraper`)
+# Coolify → api service → Logs (structlog)
+# Esperado a cada ~SCRAPER_INTERVAL_SECONDS (default 60):
+#   scraping_job.ciclo_inicio → scraping_job.execucao (TPA+ESCALANET × DIURNO+NOTURNO)
+#   scraping_service.upsert_escala_origem ... celulas=N ...
+# Status público (sem auth):
+curl -sS "https://api.lousa.pscode.ia.br/api/v1/scraping/status?limit=8" | jq '.total,.sucessos,.falhas'
+# Lousa espelhada (sem auth):
+curl -sS "https://api.lousa.pscode.ia.br/api/v1/lousa/public/preview?porto=RECIFE&turno=DIURNO" | jq '.snapshot,.stats.total_cells'
+# Disparo manual (1 fonte × porto × turno):
+curl -sS -X POST "https://api.lousa.pscode.ia.br/api/v1/scraping/disparar" \
+  -H "Content-Type: application/json" \
+  -d '{"fonte":"TPA","porto":"SUAPE","turno":"DIURNO"}'
+# NOTA: o serviço `scraper` no compose ainda é placeholder Sprint 0
+# (sindestiva-scraper só loga e sai). Ver services/scraper/README.md.
 
 # 5. Login funciona
 curl -X POST https://api.lousa.pscode.ia.br/api/v1/auth/login \
