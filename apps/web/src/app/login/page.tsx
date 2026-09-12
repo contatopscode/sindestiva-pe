@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { login } from "@/lib/api";
 
 export default function LoginPage() {
   return (
@@ -26,16 +27,10 @@ function LoginInner() {
     setLoading(true);
     setError(null);
 
-    const r = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-      credentials: "include",
-    });
+    const result = await login(email, password);
 
-    if (!r.ok) {
-      const data = await r.json().catch(() => ({ error: "Falha de rede" }));
-      setError(data.error || `Erro ${r.status}`);
+    if (!result.ok) {
+      setError(result.error || "Falha ao autenticar");
       setLoading(false);
       return;
     }

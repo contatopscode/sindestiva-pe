@@ -88,9 +88,10 @@ export function middleware(req: NextRequest) {
   }
 
   if (!rule.allowed.includes(role)) {
+    // Sessão válida, mas RBAC negou — não mandar p/ login (parece sessão morta).
     const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("error", "forbidden");
+    url.pathname = "/centro-comando";
+    url.searchParams.set("forbidden", pathname);
     return NextResponse.redirect(url);
   }
 

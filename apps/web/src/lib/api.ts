@@ -68,6 +68,24 @@ function getStoredToken(): string | null {
   return window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
 }
 
+/** Repõe JWT no sessionStorage a partir do cookie httpOnly (refresh / nova aba). */
+async function hydrateTokenFromCookie(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  if (getStoredToken()) return getStoredToken();
+  try {
+    const r = await fetch("/api/auth/token", { credentials: "include", cache: "no-store" });
+    if (!r.ok) return null;
+    const data = (await r.json()) as { access_token?: string };
+    if (data.access_token) {
+      setToken(data.access_token);
+      return data.access_token;
+    }
+  } catch {
+    /* noop */
+  }
+  return null;
+}
+
 // ---- Auth (cookie httpOnly, gerenciado server-side) -------------------------
 
 /** Limpa token (sessionStorage + cookie httpOnly) e redireciona. */
@@ -152,7 +170,8 @@ export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<
 
   // Token em sessionStorage → Authorization header (cross-domain safe).
   if (!noAuth) {
-    const token = getStoredToken();
+    let token = getStoredToken();
+    if (!token) token = await hydrateTokenFromCookie();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
