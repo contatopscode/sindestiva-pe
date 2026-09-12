@@ -2,7 +2,14 @@
 
 from __future__ import annotations
 
-from app.core.postgres_bootstrap import CRITICAL_TABLES, POSTGRES_EXTENSIONS
+from app.core.postgres_bootstrap import (
+    CRITICAL_TABLES,
+    DRIFT_ANCHOR_TABLES,
+    POSTGRES_EXTENSIONS,
+    REVISION_0001,
+    REVISION_0002,
+    compute_stamp_target_for_missing,
+)
 
 
 def test_extensions_match_migration_0001() -> None:
@@ -12,3 +19,20 @@ def test_extensions_match_migration_0001() -> None:
 def test_critical_tables_include_scraping() -> None:
     assert "lousa_escala_origem" in CRITICAL_TABLES
     assert "portos" in CRITICAL_TABLES
+    assert "portos" in DRIFT_ANCHOR_TABLES
+
+
+def test_stamp_target_portos_missing() -> None:
+    assert compute_stamp_target_for_missing(["portos", "lousa_escala_origem"]) == "base"
+
+
+def test_stamp_target_escala_origem_only() -> None:
+    assert compute_stamp_target_for_missing(["lousa_escala_origem"]) == REVISION_0001
+
+
+def test_stamp_target_alocacao_only() -> None:
+    assert compute_stamp_target_for_missing(["lousa_alocacao"]) == REVISION_0002
+
+
+def test_stamp_target_none_when_empty() -> None:
+    assert compute_stamp_target_for_missing([]) is None

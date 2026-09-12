@@ -5,7 +5,7 @@
 # Ordem de execução (todas idempotentes):
 #   0. `ensure_db_extensions.py` — schema lousa_main + pgcrypto/citext/pg_trgm
 #      (Coolify Postgres fresh não roda init.sql; create_all precisa de pg_trgm)
-#   1. `alembic upgrade head` — aplica migrations pendentes
+#   1. `ensure_db_migrations.py` — Alembic upgrade head + drift repair (stamp)
 #   2. `seed_catalogos.py` (se catálogos vazios) — popula portos, turnos, funcoes,
 #      fainas, feriados (idempotente: INSERT ... ON CONFLICT DO NOTHING).
 #   3. `seed_initial.py` (se existir) — popula users essenciais (admin, etc)
@@ -46,11 +46,16 @@ else
     exit 1
 fi
 
-echo "==> [1/5] Alembic upgrade head (idempotente)..."
-"$VENV_BIN/alembic" upgrade head || {
-    echo "ERRO: alembic upgrade falhou. Abortando."
+echo "==> [1/5] Alembic migrate + drift repair (stamp se version > tabelas)..."
+if [ -f "/app/scripts/ensure_db_migrations.py" ]; then
+    "$VENV_BIN/python" /app/scripts/ensure_db_migrations.py || {
+        echo "ERRO: ensure_db_migrations falhou. Abortando."
+        exit 1
+    }
+else
+    echo "ERRO: /app/scripts/ensure_db_migrations.py ausente. Abortando."
     exit 1
-}
+fi
 
 echo "==> [2/5] Seed catálogos (idempotente — popula portos/turnos/funcoes/fainas/feriados)..."
 if [ -f "/app/scripts/seed_catalogos.py" ]; then
