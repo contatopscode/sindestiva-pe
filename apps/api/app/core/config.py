@@ -99,6 +99,14 @@ class Settings(BaseSettings):
     # ---------- Observabilidade ----------
     sentry_dsn: str = ""
 
+    # ---------- CORS (browser → API) ----------
+    # Vírgula-separado; união com lista base em `app.core.cors` (não substitui).
+    cors_origins: str = Field(
+        default="",
+        validation_alias="CORS_ORIGINS",
+        description="Origins extras permitidos (ex.: preview custom).",
+    )
+
     # ---------- Admin (one-shot operations) ----------
     # Token compartilhado para endpoints admin (run-seeds, etc).
     # Header esperado: X-Admin-Token. Se vazio, endpoint retorna 503.
@@ -118,6 +126,12 @@ class Settings(BaseSettings):
                 "postgresql+asyncpg://", "postgresql+psycopg://", 1
             )
         return self
+
+    def resolved_cors_allow_origins(self) -> list[str]:
+        """Origins efetivos para o middleware CORS."""
+        from app.core.cors import build_cors_allow_origins
+
+        return build_cors_allow_origins(self.cors_origins)
 
 
 @lru_cache(maxsize=1)
