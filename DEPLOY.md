@@ -72,6 +72,20 @@ No projeto criado:
 
 Coolify lê o `.env` do resource. Crie `/data/coolify/proxy/sindestiva.env` (ou use UI Environment Variables):
 
+#### Build-time vs runtime (`NEXT_PUBLIC_*`)
+
+Variáveis `NEXT_PUBLIC_*` do Next.js são **inlined no JavaScript no `next build`**. Se ficarem só como runtime no container, o bundle continua com o fallback de código (ex.: `https://api.lousa.pscode.ia.br` em HOM).
+
+No Coolify, para os resources **web** e **pwa** (Docker Compose):
+
+1. Abra **Environment Variables** do resource.
+2. Em `NEXT_PUBLIC_API_URL`, marque **Available at Buildtime** (no Coolify 4.x: toggle *Build Variable* / `is_buildtime`).
+3. Valor em **produção**: `https://api.lousa.pscode.ia.br`
+4. Valor em **homolog** (`homolog`): `https://api.hom.lousa.pscode.ia.br`
+5. Após alterar ou mergear o Dockerfile com `ARG NEXT_PUBLIC_API_URL`, faça **Rebuild** (não só *Restart*) do serviço web (e pwa, se aplicável).
+
+O `infra/docker-compose.coolify.yml` repassa a variável via `build.args` → `ARG` no `apps/web/Dockerfile` e `apps/pwa/Dockerfile`. `NEXTAUTH_URL` costuma ser só runtime (server-side); não precisa de build-time salvo uso em código estático no build.
+
 ```bash
 # ----- Segurança -----
 NEXTAUTH_SECRET=$(openssl rand -base64 32)        # JWT do NextAuth

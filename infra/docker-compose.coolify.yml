@@ -137,6 +137,8 @@ services:
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lousa.pscode.ia.br}
     restart: unless-stopped
     depends_on:
       - api
@@ -159,6 +161,8 @@ services:
     build:
       context: ..
       dockerfile: apps/pwa/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lousa.pscode.ia.br}
     restart: unless-stopped
     depends_on:
       - api

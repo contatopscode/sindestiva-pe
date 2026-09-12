@@ -39,6 +39,10 @@ WORKDIR /app
 COPY apps/pwa ./apps/pwa
 COPY packages ./packages
 
+# NEXT_PUBLIC_* é embutido no bundle no `next build` — precisa existir no builder.
+ARG NEXT_PUBLIC_API_URL=
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Build: next-pwa gera sw.js + manifest.webmanifest dentro do .next/standalone
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm turbo run build --filter=@sindestiva/pwa...
