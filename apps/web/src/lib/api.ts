@@ -11,6 +11,14 @@
 // =============================================================================
 
 import type { Porto, Turno } from "@sindestiva/shared";
+import {
+  mapAuditEvent,
+  mapOgmoNotificacao,
+  normalizeRemanejamentosList,
+  type AuditEventApi,
+  type OgmoNotificacaoApi,
+  type RemanejamentoListResponseApi,
+} from "./api-mappers";
 import type {
   LousaPreviewResponse,
   RemanejamentoItem,
@@ -245,7 +253,10 @@ export async function getRemanejamentos(filters?: {
   if (filters?.limit !== undefined) params.set("limit", String(filters.limit));
   if (filters?.status) params.set("status", filters.status);
   const q = params.toString() ? `?${params.toString()}` : "";
-  return apiFetch<RemanejamentoItem[]>(`/api/v1/remanejamentos${q}`);
+  const raw = await apiFetch<RemanejamentoItem[] | RemanejamentoListResponseApi>(
+    `/api/v1/remanejamentos${q}`,
+  );
+  return normalizeRemanejamentosList(raw);
 }
 
 export async function createRemanejamento(
@@ -260,13 +271,15 @@ export async function createRemanejamento(
 // ---- OGMO -----------------------------------------------------------------
 
 export async function getOgmoNotificacoes(): Promise<OgmoNotificacao[]> {
-  return apiFetch<OgmoNotificacao[]>("/api/v1/ogmo/notificacoes");
+  const raw = await apiFetch<OgmoNotificacaoApi[]>("/api/v1/ogmo/notificacoes");
+  return raw.map(mapOgmoNotificacao);
 }
 
 // ---- Auditoria ------------------------------------------------------------
 
 export async function getAuditEvents(limit = 50): Promise<AuditEvent[]> {
-  return apiFetch<AuditEvent[]>(`/api/v1/auditoria/eventos?limit=${limit}`);
+  const raw = await apiFetch<AuditEventApi[]>(`/api/v1/auditoria/eventos?limit=${limit}`);
+  return raw.map(mapAuditEvent);
 }
 
 /** Verifica integridade da hash chain (Sprint 6 — já implementado na API). */

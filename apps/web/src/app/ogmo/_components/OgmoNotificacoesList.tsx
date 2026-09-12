@@ -5,7 +5,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { getOgmoNotificacoes } from "@/lib/api";
+import { getOgmoNotificacoes, ApiError } from "@/lib/api";
 import type { OgmoNotificacao } from "@/lib/tipos";
 import { StatusBadge, toneForOgmoStatus } from "@/app/_components/StatusBadge";
 import { EmptyState } from "@/app/_components/EmptyState";
@@ -18,7 +18,14 @@ export function OgmoNotificacoesList(): ReactNode {
     let cancelled = false;
     getOgmoNotificacoes()
       .then((d) => { if (!cancelled) setItems(d); })
-      .catch((e) => { if (!cancelled) setError(String(e.message ?? e)); });
+      .catch((e) => {
+        if (cancelled) return;
+        if (e instanceof ApiError && e.status === 404) {
+          setItems([]);
+          return;
+        }
+        setError(e instanceof ApiError ? e.detail : String(e instanceof Error ? e.message : e));
+      });
     return () => { cancelled = true; };
   }, []);
 

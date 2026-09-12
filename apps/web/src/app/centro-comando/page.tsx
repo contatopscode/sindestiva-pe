@@ -77,6 +77,15 @@ export default function CentroComandoPage(): ReactNode {
     return { totalTpas, ausentes, remanejados, confirmados, presenca };
   }, [data]);
 
+  const turnoSemDados = useMemo(() => {
+    if (!data) return false;
+    if (data.snapshot.status === "SEM_DADOS") return true;
+    return (
+      data.stats.total_tpas_escalados === 0 &&
+      data.cells.every((c) => !c.tpa_id)
+    );
+  }, [data]);
+
   return (
     <div className="p-6">
       {/* Cabeçalho da seção */}
@@ -159,7 +168,7 @@ export default function CentroComandoPage(): ReactNode {
                 scraper (Risco R2 do plano v1.0).
               </div>
             )}
-            {data.snapshot.status === "SEM_DADOS" && (
+            {turnoSemDados && (
               <div className="mt-2 rounded border border-[#d4a574]/40 bg-[#d4a574]/10 px-3 py-2 text-[12px] text-[#d4a574]">
                 ℹ️ Scrape concluído, mas o OGMO não publicou TPAs para{" "}
                 <strong>{porto}</strong> · <strong>{turno}</strong> nesta data

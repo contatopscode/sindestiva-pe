@@ -6,8 +6,9 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { getRemanejamentos } from "@/lib/api";
+import { getRemanejamentos, ApiError } from "@/lib/api";
 import type { RemanejamentoItem } from "@/lib/tipos";
+import { EmptyState } from "@/app/_components/EmptyState";
 import { RemanejamentosTable } from "./_components/RemanejamentosTable";
 
 export default function RemanejamentosPage(): ReactNode {
@@ -17,9 +18,18 @@ export default function RemanejamentosPage(): ReactNode {
 
   useEffect(() => {
     setLoading(true);
+    setError(null);
     getRemanejamentos()
-      .then((data) => { setItems(data); setLoading(false); })
-      .catch((err) => { setError(err.message ?? "Erro"); setLoading(false); });
+      .then((data) => {
+        setItems(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        const msg =
+          err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Erro";
+        setError(msg);
+        setLoading(false);
+      });
   }, []);
 
   // KPIs (réplica T5-09) — usa a lista carregada do servidor.
@@ -67,7 +77,15 @@ export default function RemanejamentosPage(): ReactNode {
             </div>
           </div>
 
-          <RemanejamentosTable items={items} />
+          {items.length === 0 ? (
+            <EmptyState
+              icon="📋"
+              title="Nenhum remanejamento registrado"
+              description="Quando o fiscal registrar remanejamentos no turno, eles aparecerão aqui com status de notificação ao OGMO."
+            />
+          ) : (
+            <RemanejamentosTable items={items} />
+          )}
         </>
       )}
     </div>
