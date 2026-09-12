@@ -1,9 +1,12 @@
 # services/scraper
 
-Worker de scraping do TPA/OGMO-PE e do EscalaNet/Recife.
+> **Estado atual (Sprint B0): placeholder.** O entrypoint `sindestiva-scraper`
+> só emite log e encerra. **Scraping de produção roda dentro do container
+> `api`** (`apps/api/app/jobs/scraping_job.py`, lifespan do FastAPI).
 
-Fora do Turborepo propositalmente — tem ciclo próprio (cron 60s) e roda como
-worker separado. Reusa o mesmo banco (`DATABASE_URL`) da API.
+Worker futuro do TPA/OGMO-PE e do EscalaNet/Recife (fora do Turborepo — ciclo
+próprio). Reusa o mesmo banco (`DATABASE_URL`) da API. Até a migração do loop
+para cá, monitore logs do serviço **api** e `GET /api/v1/scraping/status`.
 
 ## Run local
 
