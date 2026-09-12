@@ -61,12 +61,18 @@ async def lifespan(app: FastAPI):
     # por permissão — então fazemos aqui no engine do app (que já tem o
     # event listener de search_path aplicado em cada connect).
     from sqlalchemy import text
+
+    from app.core.postgres_bootstrap import ensure_schema_and_extensions
+
     try:
-        async with engine.begin() as conn:
-            await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {settings.db_schema}"))
-        log.info("api.schema_ensured", schema=settings.db_schema)
+        boot = ensure_schema_and_extensions()
+        log.info(
+            "api.postgres_bootstrap",
+            schema=boot["schema"],
+            extensions=boot["extensions"],
+        )
     except Exception as exc:  # noqa: BLE001
-        log.warning("api.schema_create_failed", schema=settings.db_schema, erro=str(exc))
+        log.warning("api.postgres_bootstrap_failed", erro=str(exc))
 
     # Sprint 0+ deploy: cria tabelas via SQLAlchemy metadata (idempotente).
     # Alembic tem problema com DB compartilhado (alembic_version table

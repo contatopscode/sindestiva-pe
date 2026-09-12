@@ -14,8 +14,12 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import shutil
+import subprocess
 import sys
 from pathlib import Path
+
+from sqlalchemy import create_engine
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -211,6 +215,89 @@ async def fix_purge_after_default(
 
 
 @router.post(
+    "/ensure-schema",
+    summary="[ADMIN] Extensions + Alembic upgrade head + drift check",
+)
+async def ensure_schema(
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+) -> dict:
+    """Reaplica bootstrap de Postgres e migrations (idempotente).
+
+    Use após deploy em DB fresh (Coolify HOM) ou se `/scraping/status` retorna
+    500 por tabela ausente. Não faz downgrade automático — se `missing_tables`
+    continuar preenchido com `alembic_revision` em head, intervenção manual
+    (superuser CREATE EXTENSION ou reset de schema) pode ser necessária.
+
+    Uso:
+        curl -X POST https://api.hom.lousa.pscode.ia.br/api/v1/admin/ensure-schema \\
+             -H "X-Admin-Token: $ADMIN_SEED_TOKEN"
+    """
+    from app.core.postgres_bootstrap import (
+        ensure_schema_and_extensions,
+        get_alembic_revision,
+        list_missing_critical_tables,
+    )
+
+    _check_admin_token(x_admin_token)
+    log.warning("admin.ensure_schema.invocado")
+
+    try:
+        bootstrap = ensure_schema_and_extensions()
+    except Exception as exc:
+        log.exception("admin.ensure_schema.bootstrap_falhou")
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Bootstrap Postgres falhou: {type(exc).__name__}: {exc}. "
+                "Se o role não tem CREATE EXTENSION, peça ao DBA: "
+                "CREATE EXTENSION IF NOT EXISTS pgcrypto, citext, pg_trgm;"
+            ),
+        ) from exc
+
+    alembic_bin = shutil.which("alembic") or "/app/.venv/bin/alembic"
+    proc = subprocess.run(
+        [alembic_bin, "upgrade", "head"],
+        cwd="/app",
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+    )
+    alembic_out = (proc.stdout or "") + (proc.stderr or "")
+    if proc.returncode != 0:
+        log.error("admin.ensure_schema.alembic_falhou", returncode=proc.returncode)
+        raise HTTPException(
+            status_code=500,
+            detail=f"alembic upgrade head falhou (rc={proc.returncode}): {alembic_out[-2000:]}",
+        )
+
+    sync_engine = create_engine(settings.database_url_sync, pool_pre_ping=True)
+    try:
+        revision = get_alembic_revision(sync_engine)
+        missing = list_missing_critical_tables(sync_engine)
+    finally:
+        sync_engine.dispose()
+
+    log.warning(
+        "admin.ensure_schema.ok",
+        revision=revision,
+        missing_tables=missing,
+    )
+    return {
+        "ok": len(missing) == 0,
+        "bootstrap": bootstrap,
+        "alembic_revision": revision,
+        "missing_tables": missing,
+        "alembic_log_tail": alembic_out.strip()[-1500:],
+        "next_step": (
+            "POST /api/v1/admin/run-seeds"
+            if not missing
+            else "Corrigir drift (extensions/superuser ou reset schema) antes de seeds"
+        ),
+    }
+
+
+@router.post(
     "/run-seeds",
     summary="[ADMIN] Roda seed_catalogos + seed_users + seed_tpas (idempotente)",
 )
@@ -218,6 +305,8 @@ async def run_seeds(
     x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
 ) -> dict:
     """Roda os 3 seeds em ordem. Cada um é idempotente.
+
+    Pré-requisito: tabelas existem (entrypoint ou `POST /admin/ensure-schema`).
 
     Uso:
         curl -X POST https://sindestiva-api.onrender.com/api/v1/admin/run-seeds \\
