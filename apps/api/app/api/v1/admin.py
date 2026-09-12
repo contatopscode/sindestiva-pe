@@ -14,12 +14,8 @@ from __future__ import annotations
 
 import asyncio
 import importlib
-import shutil
-import subprocess
 import sys
 from pathlib import Path
-
-from sqlalchemy import create_engine
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -221,12 +217,11 @@ async def fix_purge_after_default(
 async def ensure_schema(
     x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
 ) -> dict:
-    """Reaplica bootstrap de Postgres e migrations (idempotente).
+    """Reaplica bootstrap de Postgres e migrations com repair de drift.
 
-    Use após deploy em DB fresh (Coolify HOM) ou se `/scraping/status` retorna
-    500 por tabela ausente. Não faz downgrade automático — se `missing_tables`
-    continuar preenchido com `alembic_revision` em head, intervenção manual
-    (superuser CREATE EXTENSION ou reset de schema) pode ser necessária.
+    Se `alembic_version` estiver à frente de tabelas críticas (`portos`,
+    `lousa_escala_origem`), faz `alembic stamp` seguro (sem downgrade DDL)
+    e reexecuta `upgrade head`. Fallback: `create_all(checkfirst=True)`.
 
     Uso:
         curl -X POST https://api.hom.lousa.pscode.ia.br/api/v1/admin/ensure-schema \\
@@ -234,8 +229,7 @@ async def ensure_schema(
     """
     from app.core.postgres_bootstrap import (
         ensure_schema_and_extensions,
-        get_alembic_revision,
-        list_missing_critical_tables,
+        run_migrations_with_drift_repair,
     )
 
     _check_admin_token(x_admin_token)
@@ -254,46 +248,29 @@ async def ensure_schema(
             ),
         ) from exc
 
-    alembic_bin = shutil.which("alembic") or "/app/.venv/bin/alembic"
-    proc = subprocess.run(
-        [alembic_bin, "upgrade", "head"],
-        cwd="/app",
-        capture_output=True,
-        text=True,
-        timeout=600,
-        check=False,
-    )
-    alembic_out = (proc.stdout or "") + (proc.stderr or "")
-    if proc.returncode != 0:
-        log.error("admin.ensure_schema.alembic_falhou", returncode=proc.returncode)
+    migrate = run_migrations_with_drift_repair()
+    if not migrate.get("ok"):
+        log.error("admin.ensure_schema.migrate_falhou", migrate=migrate)
         raise HTTPException(
             status_code=500,
-            detail=f"alembic upgrade head falhou (rc={proc.returncode}): {alembic_out[-2000:]}",
+            detail={
+                "error": migrate.get("error"),
+                "missing_after": migrate.get("missing_after"),
+                "actions": migrate.get("actions"),
+                "log_tail": migrate.get("log_tail"),
+            },
         )
-
-    sync_engine = create_engine(settings.database_url_sync, pool_pre_ping=True)
-    try:
-        revision = get_alembic_revision(sync_engine)
-        missing = list_missing_critical_tables(sync_engine)
-    finally:
-        sync_engine.dispose()
 
     log.warning(
         "admin.ensure_schema.ok",
-        revision=revision,
-        missing_tables=missing,
+        revision=migrate.get("revision_after"),
+        missing_tables=migrate.get("missing_after"),
     )
     return {
-        "ok": len(missing) == 0,
+        "ok": True,
         "bootstrap": bootstrap,
-        "alembic_revision": revision,
-        "missing_tables": missing,
-        "alembic_log_tail": alembic_out.strip()[-1500:],
-        "next_step": (
-            "POST /api/v1/admin/run-seeds"
-            if not missing
-            else "Corrigir drift (extensions/superuser ou reset schema) antes de seeds"
-        ),
+        "migrate": migrate,
+        "next_step": "POST /api/v1/admin/run-seeds",
     }
 
 
