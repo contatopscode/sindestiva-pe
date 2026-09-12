@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SINDESTIVA-PE · PWA maskable icon (Android 12+ adaptive)
+  Safe zone: 80% do canvas centralizado (Android Adaptive Icons).
+  Conteúdo (âncora) reduzido a 80% pra caber dentro do círculo.
+  Background azul preenche 100% (Android crop variável).
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f2438"/>
+      <stop offset="100%" stop-color="#061321"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background full bleed -->
+  <rect width="512" height="512" fill="url(#bgGrad)"/>
+
+  <!-- Âncora centrada e escalada a 80% (safe zone) -->
+  <g transform="translate(256, 256) scale(0.8)" fill="none" stroke="#d4a574" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(0, 0)">
+      <circle cx="0" cy="-150" r="22"/>
+      <line x1="0" y1="-128" x2="0" y2="135"/>
+      <line x1="-65" y1="-90" x2="65" y2="-90"/>
+      <path d="M -170 90 Q -170 175 0 175 Q 170 175 170 90"/>
+      <line x1="-170" y1="90" x2="-200" y2="20"/>
+      <line x1="170" y1="90" x2="200" y2="20"/>
+    </g>
+  </g>
+</svg>

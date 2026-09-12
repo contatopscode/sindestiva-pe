@@ -95,6 +95,15 @@ infra/docker/traefik/letsencrypt/acme.json
 # ---------- Next.js ----------
 next-env.d.ts
 
+# ---------- PWA (next-pwa) — service worker gerado em build ----------
+# Apps geram public/sw.js + workbox-*.js em `next build`; não commitar.
+apps/*/public/sw.js
+apps/*/public/sw.js.map
+apps/*/public/workbox-*.js
+apps/*/public/workbox-*.js.map
+apps/*/public/swe-worker-*.js
+apps/*/public/swe-worker-*.js.map
+
 # ---------- Git worktrees (OMC / hermes-squad) ----------
 .worktrees/
 

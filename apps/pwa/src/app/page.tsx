@@ -12,9 +12,15 @@ interface ProximoDia {
   data: string; dia_semana: string; turno: string | null;
   funcao: string | null; cais: string | null; escalado: boolean;
 }
+interface CelulaLousa {
+  funcao: string | null;
+  cais: string | null;
+  // Outros campos da célula (faina_id, status, etc) — não usados nesta view.
+  [k: string]: unknown;
+}
 interface TpaEscala {
   tpa: { id: string; matricula: string; nome: string; categoria: string; funcao_base: string | null; };
-  hoje: { data: string; dia_semana: string; turno: string | null; celula: any; escalado: boolean; };
+  hoje: { data: string; dia_semana: string; turno: string | null; celula: CelulaLousa | null; escalado: boolean; };
   proximos_7_dias: ProximoDia[];
   stats_7d: { engajamentos: number; faltas: number; recebimentos_brl: number; posicao_rodizio: number; };
   links: { fiscal_whatsapp: string; cct_pdf: string; };

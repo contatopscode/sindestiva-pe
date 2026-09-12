@@ -1,0 +1,210 @@
+# =============================================================================
+# SINDESTIVA-PE · Docker Compose pra Coolify (produção)
+#
+# Cola este YAML completo no campo "Docker Compose Raw" do Coolify resource
+# (Build Pack = "Docker Compose"). Coolify injeta env vars de `${VAR}` do
+# `.env` do resource automaticamente.
+#
+# 5 serviços + 3 networks + 4 volumes:
+#   postgres  (Postgres 17, schema lousa_main)
+#   redis     (Redis 7, pub/sub WebSocket)
+#   api       (FastAPI, roda migrations + seed + uvicorn no startup)
+#   web       (Next.js 15, Centro de Comando)
+#   pwa       (Next.js 15 PWA, TPA)
+#   scraper   (Python worker, cron 60s, OUTSIDE Turborepo — mesmo padrão do AGENTS §3)
+#
+# Domínios configurados no Coolify (separado, fora deste YAML):
+#   api.lousa.pscode.ia.br → api:8000
+#   web.lousa.pscode.ia.br → web:3000
+#   pwa.lousa.pscode.ia.br → pwa:3001
+#   (scraper NÃO é público — só interno)
+#
+# SSL via Traefik do Coolify (certresolver=letsencrypt, automático).
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 17 — schema único `lousa_main` (ADR-002)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sindestiva}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD obrigatório}
+      POSTGRES_DB: ${POSTGRES_DB:-sindestiva}
+      TZ: ${TZ:-America/Recife}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=pt_BR.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/00-lousa-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sindestiva} -d ${POSTGRES_DB:-sindestiva}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - sindestiva-net
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 — pub/sub WebSocket + filas leves
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-America/Recife}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - sindestiva-net
+
+  # ---------------------------------------------------------------------------
+  # API · FastAPI (Sprint 0+)
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ..
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Banco
+      DATABASE_URL_ASYNC: postgresql+asyncpg://${POSTGRES_USER:-sindestiva}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sindestiva}
+      DATABASE_URL_SYNC: postgresql+psycopg://${POSTGRES_USER:-sindestiva}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sindestiva}
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+      # Auth
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET obrigatório}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://api.lousa.pscode.ia.br}
+      # CORS (separado por vírgula)
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://web.lousa.pscode.ia.br,https://pwa.lousa.pscode.ia.br}
+      # E-mail OGMO
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-SINDESTIVA-PE <noreply@pscode.ia.br>}
+      OGMO_EMAIL: ${OGMO_EMAIL:-ogmo@pe.gov.br}
+      OGMO_WEBHOOK_URL: ${OGMO_WEBHOOK_URL:-}
+      # WhatsApp (Evolution API)
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-}
+      # Push (FCM)
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      FCM_PRIVATE_KEY: ${FCM_PRIVATE_KEY:-}
+      FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-}
+      # Admin
+      ADMIN_SEED_TOKEN: ${ADMIN_SEED_TOKEN:?ADMIN_SEED_TOKEN obrigatório}
+      # Scraper worker
+      SCRAPER_TPA_USERNAME: ${SCRAPER_TPA_USERNAME:-}
+      SCRAPER_TPA_PASSWORD: ${SCRAPER_TPA_PASSWORD:-}
+      SCRAPER_ESCALANET_BASE_URL: ${SCRAPER_ESCALANET_BASE_URL:-http://www.ogmo-recife.org.br/EscalaNet}
+      # Sentry (opcional)
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      # Ambiente
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: ${TZ:-America/Recife}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    expose:
+      - "8000"
+    networks:
+      - sindestiva-net
+    # NÃO tem labels Traefik aqui — Coolify injeta automaticamente
+    # baseado no FQDN configurado no painel.
+
+  # ---------------------------------------------------------------------------
+  # Web · Centro de Comando (Next.js 15)
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lousa.pscode.ia.br}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET obrigatório}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://web.lousa.pscode.ia.br}
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    expose:
+      - "3000"
+    networks:
+      - sindestiva-net
+
+  # ---------------------------------------------------------------------------
+  # PWA · TPA (Next.js 15 PWA + Workbox)
+  # ---------------------------------------------------------------------------
+  pwa:
+    build:
+      context: ..
+      dockerfile: apps/pwa/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lousa.pscode.ia.br}
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3001"
+    expose:
+      - "3001"
+    networks:
+      - sindestiva-net
+
+  # ---------------------------------------------------------------------------
+  # Scraper · Worker Python (FORA do Turborepo — mesmo padrão do AGENTS §3)
+  # Cron 60s, idempotente (INSERT ... ON CONFLICT).
+  # NÃO tem FQDN público — só roda interno.
+  # ---------------------------------------------------------------------------
+  scraper:
+    build:
+      context: ..
+      dockerfile: services/scraper/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL_ASYNC: postgresql+asyncpg://${POSTGRES_USER:-sindestiva}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-sindestiva}
+      REDIS_URL: redis://redis:6379/0
+      SCRAPER_TPA_USERNAME: ${SCRAPER_TPA_USERNAME:-}
+      SCRAPER_TPA_PASSWORD: ${SCRAPER_TPA_PASSWORD:-}
+      SCRAPER_ESCALANET_BASE_URL: ${SCRAPER_ESCALANET_BASE_URL:-http://www.ogmo-recife.org.br/EscalaNet}
+      SCRAPER_INTERVAL_SECONDS: ${SCRAPER_INTERVAL_SECONDS:-60}
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: ${TZ:-America/Recife}
+    networks:
+      - sindestiva-net
+
+volumes:
+  postgres_data:
+    name: sindestiva_postgres_data
+  redis_data:
+    name: sindestiva_redis_data
+
+networks:
+  sindestiva-net:
+    name: sindestiva-net
+    driver: bridge

@@ -1,188 +1,224 @@
-# SINDESTIVA-PE · Guia de deploy (Vercel + Render)
+# SINDESTIVA-PE · Guia de deploy (Coolify)
 
-> Última atualização: **07/09/2026** · mesmo padrão usado em **Sinapse** (Suporte
-> Gerencial, deploy em Vercel + Render).
+> Última atualização: **2026-09-12** · migração de Vercel+Render pra Coolify self-hosted.
 >
-> ⚠️ **URLs reais em produção** (verificadas 07/09/2026):
->
-> | Serviço | URL real | Status |
-> |---|---|---|
-> | API (Render) | `https://sindestiva-api.onrender.com` | 🟢 vivo |
-> | Web (Vercel) | `https://sindestiva-web.vercel.app` | 🟢 vivo |
-> | PWA (Vercel) | `https://sindestiva-pwa.vercel.app` | 🟢 vivo |
-> | Docs Swagger | `https://sindestiva-api.onrender.com/docs` | 🟢 vivo |
->
-> Os subdomínios `*.lousa.pscode.ia.br` ainda **não foram provisionados**
-> (A.4 do plano de melhorias — DNS pendente em Cloudflare).
+> ⚠️ **Em migração** — Vercel/Render ainda ativos até Go-Live validar.
 
-## Arquitetura de produção
+## Arquitetura de produção (Coolify)
 
 ```
                           ┌─────────────────────────────────┐
-                          │         VERCEL (frontend)       │
-                          │   apps/web   → web.lousa.pscode │
-                          │   apps/pwa   → pwa.lousa.pscode │
+                          │      VPS Hetzner CPX31           │
+                          │      Coolify 4.3.18 + Traefik    │
                           └────────────┬────────────────────┘
-                                       │ HTTPS / JSON
-                                       │ NEXT_PUBLIC_API_URL
-                                       ▼
+                                       │
+            ┌──────────────────────────┼──────────────────────────┐
+            │                          │                          │
+            ▼                          ▼                          ▼
+   ┌────────────────┐         ┌────────────────┐         ┌────────────────┐
+   │  web (3000)    │         │  pwa (3001)    │         │  api (8000)    │
+   │  Centro de     │         │  TPA PWA       │         │  FastAPI       │
+   │  Comando       │         │                │         │  + migrations  │
+   │  Next.js 15    │         │  Next.js 15    │         │  + seed        │
+   │                │         │  PWA           │         │  + scraper cron│
+   └───────┬────────┘         └────────┬───────┘         └───────┬────────┘
+           │                          │                          │
+           └──────────────────────────┼──────────────────────────┘
+                                      │ HTTPS (Traefik + Let's Encrypt)
+                                      ▼
                           ┌─────────────────────────────────┐
-                          │         RENDER (backend)         │
-                          │  apps/api (Web Service)          │
-                          │  services/scraper (Worker)       │
-                          │  sindestiva-db (Postgres)        │
-                          │  sindestiva-redis (Key Value)    │
-                          └─────────────────────────────────┘
-                                       ▲
-                          ┌────────────┴────────────────────┐
-                          │  TPA Tecnologia (SUAPE) — scraper│
-                          │  Evolution API (WhatsApp)        │
-                          │  Resend (e-mail OGMO)            │
-                          │  FCM (push TPA)                  │
+                          │   postgres (5432) · redis (6379)│
+                          │   schema: lousa_main            │
                           └─────────────────────────────────┘
 ```
 
-## Domínios (post-deploy)
+## URLs em produção
 
-| Subdomínio              | Hospedagem | Serviço       | Status (07/09/2026) |
-|-------------------------|------------|---------------|--------------------|
-| `web.lousa.pscode.ia.br`| Vercel     | `apps/web`    | 🟢 vivo, TLS OK   |
-| `pwa.lousa.pscode.ia.br`| Vercel     | `apps/pwa`    | 🟢 vivo, TLS OK   |
-| `api.lousa.pscode.ia.br`| Render     | `apps/api`    | 🟢 vivo, TLS OK   |
+| Serviço | URL (Coolify) | Domínio custom |
+|---|---|---|
+| **API** | `https://<uuid>.2.25.218.138.sslip.io` | `api.lousa.pscode.ia.br` |
+| **Web** | `https://<uuid>.2.25.218.138.sslip.io` | `web.lousa.pscode.ia.br` |
+| **PWA** | `https://<uuid>.2.25.218.138.sslip.io` | `pwa.lousa.pscode.ia.br` |
 
-URLs padrão (auto-gerados pelos provedores, continuam funcionando):
-- API Render: `https://sindestiva-api.onrender.com`
-- Web Vercel: `https://sindestiva-web.vercel.app`
-- PWA Vercel: `https://sindestiva-pwa.vercel.app`
-
-## DNS provisionado em 07/09/2026
-
-3 CNAMEs na zona `pscode.ia.br` (Cloudflare) + domínios custom nos 3 projetos:
-
-| Subdomínio              | CNAME aponta para              |
-|-------------------------|--------------------------------|
-| `web.lousa.pscode.ia.br`| `cname.vercel-dns.com`         |
-| `pwa.lousa.pscode.ia.br`| `cname.vercel-dns.com`         |
-| `api.lousa.pscode.ia.br`| `sindestiva-api.onrender.com`  |
-
-Certs TLS emitidos automaticamente (Let's Encrypt via Vercel/Render).
+> Coolify gera URL temporária `<uuid>.2.25.218.138.sslip.io` automaticamente.
+> Pra usar domínios custom (`*.lousa.pscode.ia.br`), adicione FQDN no painel
+> do resource (ver Passo 4 abaixo).
 
 ## Passo-a-passo
 
-### 1. Render (backend + infra)
+### 1. Criar projeto no Coolify
 
-1. Acesse https://dashboard.render.com/blueprints
-2. **New Blueprint Instance** → conecte o repo `contatopscode/sindestiva-pe`
-3. Render lê o `render.yaml` na raiz e provisiona:
-   - `sindestiva-db` (Postgres, free 90d)
-   - `sindestiva-redis` (Key Value, free permanente)
-   - `sindestiva-api` (Web Service, free com cold start)
-   - `sindestiva-scraper` (Background Worker, free permanente)
-4. **Antes de aplicar**, configure as env vars sensitive via UI (depois do
-   primeiro apply, em `Environment → Environment Variables`):
-   - `EVOLUTION_API_KEY` — chave da Evolution API em `evolution-evolution-api.vcli1q.easypanel.host`
-   - `RESEND_API_KEY` — criar conta em https://resend.com (free 3k/mês)
-   - `FCM_PROJECT_ID`, `FCM_PRIVATE_KEY`, `FCM_CLIENT_EMAIL` — service account Firebase
-   - `SENTRY_DSN` — opcional, monitoramento de erros
-5. Após deploy da API, copiar a `connectionString` do Postgres e a `redisUrl`
-   do Key Value. **Note o `external DATABASE URL`** para usar no Vercel
-   (Vercel não acessa a rede interna do Render).
-6. **Domínio custom** (opcional): em `sindestiva-api → Settings → Custom Domains`,
-   adicionar `api.lousa.pscode.ia.br`. Render gera cert TLS automático via Let's Encrypt.
-7. **Rodar migrations**: na primeira vez, abrir o Shell do `sindestiva-api` e rodar:
-   ```bash
-   uv run alembic upgrade head
-   ```
-   (Render expõe Shell no plano pago; no free, usar `render.yaml` `startCommand`
-   custom ou um job de migrations separado — ver TODO abaixo.)
+1. Acesse `http://2.25.218.138:8000`
+2. **+ New Project** → Name: `SINDESTIVA-PE`, Description: `Lousa Digital · SINDESTIVA-PE`
+3. Crie 1 environment: `production`
 
-### 2. Vercel (frontend)
+### 2. Criar 1 service (Docker Compose)
 
-#### 2.1. `sindestiva-web` (Centro de Comando)
+No projeto criado:
 
-1. https://vercel.com/new → Importar `contatopscode/sindestiva-pe`
-2. **Project Name**: `sindestiva-web`
-3. **Framework Preset**: Next.js (auto-detectado)
-4. **Root Directory**: `apps/web` (configurar manualmente — Vercel não
-   detecta monorepos por padrão)
-5. **Build Command** (vem do `vercel.json`): `cd ../.. && pnpm install --frozen-lockfile && pnpm turbo run build --filter=@sindestiva/web...`
-6. **Environment Variables** (Production):
-   - `NEXT_PUBLIC_API_URL` = `https://api.lousa.pscode.ia.br` (ou `https://sindestiva-api.onrender.com` até configurar domínio)
-   - `NEXTAUTH_SECRET` = mesmo do Render (gerado por `openssl rand -base64 32`)
-   - `NEXTAUTH_URL` = `https://web.lousa.pscode.ia.br`
-7. **Domains** (Settings → Domains): adicionar `web.lousa.pscode.ia.br`
+1. **+ New Resource** → tipo **"Docker Compose"** (não "Application")
+2. **Source**: GitHub App (Coolify já tem) ou HTTPS + PAT (se repo privado)
+   - **Repo**: `contatopscode/sindestiva-pe`
+   - **Branch**: `main`
+3. **Build Pack**: `dockercompose`
+4. **Docker Compose Location**: `/infra/docker-compose.coolify.yml`
+5. **Coolify clona o repo** + gera rede + injeta labels Traefik
 
-#### 2.2. `sindestiva-pwa` (TPA App)
+> Se Coolify não conseguir clonar o repo privado, adicione PAT:
+> Settings → Git → GitHub App → Authorize. Ou use HTTPS com token:
+> URL: `https://<PAT>@github.com/contatopscode/sindestiva-pe.git`
 
-Repetir o processo acima com:
-- **Project Name**: `sindestiva-pwa`
-- **Root Directory**: `apps/pwa`
-- **NEXTAUTH_URL** = `https://pwa.lousa.pscode.ia.br`
-- **Domains**: `pwa.lousa.pscode.ia.br`
+### 3. Configurar env vars (Secrets)
 
-### 3. DNS
+Coolify lê o `.env` do resource. Crie `/data/coolify/proxy/sindestiva.env` (ou use UI Environment Variables):
 
-Adicionar no Cloudflare (zona `pscode.ia.br`):
+```bash
+# ----- Segurança -----
+NEXTAUTH_SECRET=$(openssl rand -base64 32)        # JWT do NextAuth
+ADMIN_SEED_TOKEN=$(openssl rand -base64 32)       # token admin pra /api/v1/admin/*
+POSTGRES_PASSWORD=$(openssl rand -base64 24)       # senha forte do Postgres
 
-| Tipo | Nome              | Valor                            |
-|------|-------------------|----------------------------------|
-| CNAME| `web.lousa`       | `cname.vercel-dns.com`           |
-| CNAME| `pwa.lousa`       | `cname.vercel-dns.com`           |
-| CNAME| `api.lousa`       | `sindestiva-api.onrender.com`    |
+# ----- Domínios -----
+NEXTAUTH_URL=https://web.lousa.pscode.ia.br
+NEXT_PUBLIC_API_URL=https://api.lousa.pscode.ia.br
+CORS_ORIGINS=https://web.lousa.pscode.ia.br,https://pwa.lousa.pscode.ia.br
 
-(Vercel gera o CNAME exato depois do primeiro deploy — copiar de
-`Project → Settings → Domains`.)
+# ----- Banco -----
+POSTGRES_USER=sindestiva
+POSTGRES_DB=sindestiva
+TZ=America/Recife
+
+# ----- E-mail (Resend) -----
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxx
+RESEND_FROM=SINDESTIVA-PE <noreply@pscode.ia.br>
+OGMO_EMAIL=ogmo@pe.gov.br
+OGMO_WEBHOOK_URL=
+
+# ----- WhatsApp (Evolution API) -----
+EVOLUTION_API_URL=https://evolution-evolution-api.vcli1q.easypanel.host
+EVOLUTION_API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+EVOLUTION_INSTANCE=sindestiva
+
+# ----- Push (FCM) -----
+FCM_PROJECT_ID=sindestiva-push
+FCM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+FCM_CLIENT_EMAIL=firebase-adminsdk@sindestiva-push.iam.gserviceaccount.com
+
+# ----- Scraper -----
+SCRAPER_TPA_USERNAME=
+SCRAPER_TPA_PASSWORD=
+SCRAPER_ESCALANET_BASE_URL=http://www.ogmo-recife.org.br/EscalaNet
+SCRAPER_INTERVAL_SECONDS=60
+
+# ----- Sentry (opcional) -----
+SENTRY_DSN=
+
+# ----- Ambiente -----
+APP_ENV=production
+LOG_LEVEL=info
+```
+
+### 4. Configurar FQDNs (SSL automático)
+
+Pra cada um dos 3 serviços públicos (api, web, pwa), adicione FQDN no Coolify:
+
+1. Abra o resource
+2. Settings → **Domains**
+3. **Add Domain**:
+   - API: `api.lousa.pscode.ia.br` (porta interna 8000)
+   - Web: `web.lousa.pscode.ia.br` (porta interna 3000)
+   - PWA: `pwa.lousa.pscode.ia.br` (porta interna 3001)
+4. ✅ **Generate SSL** (Let's Encrypt via DNS-01 challenge do Cloudflare)
+
+### 5. DNS no Cloudflare
+
+Adicione/atualize CNAMEs:
+
+| Tipo | Nome              | Valor                                  |
+|------|-------------------|----------------------------------------|
+| CNAME| `api.lousa`       | `2.25.218.138` (DNS-only, sem proxy)  |
+| CNAME| `web.lousa`       | `2.25.218.138`                         |
+| CNAME| `pwa.lousa`       | `2.25.218.138`                         |
+
+> **DNS-only (nuvem cinza)** porque Coolify/Traefik gerencia SSL direto.
+> Se deixar "Proxied" (nuvem laranja), Cloudflare interfere nos certs.
+
+### 6. Deploy!
+
+1. **Deploy** no painel do Coolify
+2. Acompanhe os logs (`/data/coolify/.../logs/`)
+3. Primeira execução:
+   - Build das 5 imagens (web, pwa, api, scraper)
+   - Postgres + Redis sobem
+   - API roda `alembic upgrade head` + `seed_initial.py`
+   - Web/PWA conectam na API
+   - SSL é emitido (~30s)
+
+### 7. Webhook GitHub (deploy automático)
+
+Coolify gera webhook URL automaticamente (em Settings → Webhooks). Adicione no GitHub:
+
+1. GitHub repo → Settings → Webhooks → **Add webhook**
+2. **Payload URL**: `https://2.25.218.138:8000/api/v1/deploy/webhook/<uuid>/<token>`
+3. **Content type**: `application/json`
+4. **Events**: só `Push` em `main`
+5. ✅ Active
+
+Push em `main` → Coolify rebuilda automaticamente.
 
 ## Pós-deploy — verificação
 
 ```bash
 # 1. API health
 curl https://api.lousa.pscode.ia.br/health
-# → {"aplicacao": "SINDESTIVA", "status": "ok"}
+# → {"aplicacao":"SINDESTIVA","status":"ok"}
 
 # 2. Web carrega
 curl -I https://web.lousa.pscode.ia.br
 # → HTTP/2 200
 
-# 3. Scraper está rodando
-# Render Dashboard → sindestiva-scraper → Logs
-# Esperado: "scraping_service.upsert_escala_origem celulas=226 ..."
+# 3. PWA manifest
+curl https://pwa.lousa.pscode.ia.br/manifest.webmanifest | jq
+# → {"name":"Lousa Digital · TPA",...}
 
-# 4. DB tem dados
-psql $DATABASE_URL -c "SELECT COUNT(*) FROM lousa_main.lousa_alocacao;"
-# → 226 (depois de 1 ciclo do scraper)
+# 4. Scraping rodando
+# Coolify → scraper service → Logs
+# Esperado: "scraping_service.upsert ... celulas=N ..."
+
+# 5. Login funciona
+curl -X POST https://api.lousa.pscode.ia.br/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"paulo@pscode.ia.br","password":"sindestiva-dev-2026"}'
+# → {"access_token":"...", ...}
 ```
 
-## Custos (free tier)
+## Custos (estimativa VPS)
 
-| Serviço              | Free tier                 | Custo se exceder |
-|----------------------|---------------------------|------------------|
-| Vercel (2 projetos)  | Ilimitado p/ hobby        | $20/mês por seat |
-| Render Postgres      | 90 dias, 1GB              | $7/mês após 90d  |
-| Render Key Value     | 25MB, permanente          | $10/mês p/ 1GB   |
-| Render Web Service   | 750h/mês, sleep após 15min| $7/mês p/ starter |
-| Render Worker        | 750h/mês, permanente      | $7/mês p/ starter |
-| Resend               | 3k e-mails/mês            | $20/mês p/ 50k   |
-| Evolution API        | Self-hosted (Sem custo)   | —                |
-| **Total MVP**        | **R$ 0/mês (free 90d)**   | **~$40/mês**     |
+| Serviço | Free tier | Custo (Hetzner CPX31) |
+|---|---|---|
+| VPS Coolify | — | ~R$ 100/mês (CPX31 4GB RAM) |
+| Domínios | — | R$ 0 (Cloudflare free) |
+| Resend (3k e-mails) | ✅ free | — |
+| Evolution API | ✅ self-hosted (separado) | — |
+| **Total MVP** | **~R$ 100/mês** | (vs ~R$ 80/mês Vercel+Render) |
+
+Vantagem: custo fixo, sem surpresa de "free tier expirou".
 
 ## Pendências pós-deploy
 
-- [ ] **Migrations Alembic em produção**: criar um `sindestiva-migrations` Job
-  no Render que roda `alembic upgrade head` antes da API subir. Alternativa:
-  usar `releaseCommand` no `render.yaml` (executa antes do CMD).
-- [ ] **Domínios customizados**: configurar após primeiro deploy.
-- [ ] **Backup automático do Postgres**: Render faz daily snapshot ($1/GB/mês).
-- [ ] **CORS**: ajustar `allow_origins` no FastAPI para aceitar `web.lousa.pscode.ia.br`
-  e `pwa.lousa.pscode.ia.br` (e Vercel preview URLs em dev).
-- [ ] **Monitoramento**: Sentry SDK já está nas deps, só falta `SENTRY_DSN`.
+- [ ] **Backup automático do Postgres**: `docker exec` + `pg_dump` cron (volumes Coolify)
+- [ ] **Monitoramento**: Sentry SDK + alertas Discord/WhatsApp quando scraping falha
+- [ ] **CORS**: confirmar `allow_origins` aceita os 2 domínios custom
+- [ ] **Cookie domain**: ajustar `cookieOpts.domain=.pscode.ia.br` em produção (já feito em `apps/web/src/app/...`)
+- [ ] **Rate limiting**: Traefik middleware ou FastAPI dependency
 
 ## Troubleshooting
 
-| Sintoma                                       | Causa provavel                    | Fix |
-|-----------------------------------------------|-----------------------------------|-----|
-| `sindestiva-api` 502                          | Cold start (free tier sleep)      | Primeiro request após 15min demora ~30s |
-| `psycopg.OperationalError: connection refused`| `DATABASE_URL` errado             | Verificar `sindestiva-db` connectionString no Render |
-| `redis.exceptions.ConnectionError`            | `REDIS_URL` errado                | Verificar `sindestiva-redis` redisUrl |
-| `next-auth` JWT inválido entre web e api      | `NEXTAUTH_SECRET` diferente       | Mesmo secret em Render + Vercel |
-| CORS bloqueia                                 | Origin não está em `allow_origins`| Adicionar domínio custom à config do FastAPI |
+| Sintoma | Causa provável | Fix |
+|---|---|---|
+| Build falha em `pnpm install` | Repo privado + sem PAT | Adicionar token GitHub no Coolify |
+| `api` unhealthy após deploy | Migrations falharam | Ver logs do `api`; `alembic upgrade head` manual via Shell |
+| 502 Bad Gateway | SSL não emitido ainda | Esperar 30-60s após primeiro deploy |
+| Cookie não persiste entre domínios | Domain não é `.pscode.ia.br` | Configurar `cookieOpts.domain` no backend |
+| Scraping TPA/Suape falha | Playwright sem Chromium | Verificar Dockerfile do scraper tem `libnss3` etc |
+| EscalaNet/Recife 100% falha | DNS morto (escalanet.recife.gov.br) | P0.2 — feature flag pra desligar |

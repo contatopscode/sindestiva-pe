@@ -1,0 +1,182 @@
+# =============================================================================
+# SINDESTIVA-PE · Docker Compose (deploy direto na VPS)
+# =============================================================================
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: sindestiva-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sindestiva}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?obrigatório}
+      POSTGRES_DB: ${POSTGRES_DB:-sindestiva}
+      TZ: ${TZ:-America/Recife}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --locale=pt_BR.UTF-8"
+    volumes:
+      - sindestiva_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sindestiva} -d ${POSTGRES_DB:-sindestiva}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    networks:
+      - sindestiva-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: sindestiva-redis
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-America/Recife}
+    volumes:
+      - sindestiva_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - sindestiva-net
+
+  api:
+    build:
+      context: /opt/sindestiva-repo/apps/api
+      dockerfile: Dockerfile
+    container_name: sindestiva-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-sindestiva}:${POSTGRES_PASSWORD}@sindestiva-postgres:5432/${POSTGRES_DB:-sindestiva}
+      DATABASE_URL_SYNC: postgresql+psycopg://${POSTGRES_USER:-sindestiva}:${POSTGRES_PASSWORD}@sindestiva-postgres:5432/${POSTGRES_DB:-sindestiva}
+      REDIS_URL: redis://sindestiva-redis:6379/0
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?obrigatório}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://api.lousa.pscode.ia.br}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://web.lousa.pscode.ia.br,https://pwa.lousa.pscode.ia.br}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM: ${RESEND_FROM:-SINDESTIVA-PE <noreply@pscode.ia.br>}
+      OGMO_EMAIL: ${OGMO_EMAIL:-ogmo@pe.gov.br}
+      OGMO_WEBHOOK_URL: ${OGMO_WEBHOOK_URL:-}
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-}
+      FCM_PROJECT_ID: ${FCM_PROJECT_ID:-}
+      FCM_PRIVATE_KEY: ${FCM_PRIVATE_KEY:-}
+      FCM_CLIENT_EMAIL: ${FCM_CLIENT_EMAIL:-}
+      ADMIN_SEED_TOKEN: ${ADMIN_SEED_TOKEN:?obrigatório}
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: ${TZ:-America/Recife}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health').read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    expose:
+      - "8000"
+    networks:
+      - sindestiva-net
+      - coolify
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.sindestiva-api-http.rule=Host(`api.lousa.pscode.ia.br`)
+      - traefik.http.routers.sindestiva-api-http.entryPoints=http
+      - traefik.http.routers.sindestiva-api-http.middlewares=sindestiva-redir
+      - traefik.http.routers.sindestiva-api-http.service=sindestiva-api
+      - traefik.http.routers.sindestiva-api.rule=Host(`api.lousa.pscode.ia.br`)
+      - traefik.http.routers.sindestiva-api.entryPoints=https
+      - traefik.http.routers.sindestiva-api.tls=true
+      - traefik.http.routers.sindestiva-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.sindestiva-api.service=sindestiva-api
+      - traefik.http.services.sindestiva-api.loadbalancer.server.port=8000
+      - traefik.http.services.sindestiva-api.loadbalancer.server.scheme=http
+      - traefik.http.middlewares.sindestiva-redir.redirectscheme.scheme=https
+
+  web:
+    build:
+      context: /opt/sindestiva-repo
+      dockerfile: apps/web/Dockerfile
+    container_name: sindestiva-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lousa.pscode.ia.br}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?obrigatório}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://web.lousa.pscode.ia.br}
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+    expose:
+      - "3000"
+    networks:
+      - sindestiva-net
+      - coolify
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.sindestiva-web-http.rule=Host(`web.lousa.pscode.ia.br`)
+      - traefik.http.routers.sindestiva-web-http.entryPoints=http
+      - traefik.http.routers.sindestiva-web-http.middlewares=sindestiva-redir
+      - traefik.http.routers.sindestiva-web-http.service=sindestiva-web
+      - traefik.http.routers.sindestiva-web.rule=Host(`web.lousa.pscode.ia.br`)
+      - traefik.http.routers.sindestiva-web.entryPoints=https
+      - traefik.http.routers.sindestiva-web.tls=true
+      - traefik.http.routers.sindestiva-web.tls.certresolver=letsencrypt
+      - traefik.http.routers.sindestiva-web.service=sindestiva-web
+      - traefik.http.services.sindestiva-web.loadbalancer.server.port=3000
+      - traefik.http.services.sindestiva-web.loadbalancer.server.scheme=http
+
+  pwa:
+    build:
+      context: /opt/sindestiva-repo
+      dockerfile: apps/pwa/Dockerfile
+    container_name: sindestiva-pwa
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lousa.pscode.ia.br}
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3001"
+    expose:
+      - "3001"
+    networks:
+      - sindestiva-net
+      - coolify
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - traefik.http.routers.sindestiva-pwa-http.rule=Host(`pwa.lousa.pscode.ia.br`)
+      - traefik.http.routers.sindestiva-pwa-http.entryPoints=http
+      - traefik.http.routers.sindestiva-pwa-http.middlewares=sindestiva-redir
+      - traefik.http.routers.sindestiva-pwa-http.service=sindestiva-pwa
+      - traefik.http.routers.sindestiva-pwa.rule=Host(`pwa.lousa.pscode.ia.br`)
+      - traefik.http.routers.sindestiva-pwa.entryPoints=https
+      - traefik.http.routers.sindestiva-pwa.tls=true
+      - traefik.http.routers.sindestiva-pwa.tls.certresolver=letsencrypt
+      - traefik.http.routers.sindestiva-pwa.service=sindestiva-pwa
+      - traefik.http.services.sindestiva-pwa.loadbalancer.server.port=3001
+      - traefik.http.services.sindestiva-pwa.loadbalancer.server.scheme=http
+
+volumes:
+  sindestiva_postgres_data:
+    name: sindestiva_postgres_data
+  sindestiva_redis_data:
+    name: sindestiva_redis_data
+
+networks:
+  sindestiva-net:
+    name: sindestiva-net
+    driver: bridge
+  coolify:
+    external: true
+    name: coolify

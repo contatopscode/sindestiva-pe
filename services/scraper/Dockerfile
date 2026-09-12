@@ -1,22 +1,12 @@
 # syntax=docker/dockerfile:1.7
 # =============================================================================
-# SINDESTIVA-PE · Scraper Worker Dockerfile
+# SINDESTIVA-PE · Scraper Dockerfile (worker Python)
 #
-# Render: Background Worker (sindestiva-scraper).
-# Roda cron a cada 60s (06h-22h) contra TPA Tecnologia + EscalaNet.
-#
-# Decisões:
-#  - Imagem MAIS LEVE que a da API (sem WeasyPrint, sem Playwright browser).
-#    O scraper TPA atual usa só httpx + BeautifulSoup — Playwright é mantido
-#    como dep Python para futuros layouts com JS, mas NÃO baixamos o browser
-#    (~170MB) na build. Baixar sob demanda com `playwright install` se
-#    algum scraper futuro precisar.
-#  - `uv` (mesmo padrão da API).
-#  - `tini` como PID 1 → forwarda SIGTERM para o worker → graceful shutdown.
-#  - Health check via `python -c` que testa conexão DB (Redis opcional).
-#  - Usuário não-root (`appuser`) — hardening básico.
+# Worker que roda scraping de TPA/Suape + EscalaNet/Recife a cada 60s.
+# Mesmo padrão do `apps/api/Dockerfile` (uv + multi-stage + non-root).
 # =============================================================================
 
+# ----- Stage 1: deps -----
 FROM python:3.12-slim-bookworm AS deps
 
 ENV PYTHONUNBUFFERED=1 \
@@ -25,23 +15,23 @@ ENV PYTHONUNBUFFERED=1 \
     UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1
 
-# System deps mínimas (sem WeasyPrint, sem Playwright)
+# System deps (Playwright)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    tini \
+    libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
+    libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
+    libxfixes3 libxrandr2 libgbm1 libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install uv
 COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /uvx /usr/local/bin/
 
 WORKDIR /app
 
-# Manifestos PRIMEIRO (cache de layer). README.md é necessário porque
-# o pyproject declara `readme = "README.md"` e o hatchling valida.
-COPY pyproject.toml uv.lock README.md ./
+# Copia manifestos
+COPY services/scraper/pyproject.toml services/scraper/uv.lock services/scraper/README.md ./
 RUN uv sync --frozen --no-dev
 
-
+# ----- Stage 2: runtime -----
 FROM python:3.12-slim-bookworm AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
@@ -49,27 +39,22 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PATH="/app/.venv/bin:$PATH"
 
-# Apenas tini (para forwardar SIGTERM). Sem libs de browser/WeasyPrint.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tini \
+    libnss3 libnspr4 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
+    libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 \
+    libxfixes3 libxrandr2 libgbm1 libasound2 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN groupadd --system --gid 1001 appuser \
-    && useradd --system --uid 1001 --gid appuser --home-dir /app --shell /usr/sbin/nologin appuser
+RUN groupadd --system --gid 1001 scraperuser \
+    && useradd --system --uid 1001 --gid scraperuser --home-dir /app --shell /usr/sbin/nologin scraperuser
 
 WORKDIR /app
 
-# venv do stage deps
-COPY --from=deps --chown=appuser:appuser /app/.venv /app/.venv
+COPY --from=deps --chown=scraperuser:scraperuser /app/.venv /app/.venv
+COPY --chown=scraperuser:scraperuser services/scraper ./scraper
 
-# Código
-COPY --chown=appuser:appuser sindestiva_scraper ./sindestiva_scraper
-COPY --chown=appuser:appuser workers ./workers
-COPY --chown=appuser:appuser pyproject.toml uv.lock README.md ./
+USER scraperuser
 
-USER appuser
-
-# Worker roda indefinido até receber SIGTERM. Render envia SIGTERM
-# antes de matar (kill grace period ~10s).
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["python", "-m", "sindestiva_scraper"]
+CMD ["python", "-m", "scraper"]
