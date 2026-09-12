@@ -55,6 +55,8 @@ class ScrapingStatusItem(BaseModel):
 
     id: UUID
     fonte: FonteEscalaEnum
+    porto: str = Field(description="Slug do porto (SUAPE ou RECIFE).")
+    turno: str = Field(description="Código do turno (DIURNO ou NOTURNO).")
     data_referencia: date
     content_hash: str
     status: StatusScrapingEnum
@@ -70,6 +72,7 @@ class ScrapingStatusResponse(BaseModel):
     total: int
     sucessos: int
     falhas: int
+    sem_dados: int
     layout_mudou: int
     itens: list[ScrapingStatusItem]
 

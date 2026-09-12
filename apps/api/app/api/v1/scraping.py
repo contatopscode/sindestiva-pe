@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.core.logging import get_logger
-from app.models import LousaEscalaOrigem
+from app.models import LousaEscalaOrigem, Porto, Turno
 from app.models.enums import StatusScrapingEnum
 from app.schemas.scraping import (
     ScrapingDispararRequest,
@@ -77,12 +77,14 @@ async def status(
         )
 
     stmt = (
-        select(LousaEscalaOrigem)
+        select(LousaEscalaOrigem, Porto.codigo, Turno.codigo)
+        .join(Porto, LousaEscalaOrigem.porto_id == Porto.id)
+        .join(Turno, LousaEscalaOrigem.turno_id == Turno.id)
         .order_by(LousaEscalaOrigem.scraped_at.desc())
         .limit(limit)
     )
     result = await db.execute(stmt)
-    origens = list(result.scalars().all())
+    origens = list(result.all())
 
     # Calcula total de alocações por origem (1 round-trip SQL).
     total_celulas_por_origem: dict = {}
@@ -91,12 +93,13 @@ async def status(
 
         from app.models import LousaAlocacao
 
+        origem_ids = [row[0].id for row in origens]
         count_stmt = (
             select(
                 LousaAlocacao.escala_origem_id,
                 sql_func.count(LousaAlocacao.id).label("total"),
             )
-            .where(LousaAlocacao.escala_origem_id.in_(o.id for o in origens))
+            .where(LousaAlocacao.escala_origem_id.in_(origem_ids))
             .group_by(LousaAlocacao.escala_origem_id)
         )
         count_result = await db.execute(count_stmt)
@@ -106,23 +109,26 @@ async def status(
 
     itens = [
         ScrapingStatusItem(
-            id=o.id,
-            fonte=o.fonte,
-            data_referencia=o.data_referencia,
-            content_hash=o.content_hash,
-            status=o.status,
-            total_celulas=total_celulas_por_origem.get(o.id, 0),
-            duracao_ms=o.duracao_ms,
-            scraped_at=o.scraped_at,
-            erro_detalhes=o.erro_detalhes,
+            id=origem.id,
+            fonte=origem.fonte,
+            porto=porto_codigo,
+            turno=turno_codigo,
+            data_referencia=origem.data_referencia,
+            content_hash=origem.content_hash,
+            status=origem.status,
+            total_celulas=total_celulas_por_origem.get(origem.id, 0),
+            duracao_ms=origem.duracao_ms,
+            scraped_at=origem.scraped_at,
+            erro_detalhes=origem.erro_detalhes,
         )
-        for o in origens
+        for origem, porto_codigo, turno_codigo in origens
     ]
 
     return ScrapingStatusResponse(
         total=len(itens),
         sucessos=sum(1 for i in itens if i.status == StatusScrapingEnum.SUCESSO),
         falhas=sum(1 for i in itens if i.status == StatusScrapingEnum.FALHA),
+        sem_dados=sum(1 for i in itens if i.status == StatusScrapingEnum.SEM_DADOS),
         layout_mudou=sum(1 for i in itens if i.status == StatusScrapingEnum.LAYOUT_MUDOU),
         itens=itens,
     )

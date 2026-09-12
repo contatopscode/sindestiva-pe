@@ -25,10 +25,29 @@ from app.api.deps import get_db
 from app.core.logging import get_logger
 from app.models import Faina, Funcao, LousaAlocacao, LousaCell, LousaSnapshot, Porto, Tpa, Turno
 from app.models import LousaEscalaOrigem
-from app.models.enums import CellStatusEnum, SnapshotStatusEnum
+from app.models.enums import CellStatusEnum, SnapshotStatusEnum, StatusScrapingEnum
 
 router = APIRouter(prefix="/lousa/public", tags=["lousa-public"])
 log = get_logger(__name__)
+
+# Origens usadas pelo Centro de Comando (inclui turno vazio = SEM_DADOS).
+_PREVIEWABLE_SCRAPING_STATUSES: tuple[StatusScrapingEnum, ...] = (
+    StatusScrapingEnum.SUCESSO,
+    StatusScrapingEnum.SEM_DADOS,
+    StatusScrapingEnum.PARCIAL,
+    StatusScrapingEnum.LAYOUT_MUDOU,
+)
+
+
+def _snapshot_status_ui(scraping_status: StatusScrapingEnum) -> str:
+    """Mapeia status do scraper → badge do Centro de Comando."""
+    return {
+        StatusScrapingEnum.SUCESSO: "OK",
+        StatusScrapingEnum.PARCIAL: "PARCIAL",
+        StatusScrapingEnum.FALHA: "ERRO",
+        StatusScrapingEnum.LAYOUT_MUDOU: "LAYOUT_MUDOU",
+        StatusScrapingEnum.SEM_DADOS: "SEM_DADOS",
+    }.get(scraping_status, "ERRO")
 
 
 @router.get("/preview", summary="Snapshot mais recente (sem auth, Sprint 0)")
@@ -131,7 +150,7 @@ async def preview(
                     LousaEscalaOrigem.porto_id == porto_obj.id,
                     LousaEscalaOrigem.turno_id == turno_obj.id,
                     LousaEscalaOrigem.data_referencia == ref_date,
-                    LousaEscalaOrigem.status == "SUCESSO",
+                    LousaEscalaOrigem.status.in_(_PREVIEWABLE_SCRAPING_STATUSES),
                 )
                 .order_by(LousaEscalaOrigem.scraped_at.desc())
                 .limit(1)
@@ -145,7 +164,7 @@ async def preview(
                 .order_by(LousaAlocacao.scraped_at.desc())
             )
             alocacoes_db = (await db.execute(stmt_a)).scalars().all()
-            if not alocacoes_db:
+            if not alocacoes_db and latest_escala.status != StatusScrapingEnum.SEM_DADOS:
                 continue
             # 3. Resolver TPAs em batch (1 query pra N matriculas)
             matriculas = {a.trabalhador_matricula for a in alocacoes_db if a.trabalhador_matricula}
@@ -173,9 +192,10 @@ async def preview(
             snapshot_meta = {
                 "id": str(latest_escala.id),
                 "scraped_at": latest_escala.scraped_at.isoformat(),
-                "status": latest_escala.status.value,
+                "status": _snapshot_status_ui(latest_escala.status),
                 "total_celulas": len(alocacoes_db),
                 "total_tpas_escalados": total_tpas,
+                "erro_detalhes": latest_escala.erro_detalhes,
             }
             break
 

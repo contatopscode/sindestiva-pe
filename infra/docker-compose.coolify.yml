@@ -11,7 +11,9 @@
 #   api       (FastAPI, roda migrations + seed + uvicorn no startup)
 #   web       (Next.js 15, Centro de Comando)
 #   pwa       (Next.js 15 PWA, TPA)
-#   scraper   (Python worker, cron 60s, OUTSIDE Turborepo — mesmo padrão do AGENTS §3)
+#   scraper   (opcional/legado — loop real de scraping roda no lifespan da API;
+#              ver `apps/api/app/jobs/scraping_job.py`. Mantido para deploys que
+#              ainda sobem o worker; logs operacionais: serviço `api`.)
 #
 # Domínios configurados no Coolify (separado, fora deste YAML):
 #   api.lousa.pscode.ia.br → api:8000

@@ -37,6 +37,13 @@ export function SnapshotStatus({ snapshot, onRefresh, loading }: SnapshotStatusP
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-md border border-[#1e3a52] bg-[#0f2438] px-3 py-2">
+      {typeof snapshot?.total_celulas === "number" && (
+        <span className="text-[11px] text-[#94a8bd]">
+          Células:{" "}
+          <span className="font-mono text-[#e8eef4]">{snapshot.total_celulas}</span>
+        </span>
+      )}
+
       <StatusBadge tone={tone} pulse={snapshot?.status === "OK"}>
         ● {label}
       </StatusBadge>

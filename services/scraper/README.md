@@ -2,8 +2,11 @@
 
 Worker de scraping do TPA/OGMO-PE e do EscalaNet/Recife.
 
-Fora do Turborepo propositalmente — tem ciclo próprio (cron 60s) e roda como
-worker separado. Reusa o mesmo banco (`DATABASE_URL`) da API.
+Fora do Turborepo propositalmente — ciclo próprio (cron 60s) quando deployado
+como worker separado. **Em produção Coolify (2026-09), o loop ativo está no
+lifespan da API** (`apps/api/app/jobs/scraping_job.py`); use os logs do
+serviço `api` para observabilidade. Este pacote permanece como placeholder /
+worker opcional. Reusa o mesmo banco (`DATABASE_URL`) da API.
 
 ## Run local
 
