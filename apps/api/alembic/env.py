@@ -1,25 +1,25 @@
-"""SINDESTIVA-PE · Alembic environment (async + sync fallback).
+"""SINDESTIVA-PE · Alembic environment (sync online migrations).
 
 ATENÇÃO — pega-dica cross-projeto (MEMORY do coder agent):
     NUNCA usar `asyncio.run()` dentro de lifespan FastAPI — quebra em
-    prod porque o event loop já está ativo. Este `env.py` usa
-    `connection.run_sync(do_migrations)` dentro de `asyncio.run()` no
-    TOPO do script (chamado UMA VEZ por comando Alembic), o que é
-    seguro. O problema seria instanciar engine async dentro de uma
-    request ou lifespan handler.
+    prod porque o event loop já está ativo.
+
+ATENÇÃO — Coolify HOM (2026-09): NÃO usar `async_engine` + `run_sync` aqui.
+    Sem `await connection.commit()` após `run_sync`, o SQLAlchemy 2 faz
+    ROLLBACK de todo o DDL ao fechar a conexão async — Alembic loga
+    "Running upgrade 0001→0003" mas `portos` / `alembic_version` somem.
+    Migrations online rodam com engine **sync** (`postgresql+psycopg://`).
 
 Convenção: target_metadata = `app.models.base.Base.metadata`.
 Schema target = `lousa_main` (default do init.sql do container).
 """
 from __future__ import annotations
 
-import asyncio
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import pool
+from sqlalchemy import create_engine, pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # ---------------------------------------------------------------------------
 # Import do projeto (config + Base + models)
@@ -89,24 +89,18 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 
-async def run_migrations_online() -> None:
-    """Modo online (conecta e aplica).
-
-    Usa `async_engine_from_config` + `connection.run_sync(do_migrations)`.
-    """
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
+def run_migrations_online() -> None:
+    """Modo online — psycopg sync engine (DDL persiste após commit)."""
+    connectable = create_engine(
+        settings.database_url_sync,
         poolclass=pool.NullPool,
-        future=True,
     )
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-    await connectable.dispose()
+    with connectable.connect() as connection:
+        do_run_migrations(connection)
+    connectable.dispose()
 
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    # Top-level asyncio.run — SEGURO aqui (comando Alembic standalone).
-    asyncio.run(run_migrations_online())
+    run_migrations_online()

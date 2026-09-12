@@ -36,3 +36,11 @@ def test_stamp_target_alocacao_only() -> None:
 
 def test_stamp_target_none_when_empty() -> None:
     assert compute_stamp_target_for_missing([]) is None
+
+
+def test_scan_alembic_log_for_errors() -> None:
+    from app.core.postgres_bootstrap import scan_alembic_log_for_errors
+
+    log = "INFO ok\nERROR [alembic] something broke\n"
+    hits = scan_alembic_log_for_errors(log)
+    assert any("ERROR" in h for h in hits)
