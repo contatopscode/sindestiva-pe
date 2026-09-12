@@ -210,8 +210,8 @@ async def _raspar_periodo(
     turno_codigo: str,
     *,
     http_client: _HttpGet | None = None,
-) -> tuple[list[CelulaBruta], bool]:
-    """Raspa 1 período. Retorna (celulas, layout_mudou).
+) -> tuple[list[CelulaBruta], bool, str]:
+    """Raspa 1 período. Retorna (celulas, layout_mudou, html_bruto).
 
     layout_mudou=True só quando a resposta HTTP **não tem a estrutura
     esperada** (HTML mudou, OGMO tirou do ar, etc.). Quando o turno
@@ -251,7 +251,7 @@ async def _raspar_periodo(
             periodo=periodo_codigo,
             erro=str(exc),
         )
-        return [], True  # erro de rede = sinal de layout mudou
+        return [], True, ""  # erro de rede = sinal de layout mudou
 
     duracao = int((time.monotonic() - t0) * 1000)
 
@@ -263,7 +263,7 @@ async def _raspar_periodo(
             periodo=periodo_codigo,
             html_size=len(html),
         )
-        return [], True
+        return [], True, html
 
     celulas_brutas = _parse_html(html)
     # CelulaBruta é frozen + slots → recria com turno_codigo setado.
@@ -283,23 +283,26 @@ async def _raspar_periodo(
         celulas=len(celulas),
         duracao_ms=duracao,
     )
-    return celulas, False
+    return celulas, False, html
 
 
 async def raspar_por_data(
     porto_slug: str,
     data: date,
     *,
+    turno_codigo: str | None = None,
     http_client: _HttpGet | None = None,
 ) -> EscalaBruta:
-    """Raspa a lousa EscalaNet para 1 (porto, data).
+    """Raspa a lousa EscalaNet para 1 (porto, data) e opcionalmente 1 turno.
 
-    Para cada um dos 4 períodos (46/47/48/49), faz POST e agrega.
-    Atribui turno_codigo (DIURNO/NOTURNO) baseado no período.
+    Para cada período EscalaNet (46/47/48/49) **do turno solicitado**, faz
+    POST e agrega. Sem `turno_codigo`, raspa os 4 períodos (legado).
 
     Args:
         porto_slug: "RECIFE" (único porto coberto pelo EscalaNet).
         data: data de referência da escala.
+        turno_codigo: "DIURNO" ou "NOTURNO" — limita os POSTs aos períodos
+            daquele turno (evita 4× HTTP quando o job já itera por turno).
 
     Returns:
         EscalaBruta com HTML bruto concatenado, hash agregado, células
@@ -317,17 +320,24 @@ async def raspar_por_data(
         )
 
     t0 = time.monotonic()
-    html_bruto_total = ""
+    html_partes: list[str] = []
     celulas_total: list[CelulaBruta] = []
     layout_mudou = False
 
-    for periodo_codigo, turno_codigo, _rotulo in ESCALANET_PERIODOS:
-        celulas_p, layout_mudou_p = await _raspar_periodo(
+    turno_filtro = (turno_codigo or "").upper() or None
+    periodos = ESCALANET_PERIODOS
+    if turno_filtro:
+        periodos = tuple(p for p in ESCALANET_PERIODOS if p[1] == turno_filtro)
+
+    for periodo_codigo, turno_periodo, _rotulo in periodos:
+        celulas_p, layout_mudou_p, html_p = await _raspar_periodo(
             data,
             periodo_codigo,
-            turno_codigo,
+            turno_periodo,
             http_client=http_client,
         )
+        if html_p:
+            html_partes.append(html_p)
         celulas_total.extend(celulas_p)
         # layout_mudou só é True se a estrutura HTML em si mudou.
         # Período sem TPAs (turno ainda não começou) = layout OK, sem dados.
@@ -335,7 +345,9 @@ async def raspar_por_data(
             layout_mudou = True
 
     duracao = int((time.monotonic() - t0) * 1000)
-    html_bruto = html_bruto_total or "<!-- escalanet: 4 periodos raspados -->"
+    html_bruto = "\n".join(html_partes) if html_partes else (
+        f"<!-- escalanet: {len(periodos)} periodo(s) raspado(s) -->"
+    )
     return EscalaBruta(
         html_bruto=html_bruto,
         content_hash=hash_conteudo(html_bruto),

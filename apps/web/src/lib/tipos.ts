@@ -54,7 +54,7 @@ export interface LousaCellOut {
 
 // ---- Snapshot --------------------------------------------------------------
 
-export type SnapshotStatus = "OK" | "PARCIAL" | "ERRO" | "LAYOUT_MUDOU";
+export type SnapshotStatus = "OK" | "PARCIAL" | "ERRO" | "LAYOUT_MUDOU" | "SEM_DADOS";
 
 export interface LousaSnapshotOut {
   id: string | null;
@@ -340,4 +340,5 @@ export const SNAPSHOT_STATUS_LABEL: Record<SnapshotStatus, string> = {
   PARCIAL: "Parcial",
   ERRO: "Erro",
   LAYOUT_MUDOU: "Layout mudou",
+  SEM_DADOS: "Sem TPAs no turno",
 };

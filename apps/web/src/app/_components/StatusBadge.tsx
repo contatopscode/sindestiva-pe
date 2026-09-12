@@ -41,6 +41,7 @@ export function toneForSnapshotStatus(s: SnapshotStatus | null | undefined): Bad
   if (s === "PARCIAL") return "amber";
   if (s === "ERRO") return "red";
   if (s === "LAYOUT_MUDOU") return "purple";
+  if (s === "SEM_DADOS") return "gold";
   return "muted";
 }
 

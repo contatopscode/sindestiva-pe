@@ -159,17 +159,39 @@ async def test_scraper_tpa_http_error(fake_http_factory) -> None:
 
 @pytest.mark.asyncio
 async def test_scraper_escalanet_happy_path(fake_http_factory, fakes_path) -> None:
-    """EscalaNet parseia 3 células do HTML fake (tabela `.grade-escala`)."""
+    """EscalaNet parseia 3 células do HTML fake (relatório OGMO Recife)."""
     html = (fakes_path / "escalanet_sample.html").read_text(encoding="utf-8")
     client = fake_http_factory(html=html)
-    bruto = await raspar_escalanet("RECIFE", date(2026, 9, 1), http_client=client)
+    bruto = await raspar_escalanet(
+        "RECIFE",
+        date(2026, 9, 1),
+        turno_codigo="DIURNO",
+        http_client=client,
+    )
     assert isinstance(bruto, EscalaBruta)
-    assert len(bruto.celulas) == 3
-    assert bruto.celulas[0].faina_codigo == "PROD"
+    # 2 períodos diurnos (46+47) × 3 células cada = 6 (mesmo HTML no fake).
+    assert len(bruto.celulas) == 6
+    assert bruto.celulas[0].faina_codigo == "PRODUCAO"
     assert bruto.celulas[0].funcao_codigo == "MANDO_03"
-    assert bruto.celulas[2].funcao_codigo == "SINALEIRO"
+    assert bruto.celulas[0].turno_codigo == "DIURNO"
+    assert bruto.celulas[2].funcao_codigo == "TECNICA_01"
     assert bruto.layout_mudou is False
-    assert "escalanet.recife.gov.br" in (bruto.url_origem or "")
+    assert "ogmo-recife.org.br" in (bruto.url_origem or "")
+    assert len(client.calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_scraper_escalanet_filtra_turno(fake_http_factory, fakes_path) -> None:
+    """Com `turno_codigo`, só dispara POST dos períodos daquele turno."""
+    html = (fakes_path / "escalanet_sample.html").read_text(encoding="utf-8")
+    client = fake_http_factory(html=html)
+    await raspar_escalanet(
+        "RECIFE",
+        date(2026, 9, 1),
+        turno_codigo="NOTURNO",
+        http_client=client,
+    )
+    assert len(client.calls) == 2
 
 
 # ---------------------------------------------------------------------------

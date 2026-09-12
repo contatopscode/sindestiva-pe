@@ -96,6 +96,14 @@ class FakeHttpClient:
             raise RuntimeError("FakeHttpClient sem HTML configurado")
         return _FakeResponse(self.html)
 
+    async def post(self, url: str, **kwargs: Any) -> _FakeResponse:
+        self.calls.append(url)
+        if self.raise_exc is not None:
+            raise self.raise_exc
+        if self.html is None:
+            raise RuntimeError("FakeHttpClient sem HTML configurado")
+        return _FakeResponse(self.html)
+
 
 @pytest.fixture
 def fake_http_factory():

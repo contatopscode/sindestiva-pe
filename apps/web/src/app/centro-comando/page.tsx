@@ -26,6 +26,10 @@ import { SnapshotStatus } from "./_components/SnapshotStatus";
 import { getLousaPreview } from "@/lib/api";
 import type { LousaCellOut, LousaPreviewResponse, Funcao, Faina } from "@/lib/tipos";
 
+const API_PUBLIC =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
+  "https://api.lousa.pscode.ia.br";
+
 export default function CentroComandoPage(): ReactNode {
   const [porto, setPorto] = useState<Porto>("SUAPE");
   const [turno, setTurno] = useState<Turno>("DIURNO");
@@ -155,6 +159,24 @@ export default function CentroComandoPage(): ReactNode {
                 scraper (Risco R2 do plano v1.0).
               </div>
             )}
+            {data.snapshot.status === "SEM_DADOS" && (
+              <div className="mt-2 rounded border border-[#d4a574]/40 bg-[#d4a574]/10 px-3 py-2 text-[12px] text-[#d4a574]">
+                ℹ️ Scrape concluído, mas o OGMO não publicou TPAs para{" "}
+                <strong>{porto}</strong> · <strong>{turno}</strong> nesta data
+                (turno vazio — diferente de falha de rede).
+              </div>
+            )}
+            <p className="mt-2 text-[11px] text-[#94a8bd]">
+              Matriz de scraping (fonte × porto × turno):{" "}
+              <a
+                href={`${API_PUBLIC}/api/v1/scraping/status?limit=8`}
+                className="font-mono text-[#d4a574] underline-offset-2 hover:underline"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                GET /api/v1/scraping/status
+              </a>
+            </p>
           </div>
 
           {/* Tabela principal (T4-02) */}

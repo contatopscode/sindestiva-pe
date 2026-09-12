@@ -143,7 +143,12 @@ async def executar_scraping(
     if fonte == FonteEscalaEnum.TPA:
         bruto = await raspar_tpa(porto_slug, data, http_client=http_client)
     elif fonte == FonteEscalaEnum.ESCALANET:
-        bruto = await raspar_escalanet(porto_slug, data, http_client=http_client)
+        bruto = await raspar_escalanet(
+            porto_slug,
+            data,
+            turno_codigo=turno_codigo,
+            http_client=http_client,
+        )
     else:
         # MANUAL_FISCAL não tem scraping — entrada via PWA (Sprint 4).
         return ScrapingResultado(
@@ -160,16 +165,6 @@ async def executar_scraping(
             layout_mudou=False,
             erro_detalhes=f"Fonte {fonte.value!r} não suporta scraping automático.",
         )
-
-    # 3. Determina status final.
-    if bruto.erro_detalhes:
-        status = StatusScrapingEnum.FALHA
-    elif bruto.layout_mudou:
-        status = StatusScrapingEnum.LAYOUT_MUDOU
-    elif not bruto.celulas:
-        status = StatusScrapingEnum.SEM_DADOS
-    else:
-        status = StatusScrapingEnum.SUCESSO
 
     # 3a. Filtra células por turno (TPA raspa 2 turnos na mesma página;
     # sem este filtro, teríamos UNIQUE violation em `lousa_alocacao`
@@ -200,6 +195,22 @@ async def executar_scraping(
         layout_mudou=bruto.layout_mudou,
         erro_detalhes=bruto.erro_detalhes,
     )
+
+    # 3b. Status final **após** filtro de turno — evita SUCESSO com 0 células
+    # quando o HTML agregado tem TPAs só do outro turno (TPA) ou quando o
+    # período EscalaNet do turno ainda não foi publicado pelo OGMO.
+    if bruto.erro_detalhes:
+        status = StatusScrapingEnum.FALHA
+    elif not celulas_turno:
+        status = (
+            StatusScrapingEnum.LAYOUT_MUDOU
+            if bruto.layout_mudou
+            else StatusScrapingEnum.SEM_DADOS
+        )
+    elif bruto.layout_mudou:
+        status = StatusScrapingEnum.LAYOUT_MUDOU
+    else:
+        status = StatusScrapingEnum.SUCESSO
 
     # 4. UPSERT em `lousa_escala_origem` (idempotente).
     payload_jsonb: dict[str, Any] = {
@@ -255,7 +266,7 @@ async def executar_scraping(
         turno=turno_codigo,
         data=data.isoformat(),
         status=status.value,
-        celulas=len(bruto.celulas),
+        celulas=len(celulas_turno),
     )
 
     # 5. Se scrape OK, regenera alocações (DELETE + INSERT idempotente).

@@ -8,7 +8,10 @@
 import type { ReactNode } from "react";
 import type { Porto } from "@sindestiva/shared";
 
-const PORTOS: Porto[] = ["SUAPE", "RECIFE"];
+const PORTOS: Array<{ codigo: Porto; label: string }> = [
+  { codigo: "SUAPE", label: "Suape" },
+  { codigo: "RECIFE", label: "Recife" },
+];
 
 export interface PortoSwitcherProps {
   value: Porto;
@@ -20,14 +23,15 @@ export function PortoSwitcher({ value, onChange }: PortoSwitcherProps): ReactNod
     <div className="chip-group" role="tablist" aria-label="Porto">
       {PORTOS.map((p) => (
         <button
-          key={p}
+          key={p.codigo}
           type="button"
           role="tab"
-          aria-selected={value === p}
-          className={`chip ${value === p ? "active" : ""}`}
-          onClick={() => onChange(p)}
+          aria-selected={value === p.codigo}
+          className={`chip ${value === p.codigo ? "active" : ""}`}
+          onClick={() => onChange(p.codigo)}
+          title={p.codigo}
         >
-          {p}
+          {p.label}
         </button>
       ))}
     </div>

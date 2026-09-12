@@ -8,8 +8,8 @@ import type { ReactNode } from "react";
 import type { Turno } from "@sindestiva/shared";
 
 const TURNOS: Array<{ codigo: Turno; label: string }> = [
-  { codigo: "DIURNO", label: "DIURNO" },
-  { codigo: "NOTURNO", label: "NOTURNO" },
+  { codigo: "DIURNO", label: "Diurno" },
+  { codigo: "NOTURNO", label: "Noturno" },
 ];
 
 export interface TurnoSwitcherProps {
