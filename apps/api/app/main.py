@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import api_v1_router
 from app.core.config import settings
+from app.core.cors import CORS_ALLOW_ORIGIN_REGEX
 from app.core.database import Base, engine
 from app.core.logging import configure_logging, get_logger
 from app.jobs.scheduler import start_scheduler as start_s6_scheduler, stop_scheduler as stop_s6_scheduler
@@ -117,40 +118,12 @@ app = FastAPI(
 
 
 # ---------------------------------------------------------------------------
-# CORS
+# CORS — lista base + `CORS_ORIGINS` (ver `app.core.cors` e DEPLOY.md)
 # ---------------------------------------------------------------------------
-# Dev (Next.js local): `localhost:3000/3001/3010`
-# Staging/Preview (Vercel): `*.vercel.app` (regex pega todos os preview
-#   deploys — `sindestiva-web-xxx.vercel.app`, etc)
-# Prod (Vercel custom domain): `web.lousa.pscode.ia.br`, `pwa.lousa.pscode.ia.br`
-#   (Sprint 1+ quando ativar domínios custom; por ora só Vercel temporário)
-#
-# NOTA Sprint 0+ deploy: Vercel gera URLs aleatórios por preview
-# (`sindestiva-web-<hash>-<team>.vercel.app`), então é mais robusto usar
-# `allow_origin_regex` para o domínio Vercel inteiro, em vez de listar
-# cada URL.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-        "http://localhost:3010",
-        "http://127.0.0.1:3010",
-        # Vercel temporário (Sprint 0+ até ativar domínio custom)
-        "https://sindestiva-web.vercel.app",
-        "https://sindestiva-pwa.vercel.app",
-        # Domínios custom (Sprint A+ — DNS provisionado em 07/09/2026)
-        "https://web.lousa.pscode.ia.br",
-        "https://pwa.lousa.pscode.ia.br",
-        "https://api.lousa.pscode.ia.br",  # p/ health-check cross-origin
-    ],
-    # CORS Middleware do Starlette/FastAPI aceita UMA string regex (não lista).
-    # Cobre previews temporários da Vercel.
-    allow_origin_regex=(
-        r"https://sindestiva-(web|pwa)[a-z0-9-]*\.vercel\.app"
-    ),
+    allow_origins=settings.resolved_cors_allow_origins(),
+    allow_origin_regex=CORS_ALLOW_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

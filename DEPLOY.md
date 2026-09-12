@@ -81,7 +81,13 @@ POSTGRES_PASSWORD=$(openssl rand -base64 24)       # senha forte do Postgres
 # ----- Domínios -----
 NEXTAUTH_URL=https://web.lousa.pscode.ia.br
 NEXT_PUBLIC_API_URL=https://api.lousa.pscode.ia.br
+# Opcional: origins extras (vírgula). A API já inclui prod + hom + localhost em código.
 CORS_ORIGINS=https://web.lousa.pscode.ia.br,https://pwa.lousa.pscode.ia.br
+
+# Homologação (branch homolog · Coolify HOM):
+# NEXTAUTH_URL=https://web.hom.lousa.pscode.ia.br
+# NEXT_PUBLIC_API_URL=https://api.hom.lousa.pscode.ia.br
+# CORS_ORIGINS pode repetir os de hom; a lista base já cobre web.hom / pwa.hom.
 
 # ----- Banco -----
 POSTGRES_USER=sindestiva
