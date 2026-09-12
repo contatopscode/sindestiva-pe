@@ -1,0 +1,53 @@
+# SINDESTIVA-PE routers
+http:
+  routers:
+    sindestiva-api-http:
+      rule: "Host(`api.lousa.pscode.ia.br`)"
+      service: sindestiva-api
+      entryPoints: [http]
+      middlewares: [sindestiva-redir]
+    sindestiva-web-http:
+      rule: "Host(`web.lousa.pscode.ia.br`)"
+      service: sindestiva-web
+      entryPoints: [http]
+      middlewares: [sindestiva-redir]
+    sindestiva-pwa-http:
+      rule: "Host(`pwa.lousa.pscode.ia.br`)"
+      service: sindestiva-pwa
+      entryPoints: [http]
+      middlewares: [sindestiva-redir]
+    sindestiva-api:
+      rule: "Host(`api.lousa.pscode.ia.br`)"
+      service: sindestiva-api
+      entryPoints: [https]
+      tls:
+        certResolver: letsencrypt
+    sindestiva-web:
+      rule: "Host(`web.lousa.pscode.ia.br`)"
+      service: sindestiva-web
+      entryPoints: [https]
+      tls:
+        certResolver: letsencrypt
+    sindestiva-pwa:
+      rule: "Host(`pwa.lousa.pscode.ia.br`)"
+      service: sindestiva-pwa
+      entryPoints: [https]
+      tls:
+        certResolver: letsencrypt
+  middlewares:
+    sindestiva-redir:
+      redirectScheme:
+        scheme: https
+  services:
+    sindestiva-api:
+      loadBalancer:
+        servers:
+          - url: "http://172.16.1.19:8000"
+    sindestiva-web:
+      loadBalancer:
+        servers:
+          - url: "http://172.16.1.21:3000"
+    sindestiva-pwa:
+      loadBalancer:
+        servers:
+          - url: "http://172.16.1.20:3001"
