@@ -51,10 +51,32 @@ import type {
 
 const DEFAULT_API_URL = "https://api.lousa.pscode.ia.br";
 
-/** Base URL absoluta da API. Variável NEXT_PUBLIC_API_URL sobrescreve em dev. */
-export const API_URL: string =
-  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) ||
-  DEFAULT_API_URL;
+/**
+ * Resolve a base URL da API a partir de NEXT_PUBLIC_API_URL.
+ *
+ * - Em produção: se a env não estiver setada (ou for string vazia),
+ *   LANÇA erro. Falha alto no carregamento do módulo é preferível a
+ *   bundle rodando com fallback NXDOMAIN.
+ * - Em dev: aceita fallback silencioso para não atrapalhar DX local.
+ *
+ * Hard-coded fallback NXDOMAIN existe aqui e em mais NENHUM arquivo
+ * de runtime (assertiva mantida pelo CI grep — ver C3 da SPEC).
+ */
+function resolveApiUrl(): string {
+  const fromEnv =
+    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_API_URL : undefined;
+  if (fromEnv && fromEnv.trim()) return fromEnv.replace(/\/$/, "");
+  if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "NEXT_PUBLIC_API_URL não definida em produção. " +
+        "Configure a env na plataforma de deploy e faça rebuild.",
+    );
+  }
+  return DEFAULT_API_URL; // dev only
+}
+
+/** Base URL absoluta da API. Resolvida em build/load via resolveApiUrl(). */
+export const API_URL: string = resolveApiUrl();
 
 /** Mesma URL absoluta (sem proxy no MVP). */
 export const API_ABSOLUTE_URL = API_URL;
