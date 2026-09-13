@@ -16,8 +16,9 @@
  */
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import { API_URL } from "@/lib/api";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "https://api.lousa.pscode.ia.br";
+const API = API_URL;
 
 async function proxy(
   req: NextRequest,

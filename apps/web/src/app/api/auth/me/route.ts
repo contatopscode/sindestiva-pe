@@ -5,8 +5,9 @@
  */
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { API_URL } from "@/lib/api";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "https://api.lousa.pscode.ia.br";
+const API = API_URL;
 
 export async function GET() {
   const token = (await cookies()).get("sindestiva_token")?.value;

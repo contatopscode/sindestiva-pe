@@ -23,12 +23,10 @@ import { LousaTable } from "./_components/LousaTable";
 import { PortoSwitcher } from "./_components/PortoSwitcher";
 import { TurnoSwitcher } from "./_components/TurnoSwitcher";
 import { SnapshotStatus } from "./_components/SnapshotStatus";
-import { getLousaPreview } from "@/lib/api";
+import { getLousaPreview, API_URL } from "@/lib/api";
 import type { LousaCellOut, LousaPreviewResponse, Funcao, Faina } from "@/lib/tipos";
 
-const API_PUBLIC =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "https://api.lousa.pscode.ia.br";
+const API_PUBLIC = API_URL;
 
 export default function CentroComandoPage(): ReactNode {
   const [porto, setPorto] = useState<Porto>("SUAPE");
