@@ -84,18 +84,47 @@ export const API_ABSOLUTE_URL = API_URL;
 // Storage key p/ JWT em sessionStorage (client-side).
 const TOKEN_STORAGE_KEY = "sindestiva.jwt";
 
+/**
+ * Decodifica o payload do JWT e retorna o instante de expiração em ms
+ * (epoch * 1000) ou null. Robusto a tokens malformados (try/catch).
+ *
+ * Esta checagem é UX-only: evita enviar token morto no Authorization
+ * header. A validação de assinatura continua sendo server-side em
+ * apps/api/app/core/security.py.
+ */
+function jwtExpiresAt(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1] ?? "")) as { exp?: number };
+    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 export function setToken(token: string | null): void {
   if (typeof window === "undefined") return;
   if (token === null) {
     window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-  } else {
-    window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    return;
+  }
+  window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+  const expMs = jwtExpiresAt(token);
+  if (expMs !== null) {
+    const delay = Math.max(0, expMs - Date.now());
+    setTimeout(() => setToken(null), delay);
   }
 }
 
 function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
-  return window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  const raw = window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!raw) return null;
+  const expMs = jwtExpiresAt(raw);
+  if (expMs !== null && expMs <= Date.now()) {
+    window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    return null;
+  }
+  return raw;
 }
 
 /** Repõe JWT no sessionStorage a partir do cookie httpOnly (refresh / nova aba). */
@@ -219,8 +248,15 @@ export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<
     });
   } catch (err) {
     clearTimeout(timer);
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new ApiError(0, `Falha de rede: ${msg}`);
+    const raw = err instanceof Error ? err.message : String(err);
+    // Contexto para distinguir NXDOMAIN / CORS / timeout / conexão-recusada
+    // na próxima ocorrência do sintoma (C4). Wrapper global captura este
+    // console.error; não importar Sentry/Datadog diretamente aqui.
+    const context = `[url=${url}][mode=cors]`;
+    if (typeof console !== "undefined") {
+      console.error("[apiFetch] network failure", { url, mode: "cors", raw });
+    }
+    throw new ApiError(0, `Falha de rede: ${raw} ${context}`);
   }
   clearTimeout(timer);
 
