@@ -17,6 +17,8 @@ import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
+import type { Role } from "@/lib/auth";
 
 export interface SidebarItem {
   /** String para acomodar hrefs placeholder tipo "#". Cast para Route no Link. */
@@ -27,6 +29,8 @@ export interface SidebarItem {
   disabled?: boolean;
   /** Quando true, abre em nova aba (ex: OGMO read-only). */
   external?: boolean;
+  /** Quando definido (`roles?: Role[]`), item só aparece para usuários com role nesta lista. */
+  roles?: Role[];
 }
 
 export interface SidebarGroup {
@@ -53,7 +57,8 @@ const GROUPS: SidebarGroup[] = [
   {
     title: "Plataforma",
     items: [
-      { href: "/bi", label: "BI & Dashboards", icon: "📊" },
+      // Manter em sincronia com middleware.ts ROLE_RULES
+      { href: "/bi", label: "BI & Dashboards", icon: "📊", roles: ["DIRIGENTE"] },
     ],
   },
   {
@@ -66,6 +71,29 @@ const GROUPS: SidebarGroup[] = [
 
 export function Sidebar(): ReactNode {
   const pathname = usePathname();
+  const [userRole, setUserRole] = useState<Role | null>(null);
+
+  useEffect(() => {
+    // Busca role do usuário autenticado (cookie httpOnly). 401 → null
+    // (middleware já redirecionou — item com roles fica oculto até o
+    // próximo mount com sessão válida).
+    fetch("/api/auth/me", { credentials: "include" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: unknown) => {
+        if (
+          data &&
+          typeof data === "object" &&
+          "role" in data &&
+          typeof (data as { role: unknown }).role === "string"
+        ) {
+          const role = (data as { role: string }).role;
+          if (role === "FISCAL" || role === "DIRIGENTE" || role === "TPA") {
+            setUserRole(role);
+          }
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   return (
     <aside className="sidebar flex h-full w-[240px] flex-col border-r border-[#1e3a52] bg-[#0a1929] py-4 overflow-y-auto">
@@ -75,6 +103,13 @@ export function Sidebar(): ReactNode {
             {group.title}
           </div>
           {group.items.map((item) => {
+            // Filtro por role: ausente → visível para todos. userRole null
+            // (sessão ainda carregando/erro) → itens com roles ficam
+            // ocultos para evitar flash de "promessa" antes de sumir.
+            const visible =
+              !item.roles || (userRole !== null && item.roles.includes(userRole));
+            if (!visible) return null;
+
             const active = !item.disabled && pathname === item.href;
             const base =
               "mx-2 mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium transition-colors";
