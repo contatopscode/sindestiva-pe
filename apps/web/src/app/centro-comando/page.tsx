@@ -16,8 +16,9 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import type { Porto, Turno } from "@sindestiva/shared";
 import { LousaTable } from "./_components/LousaTable";
 import { PortoSwitcher } from "./_components/PortoSwitcher";
@@ -29,6 +30,17 @@ import type { LousaCellOut, LousaPreviewResponse, Funcao, Faina } from "@/lib/ti
 const API_PUBLIC = API_URL;
 
 export default function CentroComandoPage(): ReactNode {
+  // Mitigação R6 (Next.js 15): useSearchParams exige Suspense boundary
+  // para evitar bailout de prerender. Envolvemos a tela toda no Suspense
+  // — a página já é dinâmica (fetch + auto-refresh).
+  return (
+    <Suspense fallback={<div className="loading p-6">Carregando…</div>}>
+      <CentroComandoPageInner />
+    </Suspense>
+  );
+}
+
+function CentroComandoPageInner(): ReactNode {
   const [porto, setPorto] = useState<Porto>("SUAPE");
   const [turno, setTurno] = useState<Turno>("DIURNO");
   const [data, setData] = useState<LousaPreviewResponse | null>(null);
@@ -37,6 +49,26 @@ export default function CentroComandoPage(): ReactNode {
   const [remanejarCtx, setRemanejarCtx] = useState<
     { cell: LousaCellOut; funcao: Funcao; faina: Faina } | null
   >(null);
+
+  // Banner de "forbidden" — feedback do redirect silencioso do middleware.
+  // O middleware grava ?forbidden=<path> quando o role do usuário não tem
+  // permissão para acessar a rota alvo (ex.: FISCAL digitando /bi na barra).
+  const searchParams = useSearchParams();
+  const forbiddenPath = searchParams?.get("forbidden");
+  const [bannerVisible, setBannerVisible] = useState(true);
+
+  // Reset do banner quando o path "forbidden" muda (ex.: novo redirect).
+  useEffect(() => {
+    setBannerVisible(true);
+  }, [forbiddenPath]);
+
+  // Auto-hide do banner após 8s (UX: não persistir entre navegações,
+  // não usar localStorage — perda de dispensa é aceitável).
+  useEffect(() => {
+    if (!forbiddenPath) return;
+    const id = setTimeout(() => setBannerVisible(false), 8000);
+    return () => clearTimeout(id);
+  }, [forbiddenPath]);
 
   const fetchLousa = useCallback(async () => {
     setLoading(true);
@@ -86,6 +118,29 @@ export default function CentroComandoPage(): ReactNode {
 
   return (
     <div className="p-6">
+      {/* Banner de forbidden — feedback do redirect silencioso do middleware */}
+      {forbiddenPath && bannerVisible && (
+        <div
+          role="alert"
+          className="mb-4 flex items-start justify-between gap-4 rounded border border-[#d4a574]/40 bg-[#d4a574]/10 px-4 py-3"
+        >
+          <div className="text-[12px] text-[#d4a574]">
+            🔒 Você não tem permissão para acessar{" "}
+            <code className="font-mono">{forbiddenPath}</code> (restrito a{" "}
+            {forbiddenPath === "/bi" ? "DIRIGENTE" : "outros perfis"}). Voltar
+            ao menu.
+          </div>
+          <button
+            type="button"
+            onClick={() => setBannerVisible(false)}
+            className="shrink-0 rounded border border-[#d4a574]/40 px-2 py-1 text-[11px] font-semibold text-[#d4a574] hover:bg-[#d4a574]/20"
+            aria-label="Fechar aviso"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Cabeçalho da seção */}
       <div className="section-header">
         <div>
