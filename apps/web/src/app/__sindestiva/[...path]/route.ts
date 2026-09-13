@@ -1,5 +1,9 @@
 /**
- * Catch-all proxy: /__sindestiva/* → https://api.lousa.pscode.ia.br/api/v1/*
+ * Catch-all proxy: /__sindestiva/* → API_URL/<caller-path>
+ *
+ * O caller (`apiFetch` em `@/lib/api`) já envia o path COMPLETO, incluindo
+ * o prefixo `/api/v1/`. Este handler apenas concatena `API_URL + / + path`
+ * — NÃO adiciona prefixo próprio, para não duplicar `/api/v1/api/v1/...`.
  *
  * Por que isso existe:
  *   O cookie `sindestiva_token` é domain-scoped ao host
@@ -16,8 +20,9 @@
  */
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import { API_URL } from "@/lib/api";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "https://api.lousa.pscode.ia.br";
+const API = API_URL;
 
 async function proxy(
   req: NextRequest,
@@ -25,7 +30,9 @@ async function proxy(
 ): Promise<Response> {
   const { path } = await ctx.params;
   const fullPath = path.join("/");
-  const url = `${API}/api/v1/${fullPath}${req.nextUrl.search}`;
+  // Caller já envia o prefixo `/api/v1/...` completo — não duplicar aqui.
+  // Apenas junta `API_URL + / + path-capturado + query-string`.
+  const url = `${API}/${fullPath}${req.nextUrl.search}`;
   const cookieStore = await cookies();
   const tokenCookie = cookieStore.get("sindestiva_token")?.value;
   const allCookies = cookieStore

@@ -51,10 +51,32 @@ import type {
 
 const DEFAULT_API_URL = "https://api.lousa.pscode.ia.br";
 
-/** Base URL absoluta da API. Variável NEXT_PUBLIC_API_URL sobrescreve em dev. */
-export const API_URL: string =
-  (typeof process !== "undefined" && process.env.NEXT_PUBLIC_API_URL) ||
-  DEFAULT_API_URL;
+/**
+ * Resolve a base URL da API a partir de NEXT_PUBLIC_API_URL.
+ *
+ * - Em produção: se a env não estiver setada (ou for string vazia),
+ *   LANÇA erro. Falha alto no carregamento do módulo é preferível a
+ *   bundle rodando com fallback NXDOMAIN.
+ * - Em dev: aceita fallback silencioso para não atrapalhar DX local.
+ *
+ * Hard-coded fallback NXDOMAIN existe aqui e em mais NENHUM arquivo
+ * de runtime (assertiva mantida pelo CI grep — ver C3 da SPEC).
+ */
+function resolveApiUrl(): string {
+  const fromEnv =
+    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_API_URL : undefined;
+  if (fromEnv && fromEnv.trim()) return fromEnv.replace(/\/$/, "");
+  if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
+    throw new Error(
+      "NEXT_PUBLIC_API_URL não definida em produção. " +
+        "Configure a env na plataforma de deploy e faça rebuild.",
+    );
+  }
+  return DEFAULT_API_URL; // dev only
+}
+
+/** Base URL absoluta da API. Resolvida em build/load via resolveApiUrl(). */
+export const API_URL: string = resolveApiUrl();
 
 /** Mesma URL absoluta (sem proxy no MVP). */
 export const API_ABSOLUTE_URL = API_URL;
@@ -62,18 +84,67 @@ export const API_ABSOLUTE_URL = API_URL;
 // Storage key p/ JWT em sessionStorage (client-side).
 const TOKEN_STORAGE_KEY = "sindestiva.jwt";
 
+/**
+ * Decodifica o payload do JWT e retorna o instante de expiração em ms
+ * (epoch * 1000) ou null. Robusto a tokens malformados (try/catch).
+ *
+ * Esta checagem é UX-only: evita enviar token morto no Authorization
+ * header. A validação de assinatura continua sendo server-side em
+ * apps/api/app/core/security.py.
+ */
+function jwtExpiresAt(token: string): number | null {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1] ?? "")) as { exp?: number };
+    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Handle do setTimeout que dispara logout automático ao expirar o JWT.
+ * Mantido em escopo de módulo para que `setToken` possa CANCELAR o
+ * timer anterior antes de agendar o próximo — sem isso, re-login na
+ * mesma sessão SPA acumula timers e o primeiro a disparar apaga o
+ * token enquanto ele ainda está válido (logout prematuro).
+ */
+let logoutTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function setToken(token: string | null): void {
   if (typeof window === "undefined") return;
+  // Cancela timer anterior antes de qualquer mudança de estado. Evita
+  // que um timer "stale" dispare logout enquanto o token atual ainda
+  // é válido (cenário: usuário re-logou e o timer antigo não foi
+  // descartado).
+  if (logoutTimer !== null) {
+    clearTimeout(logoutTimer);
+    logoutTimer = null;
+  }
   if (token === null) {
     window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
-  } else {
-    window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+    return;
+  }
+  window.sessionStorage.setItem(TOKEN_STORAGE_KEY, token);
+  const expMs = jwtExpiresAt(token);
+  if (expMs !== null) {
+    const delay = Math.max(0, expMs - Date.now());
+    logoutTimer = setTimeout(() => {
+      logoutTimer = null;
+      setToken(null);
+    }, delay);
   }
 }
 
 function getStoredToken(): string | null {
   if (typeof window === "undefined") return null;
-  return window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  const raw = window.sessionStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!raw) return null;
+  const expMs = jwtExpiresAt(raw);
+  if (expMs !== null && expMs <= Date.now()) {
+    window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    return null;
+  }
+  return raw;
 }
 
 /** Repõe JWT no sessionStorage a partir do cookie httpOnly (refresh / nova aba). */
@@ -169,7 +240,10 @@ export interface ApiOptions {
 export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const { method = "GET", body, noAuth = false, noRedirect = false, timeoutMs = 8000 } = opts;
 
-  const url = `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  // C6: chama o proxy server-side /__sindestiva/... (mesmo host).
+  // O proxy resolve API_URL em runtime server-side — elimina a
+  // dependência de NEXT_PUBLIC_API_URL no bundle JS do client.
+  const url = `/__sindestiva${path.startsWith("/") ? path : `/${path}`}`;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -197,8 +271,15 @@ export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<
     });
   } catch (err) {
     clearTimeout(timer);
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new ApiError(0, `Falha de rede: ${msg}`);
+    const raw = err instanceof Error ? err.message : String(err);
+    // Contexto para distinguir NXDOMAIN / CORS / timeout / conexão-recusada
+    // na próxima ocorrência do sintoma (C4). Wrapper global captura este
+    // console.error; não importar Sentry/Datadog diretamente aqui.
+    const context = `[url=${url}][mode=cors]`;
+    if (typeof console !== "undefined") {
+      console.error("[apiFetch] network failure", { url, mode: "cors", raw });
+    }
+    throw new ApiError(0, `Falha de rede: ${raw} ${context}`);
   }
   clearTimeout(timer);
 
@@ -336,7 +417,9 @@ export async function getBIInsights(periodoDias: PeriodoDias = 30): Promise<Insi
 /** Dispara download do PDF do BI. */
 export async function downloadBIPDF(periodoDias: PeriodoDias = 30): Promise<void> {
   // Download via proxy (mesmo host) — sem isso, cookie cross-domain não viaja.
-  const url = `${API_URL}/bi/export-pdf?periodo_dias=${periodoDias}`;
+  // C6: o proxy já repassa content-disposition (route.ts:59-60), então o nome
+  // do arquivo continua correto.
+  const url = `/__sindestiva/bi/export-pdf?periodo_dias=${periodoDias}`;
   const res = await fetch(url, {
     method: "GET",
     credentials: "include",

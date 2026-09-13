@@ -18,8 +18,9 @@
  *   - Mesmo cookie serve para API de prod (cross-origin via CORS).
  */
 import { cookies } from "next/headers";
+import { API_URL } from "@/lib/api";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "https://api.lousa.pscode.ia.br";
+const API = API_URL;
 const COOKIE_NAME = "sindestiva_token";
 const COOKIE_MAX_AGE = 8 * 60 * 60;  // 8h, mesmo do JWT
 

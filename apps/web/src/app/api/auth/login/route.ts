@@ -5,8 +5,9 @@
  * `sindestiva_token` e retorna {ok, role, access_token}.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { API_URL } from "@/lib/api";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "https://api.lousa.pscode.ia.br";
+const API = API_URL;
 const COOKIE_NAME = "sindestiva_token";
 const COOKIE_MAX_AGE = 8 * 60 * 60;
 
