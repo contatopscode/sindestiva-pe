@@ -50,7 +50,9 @@ jobs:
       # Barreira de regressão: impede que o fallback NXDOMAIN
       # 'https://api.lousa.pscode.ia.br' seja reintroduzido em
       # apps/web/src fora da lista branca documentada abaixo.
-      # (SINDESTIVA-PE-FSW-2026-001 · S3 · F2 — C3 da SPEC §4.)
+      # (SINDESTIVA-PE-FSW-2026-001 · S3 · F2 — C3 da SPEC §4,
+      # atualizado em CR1 após S1 remover o fallback inline de
+      # centro-comando/page.tsx — entrada morta retirada da whitelist.)
       #
       # Lista branca — cada entrada documentada (evitar lista silenciosa):
       #   1. api\.ts:.*DEFAULT_API_URL
@@ -69,16 +71,18 @@ jobs:
       #      → apps/web/src/app/api/auth/login/route.ts (~linha 25) —
       #        comentário explicando o `Domain=.pscode.ia.br` do cookie
       #        httpOnly (compartilhamento entre web.lousa e api.lousa).
-      #   5. centro-comando/page\.tsx:.*server-side
-      #      → apps/web/src/app/centro-comando/page.tsx — usa API_URL
-      #        direto em server-side rendering do componente de servidor
-      #        (legítimo; proxy BFF só atende client-side).
+      #
+      # NOTA — entradas mortas removidas em CR1 (não recolocar):
+      #   - centro-comando/page\.tsx:.*server-side → arquivo não contém
+      #     mais a string (S1 substituiu o fallback inline por import
+      #     API_URL); manter a entrada reintroduziria um falso positivo
+      #     e mascararia regressões reais.
       # ---------------------------------------------------------------------
       - name: Verify no NXDOMAIN fallback drift (C3)
         run: |
           set -e
           HITS=$(grep -rnE 'lousa\.pscode\.ia\.br' apps/web/src \
-            | grep -vE '(api\.ts:.*DEFAULT_API_URL|api\.ts:.*scoped|__sindestiva/\[...path\]/route\.ts:|api/auth/login/route\.ts:.*Domain=\.pscode\.ia\.br|centro-comando/page\.tsx:.*server-side)' \
+            | grep -vE '(api\.ts:.*DEFAULT_API_URL|api\.ts:.*scoped|__sindestiva/\[...path\]/route\.ts:|api/auth/login/route\.ts:.*Domain=\.pscode\.ia\.br)' \
             || true)
           if [ -n "$HITS" ]; then
             echo "::error::NXDOMAIN fallback drift detectado em apps/web/src:"

@@ -101,8 +101,25 @@ function jwtExpiresAt(token: string): number | null {
   }
 }
 
+/**
+ * Handle do setTimeout que dispara logout automático ao expirar o JWT.
+ * Mantido em escopo de módulo para que `setToken` possa CANCELAR o
+ * timer anterior antes de agendar o próximo — sem isso, re-login na
+ * mesma sessão SPA acumula timers e o primeiro a disparar apaga o
+ * token enquanto ele ainda está válido (logout prematuro).
+ */
+let logoutTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function setToken(token: string | null): void {
   if (typeof window === "undefined") return;
+  // Cancela timer anterior antes de qualquer mudança de estado. Evita
+  // que um timer "stale" dispare logout enquanto o token atual ainda
+  // é válido (cenário: usuário re-logou e o timer antigo não foi
+  // descartado).
+  if (logoutTimer !== null) {
+    clearTimeout(logoutTimer);
+    logoutTimer = null;
+  }
   if (token === null) {
     window.sessionStorage.removeItem(TOKEN_STORAGE_KEY);
     return;
@@ -111,7 +128,10 @@ export function setToken(token: string | null): void {
   const expMs = jwtExpiresAt(token);
   if (expMs !== null) {
     const delay = Math.max(0, expMs - Date.now());
-    setTimeout(() => setToken(null), delay);
+    logoutTimer = setTimeout(() => {
+      logoutTimer = null;
+      setToken(null);
+    }, delay);
   }
 }
 
