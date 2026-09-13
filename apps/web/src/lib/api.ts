@@ -220,7 +220,10 @@ export interface ApiOptions {
 export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const { method = "GET", body, noAuth = false, noRedirect = false, timeoutMs = 8000 } = opts;
 
-  const url = `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  // C6: chama o proxy server-side /__sindestiva/... (mesmo host).
+  // O proxy resolve API_URL em runtime server-side — elimina a
+  // dependência de NEXT_PUBLIC_API_URL no bundle JS do client.
+  const url = `/__sindestiva${path.startsWith("/") ? path : `/${path}`}`;
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -394,7 +397,9 @@ export async function getBIInsights(periodoDias: PeriodoDias = 30): Promise<Insi
 /** Dispara download do PDF do BI. */
 export async function downloadBIPDF(periodoDias: PeriodoDias = 30): Promise<void> {
   // Download via proxy (mesmo host) — sem isso, cookie cross-domain não viaja.
-  const url = `${API_URL}/bi/export-pdf?periodo_dias=${periodoDias}`;
+  // C6: o proxy já repassa content-disposition (route.ts:59-60), então o nome
+  // do arquivo continua correto.
+  const url = `/__sindestiva/bi/export-pdf?periodo_dias=${periodoDias}`;
   const res = await fetch(url, {
     method: "GET",
     credentials: "include",
