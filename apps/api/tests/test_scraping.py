@@ -29,6 +29,7 @@ from app.core.database import session_scope
 from app.models.enums import FonteEscalaEnum, StatusScrapingEnum
 from app.scrapers import hash_conteudo, raspar_escalanet, raspar_tpa
 from app.scrapers.base import EscalaBruta
+from app.scrapers.escalanet import _parse_html
 from app.services.scraping_service import executar_scraping
 
 # ---------------------------------------------------------------------------
@@ -178,6 +179,19 @@ async def test_scraper_escalanet_happy_path(fake_http_factory, fakes_path) -> No
     assert bruto.layout_mudou is False
     assert "ogmo-recife.org.br" in (bruto.url_origem or "")
     assert len(client.calls) == 2
+
+
+def test_escalanet_normaliza_rotulos_fn_ambipar_440(fakes_path) -> None:
+    """Rótulos (FN) / TRAB. PORÃO → catálogo seed; 4 TPAs → 3 células agregadas."""
+    html = (fakes_path / "escalanet_ambipar_440.html").read_text(encoding="utf-8")
+    celulas = _parse_html(html)
+    assert len(celulas) == 3
+    por_funcao = {c.funcao_codigo: c for c in celulas}
+    assert por_funcao["MANDO_01"].trabalhador_matricula == "300378"
+    assert por_funcao["TECNICA_01"].trabalhador_matricula == "100316"
+    assert por_funcao["TERNO_01"].trabalhador_matricula == "100291,100357"
+    assert all(c.faina_codigo == "PRODUCAO" for c in celulas)
+    assert not any(c.funcao_codigo.startswith("FUNCAO_RAW_") for c in celulas)
 
 
 @pytest.mark.asyncio
