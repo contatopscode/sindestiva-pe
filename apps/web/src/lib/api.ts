@@ -554,3 +554,91 @@ export async function updateAdminUser(
     body: payload,
   });
 }
+
+// ---- Gestão de TPAs (DIRIGENTE) --------------------------------------------
+
+export type TpaCadastroStatus = "ATIVO" | "AFASTADO" | "DESLIGADO" | "SUSPENSO";
+
+export interface AdminTpaFuncaoMeta {
+  id: string;
+  codigo: string;
+  nome: string;
+  categoria: string;
+}
+
+export interface AdminTpa {
+  id: string;
+  user_id: string;
+  email: string | null;
+  telefone: string;
+  user_status: AdminUserStatus;
+  cpf: string;
+  nome_completo: string;
+  matricula_ogmo: string;
+  funcao_base_id: string;
+  funcao_codigo: string;
+  funcao_nome: string;
+  categoria: string;
+  status_cadastro: TpaCadastroStatus;
+  data_nascimento: string | null;
+  data_admissao: string | null;
+  data_desligamento: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminTpaListResponse {
+  items: AdminTpa[];
+  total: number;
+}
+
+export interface AdminTpaCreatePayload {
+  cpf: string;
+  nome_completo: string;
+  matricula_ogmo: string;
+  telefone: string;
+  email?: string;
+  funcao_base_id: string;
+  status_cadastro?: TpaCadastroStatus;
+  data_nascimento?: string;
+  data_admissao?: string;
+}
+
+export type AdminTpaUpdatePayload = Partial<
+  Omit<AdminTpaCreatePayload, "cpf">
+> & {
+  data_desligamento?: string;
+};
+
+export async function listAdminTpas(params?: {
+  q?: string;
+  status_cadastro?: TpaCadastroStatus;
+  page?: number;
+  page_size?: number;
+}): Promise<AdminTpaListResponse> {
+  const qs = new URLSearchParams();
+  if (params?.q) qs.set("q", params.q);
+  if (params?.status_cadastro) qs.set("status_cadastro", params.status_cadastro);
+  if (params?.page) qs.set("page", String(params.page));
+  if (params?.page_size) qs.set("page_size", String(params.page_size));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return apiFetch<AdminTpaListResponse>(`/api/v1/tpas${suffix}`);
+}
+
+export async function createAdminTpa(payload: AdminTpaCreatePayload): Promise<AdminTpa> {
+  return apiFetch<AdminTpa>("/api/v1/tpas", { method: "POST", body: payload });
+}
+
+export async function updateAdminTpa(
+  tpaId: string,
+  payload: AdminTpaUpdatePayload,
+): Promise<AdminTpa> {
+  return apiFetch<AdminTpa>(`/api/v1/tpas/${encodeURIComponent(tpaId)}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
+
+export async function listTpaFuncoes(): Promise<AdminTpaFuncaoMeta[]> {
+  return apiFetch<AdminTpaFuncaoMeta[]>("/api/v1/tpas/meta/funcoes");
+}

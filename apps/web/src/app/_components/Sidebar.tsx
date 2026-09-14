@@ -61,6 +61,7 @@ const GROUPS: SidebarGroup[] = [
       // Manter em sincronia com middleware.ts ROLE_RULES
       { href: "/bi", label: "BI & Dashboards", icon: "📊", roles: ["DIRIGENTE"] },
       { href: "/usuarios", label: "Usuários", icon: "👥", roles: ["DIRIGENTE"] },
+      { href: "/tpas", label: "TPAs", icon: "👷", roles: ["DIRIGENTE"] },
     ],
   },
   {

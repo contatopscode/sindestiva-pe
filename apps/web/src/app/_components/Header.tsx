@@ -31,6 +31,7 @@ const TITLES: Record<string, string> = {
   "/auditoria": "Auditoria & Integridade",
   "/bi": "BI & Dashboards",
   "/usuarios": "Gestão de Usuários",
+  "/tpas": "Cadastro de TPAs",
 };
 
 export function Header(): ReactNode {
