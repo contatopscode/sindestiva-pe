@@ -52,31 +52,11 @@ import type {
 // localStorage antigo). Sprint D migra p/ BFF completo (proxy server-side
 // sem expor token no browser).
 
-const DEFAULT_API_URL = "https://api.lousa.pscode.ia.br";
+import { buildBffProxyUrl } from "./bff-proxy";
+import { DEFAULT_API_URL_DEV, resolveApiUrl } from "./api-url";
 
-/**
- * Resolve a base URL da API a partir de NEXT_PUBLIC_API_URL.
- *
- * - Em produção: se a env não estiver setada (ou for string vazia),
- *   LANÇA erro. Falha alto no carregamento do módulo é preferível a
- *   bundle rodando com fallback NXDOMAIN.
- * - Em dev: aceita fallback silencioso para não atrapalhar DX local.
- *
- * Hard-coded fallback NXDOMAIN existe aqui e em mais NENHUM arquivo
- * de runtime (assertiva mantida pelo CI grep — ver C3 da SPEC).
- */
-function resolveApiUrl(): string {
-  const fromEnv =
-    typeof process !== "undefined" ? process.env.NEXT_PUBLIC_API_URL : undefined;
-  if (fromEnv && fromEnv.trim()) return fromEnv.replace(/\/$/, "");
-  if (typeof process !== "undefined" && process.env.NODE_ENV === "production") {
-    throw new Error(
-      "NEXT_PUBLIC_API_URL não definida em produção. " +
-        "Configure a env na plataforma de deploy e faça rebuild.",
-    );
-  }
-  return DEFAULT_API_URL; // dev only
-}
+/** Dev fallback — origem canônica em api-url.ts (CI C3 whitelist: DEFAULT_API_URL). */
+export const DEFAULT_API_URL = DEFAULT_API_URL_DEV;
 
 /** Base URL absoluta da API. Resolvida em build/load via resolveApiUrl(). */
 export const API_URL: string = resolveApiUrl();
@@ -243,10 +223,8 @@ export interface ApiOptions {
 export async function apiFetch<T>(path: string, opts: ApiOptions = {}): Promise<T> {
   const { method = "GET", body, noAuth = false, noRedirect = false, timeoutMs = 8000 } = opts;
 
-  // C6: chama o proxy server-side /__sindestiva/... (mesmo host).
-  // O proxy resolve API_URL em runtime server-side — elimina a
-  // dependência de NEXT_PUBLIC_API_URL no bundle JS do client.
-  const url = `/__sindestiva${path.startsWith("/") ? path : `/${path}`}`;
+  // C6: proxy same-origin /api/sindestiva/... (route handler público no App Router).
+  const url = buildBffProxyUrl(path);
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -463,7 +441,7 @@ export async function downloadBIPDF(periodoDias: PeriodoDias = 30): Promise<void
   // Download via proxy (mesmo host) — sem isso, cookie cross-domain não viaja.
   // C6: o proxy já repassa content-disposition (route.ts:59-60), então o nome
   // do arquivo continua correto.
-  const url = `/__sindestiva/bi/export-pdf?periodo_dias=${periodoDias}`;
+  const url = buildBffProxyUrl(`/api/v1/bi/export-pdf?periodo_dias=${periodoDias}`);
   const res = await fetch(url, {
     method: "GET",
     credentials: "include",
