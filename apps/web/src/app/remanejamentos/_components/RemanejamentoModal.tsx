@@ -658,9 +658,24 @@ export function RemanejamentoModal({
               >
                 Cancelar
               </button>
+
+              {/* UX2 — feedback "o que falta" (SPEC §4.2 UX2): helper text
+                  `<p>Pendente: ...</p>` + tooltip acessível via `title` no
+                  botão submit abaixo. Só aparecem quando
+                  canSubmit.canSubmit === false (UX silenciosa no sucesso).
+                  Lista derivada do mesmo useMemo da regra de canSubmit
+                  (SPEC §5.3: mitigação de drift). */}
+
+              {!canSubmit.canSubmit && (
+                <p className="text-[10px] text-[#94a8bd] mt-1">
+                  Pendente: {canSubmit.camposPendentes.join(", ")}
+                </p>
+              )}
+
               <button
                 type="submit"
-                disabled={!canSubmit}
+                disabled={!canSubmit.canSubmit}
+                title={canSubmit.canSubmit ? undefined : canSubmit.camposPendentes.join(", ")}
                 className="rounded bg-[#d4a574] px-4 py-2 text-[12px] font-bold text-[#0a1929] hover:bg-[#e8c49a] disabled:opacity-50"
               >
                 {submitting
