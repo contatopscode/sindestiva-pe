@@ -488,3 +488,31 @@ async def test_bi_api_periodo_invalido_retorna_400(client, api_token_paulo) -> N
     )
     assert resp.status_code == 400
     assert resp.json()["detail"]["code"] == "BAD_PERIODO"
+
+
+# ---------------------------------------------------------------------------
+# 13. RBAC — alias exigido por S6/D53 (test_bi_403_role_required)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_bi_403_role_required(client, api_token_manoel) -> None:
+    """FISCAL acessa /bi/kpis → 403 ROLE_REQUIRED (D53 / S6 F4).
+
+    Alias semântico exigido pelo avaliador: garante que a rota
+    /bi/kpis continua protegida por RBAC após mudanças de S1–S5.
+    Manoel Costa (FISCAL) está autenticado (token válido), mas não
+    tem role DIRIGENTE → endpoint bloqueia com 403 + code ROLE_REQUIRED.
+
+    Por que importa? BI mostra dados consolidados da operação
+    (comparecimento, folha paga, KPIs de OGMO) — restringir a
+    Dirigente é requisito de HU007. Se alguém remover o `require_role`
+    no router, esse teste pega a regressão.
+    """
+    resp = await client.get(
+        "/api/v1/bi/kpis",
+        headers={"Authorization": f"Bearer {api_token_manoel}"},
+    )
+    assert resp.status_code == 403, resp.text
+    body = resp.json()
+    assert body["detail"]["code"] == "ROLE_REQUIRED"
