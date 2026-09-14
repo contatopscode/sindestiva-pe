@@ -8,9 +8,12 @@ from sqlalchemy import select
 
 from app.models import Tpa
 from app.services.tpa_match_service import (
+    expand_matriculas_from_valores,
+    is_valid_matricula_ogmo_storage,
     load_tpas_by_matriculas,
     normalize_matricula_ogmo,
     resolve_tpa_by_matricula,
+    split_matriculas_celula,
 )
 
 
@@ -20,6 +23,21 @@ def test_normalize_matricula_trim_sem_strip_zeros() -> None:
     assert normalize_matricula_ogmo("012") != "12"
     assert normalize_matricula_ogmo("") is None
     assert normalize_matricula_ogmo(None) is None
+
+
+def test_split_matriculas_celula_escalanet_multi() -> None:
+    assert split_matriculas_celula("100193,101426") == ["100193", "101426"]
+    assert split_matriculas_celula(" 100193 , 101426 ") == ["100193", "101426"]
+    assert expand_matriculas_from_valores(["100193,101426"]) == [
+        "100193",
+        "101426",
+    ]
+
+
+def test_is_valid_matricula_ogmo_storage_length_check() -> None:
+    assert is_valid_matricula_ogmo_storage("162") is True
+    assert is_valid_matricula_ogmo_storage("100193,101426") is False
+    assert is_valid_matricula_ogmo_storage("12345678901") is False
 
 
 @pytest.mark.asyncio

@@ -103,3 +103,106 @@ async def test_backfill_from_alocacao_links_trabalhador_id(
         await db_session.execute(select(Tpa).where(Tpa.matricula_ogmo == "162"))
     ).scalar_one()
     assert refreshed.trabalhador_id == tpa.id
+
+
+@pytest.mark.asyncio
+async def test_backfill_escalanet_comma_cell_two_stubs(
+    db_session,
+    monkeypatch,
+) -> None:
+    """Célula EscalaNet multi-TPA não deve estourar ck_tpas_matricula_ogmo."""
+    from app.models import Faina, Funcao, LousaEscalaOrigem, Porto, Turno
+    from app.models.enums import FonteEscalaEnum, StatusScrapingEnum
+
+    monkeypatch.setenv("ALLOW_TPA_STUB", "1")
+    get_settings.cache_clear()
+
+    porto = (await db_session.execute(select(Porto).where(Porto.codigo == "RECIFE"))).scalar_one()
+    turno = (await db_session.execute(select(Turno).where(Turno.codigo == "DIURNO"))).scalar_one()
+    faina = (await db_session.execute(select(Faina).limit(1))).scalar_one()
+    funcoes = (await db_session.execute(select(Funcao).limit(3))).scalars().all()
+    assert len(funcoes) >= 3
+    fn_combo, fn_a, fn_b = funcoes[0], funcoes[1], funcoes[2]
+
+    now = datetime.now(tz=timezone.utc)
+    origem = LousaEscalaOrigem(
+        fonte=FonteEscalaEnum.ESCALANET,
+        porto_id=porto.id,
+        turno_id=turno.id,
+        data_referencia=date.today(),
+        url_origem="http://test",
+        content_hash="b" * 64,
+        payload_jsonb={},
+        duracao_ms=1,
+        status=StatusScrapingEnum.SUCESSO,
+        scraped_at=now,
+    )
+    db_session.add(origem)
+    await db_session.flush()
+
+    aloc_combo = LousaAlocacao(
+        escala_origem_id=origem.id,
+        porto_id=porto.id,
+        turno_id=turno.id,
+        faina_id=faina.id,
+        funcao_id=fn_combo.id,
+        data_referencia=date.today(),
+        trabalhador_matricula="100193,101426",
+        trabalhador_id=None,
+        scraped_at=now,
+    )
+    aloc_single_a = LousaAlocacao(
+        escala_origem_id=origem.id,
+        porto_id=porto.id,
+        turno_id=turno.id,
+        faina_id=faina.id,
+        funcao_id=fn_a.id,
+        data_referencia=date.today(),
+        trabalhador_matricula="100193",
+        trabalhador_id=None,
+        scraped_at=now,
+    )
+    aloc_single_b = LousaAlocacao(
+        escala_origem_id=origem.id,
+        porto_id=porto.id,
+        turno_id=turno.id,
+        faina_id=faina.id,
+        funcao_id=fn_b.id,
+        data_referencia=date.today(),
+        trabalhador_matricula="101426",
+        trabalhador_id=None,
+        scraped_at=now,
+    )
+    db_session.add_all([aloc_combo, aloc_single_a, aloc_single_b])
+    await db_session.commit()
+
+    result = await backfill_stubs_from_lousa_alocacao(db_session, days=7)
+    assert result.get("ok") is True
+    assert result.get("created", 0) >= 2
+
+    tpas = (
+        await db_session.execute(
+            select(Tpa).where(Tpa.matricula_ogmo.in_(["100193", "101426"]))
+        )
+    ).scalars().all()
+    assert len(tpas) == 2
+
+    refreshed_combo = (
+        await db_session.execute(
+            select(LousaAlocacao).where(LousaAlocacao.id == aloc_combo.id)
+        )
+    ).scalar_one()
+    refreshed_a = (
+        await db_session.execute(
+            select(LousaAlocacao).where(LousaAlocacao.id == aloc_single_a.id)
+        )
+    ).scalar_one()
+    refreshed_b = (
+        await db_session.execute(
+            select(LousaAlocacao).where(LousaAlocacao.id == aloc_single_b.id)
+        )
+    ).scalar_one()
+    assert refreshed_combo.trabalhador_id is not None
+    assert refreshed_a.trabalhador_id is not None
+    assert refreshed_b.trabalhador_id is not None
+    assert result.get("linked_alocacoes", 0) >= 3
