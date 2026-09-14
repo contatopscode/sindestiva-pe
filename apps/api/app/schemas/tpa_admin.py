@@ -33,18 +33,16 @@ def _validate_matricula_ogmo(value: str) -> str:
     return v
 
 
-class TpaFuncaoMeta(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class AdminTpaFuncaoMeta(BaseModel):
+    """Item do catálogo GET /tpas/meta/funcoes (funções ativas)."""
 
     id: UUID
     codigo: str
-    nome_exibicao: str
+    nome: str
     categoria: str
-    ordem_lousa: int
-    is_active: bool
 
 
-class TpaAdminRead(BaseModel):
+class AdminTpaRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -67,12 +65,12 @@ class TpaAdminRead(BaseModel):
     updated_at: datetime
 
 
-class TpaAdminListResponse(BaseModel):
-    items: list[TpaAdminRead]
+class AdminTpaListResponse(BaseModel):
+    items: list[AdminTpaRead]
     total: int
 
 
-class TpaAdminCreate(BaseModel):
+class AdminTpaCreate(BaseModel):
     cpf: str = Field(min_length=11, max_length=14)
     nome_completo: str = Field(min_length=2, max_length=200)
     matricula_ogmo: str = Field(min_length=1, max_length=10)
@@ -97,7 +95,7 @@ class TpaAdminCreate(BaseModel):
         return _validate_matricula_ogmo(value)
 
 
-class TpaAdminUpdate(BaseModel):
+class AdminTpaUpdate(BaseModel):
     nome_completo: str | None = Field(default=None, min_length=2, max_length=200)
     matricula_ogmo: str | None = Field(default=None, min_length=1, max_length=10)
     telefone: str | None = Field(default=None, min_length=8, max_length=32)
@@ -116,7 +114,7 @@ class TpaAdminUpdate(BaseModel):
         return _validate_matricula_ogmo(value)
 
     @model_validator(mode="after")
-    def _non_empty_patch(self) -> TpaAdminUpdate:
+    def _non_empty_patch(self) -> AdminTpaUpdate:
         if not any(
             getattr(self, f) is not None
             for f in (
@@ -136,9 +134,9 @@ class TpaAdminUpdate(BaseModel):
 
 
 __all__ = [
-    "TpaAdminCreate",
-    "TpaAdminListResponse",
-    "TpaAdminRead",
-    "TpaAdminUpdate",
-    "TpaFuncaoMeta",
+    "AdminTpaCreate",
+    "AdminTpaFuncaoMeta",
+    "AdminTpaListResponse",
+    "AdminTpaRead",
+    "AdminTpaUpdate",
 ]

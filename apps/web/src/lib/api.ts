@@ -559,13 +559,11 @@ export async function updateAdminUser(
 
 export type TpaCadastroStatus = "ATIVO" | "AFASTADO" | "DESLIGADO" | "SUSPENSO";
 
-export interface TpaFuncaoMeta {
+export interface AdminTpaFuncaoMeta {
   id: string;
   codigo: string;
-  nome_exibicao: string;
+  nome: string;
   categoria: string;
-  ordem_lousa: number;
-  is_active: boolean;
 }
 
 export interface AdminTpa {
@@ -641,6 +639,6 @@ export async function updateAdminTpa(
   });
 }
 
-export async function listTpaFuncoes(): Promise<TpaFuncaoMeta[]> {
-  return apiFetch<TpaFuncaoMeta[]>("/api/v1/tpas/meta/funcoes");
+export async function listTpaFuncoes(): Promise<AdminTpaFuncaoMeta[]> {
+  return apiFetch<AdminTpaFuncaoMeta[]>("/api/v1/tpas/meta/funcoes");
 }

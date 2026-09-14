@@ -8,7 +8,7 @@ import {
   listTpaFuncoes,
   updateAdminTpa,
   type AdminTpa,
-  type TpaFuncaoMeta,
+  type AdminTpaFuncaoMeta,
 } from "@/lib/api";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
@@ -37,7 +37,7 @@ function parseApiError(err: unknown): string {
 export default function TpasPage(): ReactNode {
   const [items, setItems] = useState<AdminTpa[] | null>(null);
   const [total, setTotal] = useState(0);
-  const [funcoes, setFuncoes] = useState<TpaFuncaoMeta[]>([]);
+  const [funcoes, setFuncoes] = useState<AdminTpaFuncaoMeta[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");

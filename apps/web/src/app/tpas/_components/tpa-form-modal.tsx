@@ -1,7 +1,6 @@
 "use client";
 
-import type { AdminTpa, AdminTpaCreatePayload, AdminTpaUpdatePayload } from "@/lib/api";
-import type { TpaFuncaoMeta } from "@/lib/api";
+import type { AdminTpa, AdminTpaCreatePayload, AdminTpaUpdatePayload, AdminTpaFuncaoMeta } from "@/lib/api";
 import type { ReactNode } from "react";
 
 export interface TpaFormValues {
@@ -73,7 +72,7 @@ interface TpaFormModalProps {
   open: boolean;
   mode: "create" | "edit";
   values: TpaFormValues;
-  funcoes: TpaFuncaoMeta[];
+  funcoes: AdminTpaFuncaoMeta[];
   saving: boolean;
   error: string | null;
   onChange: (next: TpaFormValues) => void;
@@ -183,7 +182,7 @@ export function TpaFormModal({
               <option value="">Selecione…</option>
               {funcoes.map((f) => (
                 <option key={f.id} value={f.id}>
-                  {f.nome_exibicao} ({f.codigo})
+                  {f.nome} ({f.codigo})
                 </option>
               ))}
             </select>

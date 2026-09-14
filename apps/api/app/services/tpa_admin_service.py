@@ -14,10 +14,10 @@ from app.core.logging import get_logger
 from app.models import Funcao, Tpa, User
 from app.models.enums import RoleEnum, TpaStatusEnum, UserStatusEnum
 from app.schemas.tpa_admin import (
-    TpaAdminCreate,
-    TpaAdminRead,
-    TpaAdminUpdate,
-    TpaFuncaoMeta,
+    AdminTpaCreate,
+    AdminTpaFuncaoMeta,
+    AdminTpaRead,
+    AdminTpaUpdate,
 )
 
 log = get_logger(__name__)
@@ -41,9 +41,9 @@ def _default_email(cpf: str) -> str:
     return f"tpa+{cpf}@sindestiva.local"
 
 
-def _serialize_tpa(tpa: Tpa, *, funcao: Funcao) -> TpaAdminRead:
+def _serialize_tpa(tpa: Tpa, *, funcao: Funcao) -> AdminTpaRead:
     user = tpa.user
-    return TpaAdminRead(
+    return AdminTpaRead(
         id=tpa.id,
         user_id=tpa.user_id,
         email=user.email,
@@ -100,10 +100,18 @@ async def _load_tpa(db: AsyncSession, tpa_id: UUID) -> Tpa | None:
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
-async def list_tpa_funcoes(db: AsyncSession) -> list[TpaFuncaoMeta]:
+async def list_tpa_funcoes(db: AsyncSession) -> list[AdminTpaFuncaoMeta]:
     stmt = select(Funcao).where(Funcao.is_active.is_(True)).order_by(Funcao.ordem_lousa)
     rows = list((await db.execute(stmt)).scalars().all())
-    return [TpaFuncaoMeta.model_validate(r) for r in rows]
+    return [
+        AdminTpaFuncaoMeta(
+            id=row.id,
+            codigo=row.codigo,
+            nome=row.nome_exibicao,
+            categoria=row.categoria,
+        )
+        for row in rows
+    ]
 
 
 async def list_admin_tpas(
@@ -113,7 +121,7 @@ async def list_admin_tpas(
     status_cadastro: TpaStatusEnum | None = None,
     page: int = 1,
     page_size: int = 20,
-) -> tuple[list[TpaAdminRead], int]:
+) -> tuple[list[AdminTpaRead], int]:
     page = max(1, page)
     page_size = min(max(1, page_size), 100)
 
@@ -157,7 +165,7 @@ async def list_admin_tpas(
     return items, total
 
 
-async def get_admin_tpa(db: AsyncSession, tpa_id: UUID) -> TpaAdminRead:
+async def get_admin_tpa(db: AsyncSession, tpa_id: UUID) -> AdminTpaRead:
     stmt = (
         select(Tpa, Funcao)
         .join(User, Tpa.user_id == User.id)
@@ -176,7 +184,7 @@ async def get_admin_tpa(db: AsyncSession, tpa_id: UUID) -> TpaAdminRead:
     return _serialize_tpa(tpa, funcao=funcao)
 
 
-async def create_admin_tpa(db: AsyncSession, data: TpaAdminCreate) -> TpaAdminRead:
+async def create_admin_tpa(db: AsyncSession, data: AdminTpaCreate) -> AdminTpaRead:
     funcao = await _load_funcao(db, data.funcao_base_id)
 
     cpf_taken = (
@@ -243,8 +251,8 @@ async def create_admin_tpa(db: AsyncSession, data: TpaAdminCreate) -> TpaAdminRe
 async def update_admin_tpa(
     db: AsyncSession,
     tpa_id: UUID,
-    data: TpaAdminUpdate,
-) -> TpaAdminRead:
+    data: AdminTpaUpdate,
+) -> AdminTpaRead:
     tpa = await _load_tpa(db, tpa_id)
     if tpa is None or tpa.user.role != RoleEnum.TPA:
         raise TpaAdminError(404, "NOT_FOUND", "TPA não encontrado.")

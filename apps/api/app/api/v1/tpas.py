@@ -12,11 +12,11 @@ from app.api.deps import get_db
 from app.core.security import get_current_user_id, get_current_user_role, oauth2_scheme
 from app.models.enums import TpaStatusEnum
 from app.schemas.tpa_admin import (
-    TpaAdminCreate,
-    TpaAdminListResponse,
-    TpaAdminRead,
-    TpaAdminUpdate,
-    TpaFuncaoMeta,
+    AdminTpaCreate,
+    AdminTpaFuncaoMeta,
+    AdminTpaListResponse,
+    AdminTpaRead,
+    AdminTpaUpdate,
 )
 from app.services import tpa_admin_service as svc
 
@@ -55,7 +55,7 @@ def _http_from_admin_error(exc: svc.TpaAdminError) -> HTTPException:
 async def list_funcoes_meta(
     db: AsyncSession = Depends(get_db),
     _: str = Depends(_require_dirigente),
-) -> list[TpaFuncaoMeta]:
+) -> list[AdminTpaFuncaoMeta]:
     return await svc.list_tpa_funcoes(db)
 
 
@@ -67,7 +67,7 @@ async def list_tpas(
     status_cadastro: TpaStatusEnum | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-) -> TpaAdminListResponse:
+) -> AdminTpaListResponse:
     items, total = await svc.list_admin_tpas(
         db,
         q=q,
@@ -75,7 +75,7 @@ async def list_tpas(
         page=page,
         page_size=page_size,
     )
-    return TpaAdminListResponse(items=items, total=total)
+    return AdminTpaListResponse(items=items, total=total)
 
 
 @router.get("/{tpa_id}", summary="Detalhe de um TPA")
@@ -83,7 +83,7 @@ async def get_tpa(
     tpa_id: UUID,
     db: AsyncSession = Depends(get_db),
     _: str = Depends(_require_dirigente),
-) -> TpaAdminRead:
+) -> AdminTpaRead:
     try:
         return await svc.get_admin_tpa(db, tpa_id)
     except svc.TpaAdminError as exc:
@@ -92,10 +92,10 @@ async def get_tpa(
 
 @router.post("", summary="Cria TPA + User(role=TPA)", status_code=201)
 async def create_tpa(
-    body: TpaAdminCreate,
+    body: AdminTpaCreate,
     db: AsyncSession = Depends(get_db),
     _: str = Depends(_require_dirigente),
-) -> TpaAdminRead:
+) -> AdminTpaRead:
     try:
         return await svc.create_admin_tpa(db, body)
     except svc.TpaAdminError as exc:
@@ -105,10 +105,10 @@ async def create_tpa(
 @router.patch("/{tpa_id}", summary="Atualiza cadastro TPA")
 async def update_tpa(
     tpa_id: UUID,
-    body: TpaAdminUpdate,
+    body: AdminTpaUpdate,
     db: AsyncSession = Depends(get_db),
     _: str = Depends(_require_dirigente),
-) -> TpaAdminRead:
+) -> AdminTpaRead:
     try:
         return await svc.update_admin_tpa(db, tpa_id, body)
     except svc.TpaAdminError as exc:
