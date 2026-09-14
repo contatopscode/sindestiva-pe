@@ -330,8 +330,48 @@ async def run_seeds(
             detail=f"Falha em seed_tpas_demo: {type(exc).__name__}: {exc}",
         ) from exc
 
+    if settings.allow_tpa_stub:
+        try:
+            steps["tpas_from_lousa"] = await _executar_seed("seed_tpas_from_lousa")
+        except Exception as exc:
+            log.exception("admin.run_seeds.tpas_from_lousa_falhou")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Falha em seed_tpas_from_lousa: {type(exc).__name__}: {exc}",
+            ) from exc
+    else:
+        steps["tpas_from_lousa"] = {
+            "skipped": True,
+            "reason": "ALLOW_TPA_STUB=0",
+        }
+
     log.warning("admin.run_seeds.ok", steps=list(steps.keys()))
     return {"ok": True, "steps": steps}
+
+
+@router.post(
+    "/backfill-tpas-from-lousa",
+    summary="[ADMIN] Cria stubs TPA das matrículas em lousa_alocacao (ALLOW_TPA_STUB)",
+)
+async def backfill_tpas_from_lousa(
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Backfill idempotente de User+Tpa + link `trabalhador_id` em alocações."""
+    _check_admin_token(x_admin_token)
+    if not settings.allow_tpa_stub:
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "ALLOW_TPA_STUB=0 — configure ALLOW_TPA_STUB=1 no servidor.",
+        }
+    log.warning("admin.backfill_tpas_from_lousa.invocado", days=days)
+    from app.services.tpa_stub_backfill_service import backfill_stubs_from_lousa_alocacao
+
+    result = await backfill_stubs_from_lousa_alocacao(db, days=days)
+    log.warning("admin.backfill_tpas_from_lousa.ok", result=result)
+    return result
 
 
 __all__ = ["router"]
