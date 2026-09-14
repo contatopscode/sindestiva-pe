@@ -13,8 +13,12 @@
 // =============================================================================
 
 import type { ReactNode } from "react";
-import type { CellStatus, SnapshotStatus } from "@/lib/tipos";
-import type { StatusOgmo } from "@sindestiva/shared";
+import type {
+  CellStatus,
+  SnapshotStatus,
+  StatusNotificacaoUi,
+  StatusRemanejamentoUi,
+} from "@/lib/tipos";
 
 export type BadgeTone = "green" | "amber" | "red" | "cyan" | "purple" | "gold" | "muted";
 
@@ -45,12 +49,60 @@ export function toneForSnapshotStatus(s: SnapshotStatus | null | undefined): Bad
   return "muted";
 }
 
-export function toneForOgmoStatus(s: StatusOgmo): BadgeTone {
-  if (s === "ACK") return "green";
-  if (s === "SENT") return "cyan";
-  if (s === "PEND") return "amber";
-  if (s === "NACK") return "red";
-  return "muted";
+/**
+ * Tom do badge para o ciclo de vida do remanejamento
+ * (`StatusRemanejamentoUi`, 6 valores).
+ *
+ * Mapeamento:
+ *   - PENDENTE        → amber (aguarda ação do fiscal)
+ *   - APROVADO        → cyan (pronto p/ OGMO)
+ *   - NOTIFICADO_OGMO → purple (em trânsito)
+ *   - ACK             → green (confirmado pelo OGMO)
+ *   - NACK            → red (rejeitado pelo OGMO)
+ *   - CANCELADO       → muted
+ */
+export function toneForStatusRemanejamento(s: StatusRemanejamentoUi): BadgeTone {
+  switch (s) {
+    case "PENDENTE":
+      return "amber";
+    case "APROVADO":
+      return "cyan";
+    case "NOTIFICADO_OGMO":
+      return "purple";
+    case "ACK":
+      return "green";
+    case "NACK":
+      return "red";
+    case "CANCELADO":
+      return "muted";
+    default:
+      return "muted";
+  }
+}
+
+/**
+ * Tom do badge para a fila de notificações OGMO
+ * (`StatusNotificacaoUi`, 5 valores).
+ *
+ * Mapeamento (F4):
+ *   - PENDENTE        → amber
+ *   - ENVIADO | ENTREGUE → cyan
+ *   - FALHOU | REJEITADO → red
+ *   - outros (defesa) → muted
+ */
+export function toneForNotificacaoStatus(s: StatusNotificacaoUi): BadgeTone {
+  switch (s) {
+    case "PENDENTE":
+      return "amber";
+    case "ENVIADO":
+    case "ENTREGUE":
+      return "cyan";
+    case "FALHOU":
+    case "REJEITADO":
+      return "red";
+    default:
+      return "muted";
+  }
 }
 
 export interface StatusBadgeProps {
