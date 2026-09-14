@@ -250,43 +250,33 @@ export function RemanejamentoModal({
     if (cell.cais) setCaisOrigem(cell.cais);
   }
 
-  const canSubmit = useMemo(() => {
-    if (submitting) return false;
-    if (!confirmCct) return false;
-    if (!portoId || !turnoId) return false;
-    if (!tpaOutIdResolved) return false;
-    if (!funcaoId || !fainaId) return false;
-    if (!motivo) return false;
-    if (motivo === "OUTRO" && motivoOutro.trim() === "") return false;
-    if (motivo !== "OUTRO" && motivoOutro !== "" && motivoOutro.length > MAX_MOTIVO_OUTRO) return false;
-    if (baseLegalMode === "catalogo" && !baseLegalCctId) return false;
-    if (baseLegalMode === "livre") {
-      if (baseLegalLivre.trim() === "") return false;
-      if (baseLegalLivre.length > MAX_BASE_LEGAL_LIVRE) return false;
-    }
-    if (observacoes.length > MAX_OBSERVACOES) return false;
-    if (caisOrigem.length > 8) return false;
-    return true;
-  }, [
-    submitting,
-    portoId,
-    turnoId,
-    tpaOutIdResolved,
-    confirmCct,
-    funcaoId,
-    fainaId,
-    motivo,
-    motivoOutro,
-    baseLegalMode,
-    baseLegalCctId,
-    baseLegalLivre,
-    observacoes,
-    caisOrigem,
-  ]);
+  // UX2: além do flag `canSubmit`, devolvemos `camposPendentes` com a lista
+  // de rótulos dos campos que ainda bloqueiam o submit. Tudo derivado do
+  // mesmo `useMemo` para garantir sincronia entre a regra e a lista
+  // exibida (mitiga risco SPEC §5.3). UX silenciosa quando `canSubmit` é
+  // `true` (helper text não renderiza e `title` é `undefined`).
+  const canSubmit = useMemo<{ canSubmit: boolean; camposPendentes: string[] }>(() => {
+    const camposPendentes: string[] = [];
+    const valido: boolean = ((): boolean => {
+      if (submitting) { camposPendentes.push("envio em andamento"); return false; }
+      if (!confirmCct) { camposPendentes.push("ack CCT"); return false; }
+      if (!portoId || !turnoId) { camposPendentes.push("porto/turno"); return false; }
+      if (!tpaOutIdResolved) { camposPendentes.push("TPA a remover"); return false; }
+      if (!funcaoId || !fainaId) { camposPendentes.push("função e faina"); return false; }
+      if (!motivo) { camposPendentes.push("motivo"); return false; }
+      if (motivo === "OUTRO" && motivoOutro.trim() === "") { camposPendentes.push("motivo_outro_texto"); return false; }
+      if (motivo !== "OUTRO" && motivoOutro !== "" && motivoOutro.length > MAX_MOTIVO_OUTRO) { camposPendentes.push("motivo_outro_texto"); return false; }
+      if (baseLegalMode === "catalogo" && !baseLegalCctId) { camposPendentes.push("base legal"); return false; }
+      if (baseLegalMode === "livre" && (baseLegalLivre.trim() === "" || baseLegalLivre.length > MAX_BASE_LEGAL_LIVRE)) { camposPendentes.push("base legal"); return false; }
+      if (observacoes.length > MAX_OBSERVACOES || caisOrigem.length > 8) { camposPendentes.push("cais de origem/observações"); return false; }
+      return true;
+    })();
+    return { canSubmit: valido, camposPendentes };
+  }, [submitting, portoId, turnoId, tpaOutIdResolved, confirmCct, funcaoId, fainaId, motivo, motivoOutro, baseLegalMode, baseLegalCctId, baseLegalLivre, observacoes, caisOrigem]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit.canSubmit) return;
     setSubmitting(true);
     setSubmitError(null);
 
