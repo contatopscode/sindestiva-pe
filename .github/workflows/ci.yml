@@ -62,11 +62,10 @@ jobs:
       #      → apps/web/src/lib/api.ts (~linha 42) — comentário sobre o
       #        scoping do cookie httpOnly entre web.lousa.pscode.ia.br e
       #        api.lousa.pscode.ia.br (contexto arquitetural).
-      #   3. __sindestiva/\[...path\]/route\.ts:
-      #      → handler catch-all do proxy BFF — comentários de cabeçalho
-      #        (linhas 2 e 6) e origin default `web.lousa.pscode.ia.br`
-      #        (linha ~62). É o ÚNICO arquivo server-side que pode falar
-      #        de api.lousa, porque é ele que faz o repasse upstream.
+      #   3. api/sindestiva/\[...path\]/route\.ts:
+      #      → handler catch-all do proxy BFF — origin default
+      #        `web.lousa.pscode.ia.br`. Único arquivo server-side (além
+      #        de api-url) que pode falar de api.lousa no repasse upstream.
       #   4. api/auth/login/route\.ts:.*Domain=\.pscode\.ia\.br
       #      → apps/web/src/app/api/auth/login/route.ts (~linha 25) —
       #        comentário explicando o `Domain=.pscode.ia.br` do cookie
@@ -82,7 +81,7 @@ jobs:
         run: |
           set -e
           HITS=$(grep -rnE 'lousa\.pscode\.ia\.br' apps/web/src \
-            | grep -vE '(api\.ts:.*DEFAULT_API_URL|api\.ts:.*scoped|__sindestiva/\[...path\]/route\.ts:|api/auth/login/route\.ts:.*Domain=\.pscode\.ia\.br)' \
+            | grep -vE '(api\.ts:.*DEFAULT_API_URL|api\.ts:.*scoped|api/sindestiva/\[...path\]/route\.ts:|api-url\.ts:.*DEFAULT_API_URL|api/auth/login/route\.ts:.*Domain=\.pscode\.ia\.br)' \
             || true)
           if [ -n "$HITS" ]; then
             echo "::error::NXDOMAIN fallback drift detectado em apps/web/src:"
@@ -91,6 +90,24 @@ jobs:
             exit 1
           fi
           echo "OK — nenhuma ocorrência fora da lista branca."
+
+      - name: Verify BFF proxy route is public (App Router)
+        run: |
+          set -e
+          ROUTE="apps/web/src/app/api/sindestiva/[...path]/route.ts"
+          if [ ! -f "$ROUTE" ]; then
+            echo "::error::Rota BFF ausente: $ROUTE"
+            exit 1
+          fi
+          if [ -d "apps/web/src/app/__sindestiva" ]; then
+            echo "::error::Pasta privada apps/web/src/app/__sindestiva ainda existe (Next.js não registra rotas _*)"
+            exit 1
+          fi
+          if grep -qE 'BFF_PROXY_PREFIX.*=.*"/_' apps/web/src/lib/bff-proxy.ts; then
+            echo "::error::BFF_PROXY_PREFIX não pode começar com underscore (private folder)"
+            exit 1
+          fi
+          echo "OK — proxy BFF em rota pública."
 
   # ---------------------------------------------------------------------------
   # Backend / Scraper — ruff + pytest
