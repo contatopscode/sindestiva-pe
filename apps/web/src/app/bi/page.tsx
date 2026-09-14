@@ -1,16 +1,28 @@
 // =============================================================================
-// SINDESTIVA-PE · /bi — BI & Dashboards (Sprint 7 — Marco M7)
+// SINDESTIVA-PE · /bi — BI & Dashboards (Sprint 5 — Marco M5, refinações da M7)
 //
-// Tela principal do Presidente (Josias) com 4 KPIs, gráfico de barras
-// ECharts, ranking top remanejados, 3 cards top-1, insights automáticos,
-// drill-down por dia e export PDF.
+// Refactor vs M7:
+//   - 403 ROLE_REQUIRED tratado com banner dedicado (H15 — UX do Dirigente
+//     não compartilha com erros genéricos). Botão "Voltar ao Centro de
+//     Comando" usa router.push('/centro-comando').
+//   - EmptyState genérico substituído por "Sem remanejamentos no período"
+//     com ícone 📊 quando `porDia.total === 0`.
+//   - Drill-down deixou de ser modal: renderizado INLINE como expansão
+//     abaixo do gráfico clicado (sem nova rota, sem overlay). 404 →
+//     EmptyState "Sem remanejamentos nesta data".
+//   - Auto-refresh a cada 5 min (CACHE_TTL_SEGUNDOS do backend) com
+//     indicador "Atualizado às HH:MM" no topo da página.
+//   - Tabs horizontais '7d · 30d · 90d · 365d' (default 30d) usando o
+//     `PeriodoDias` de `@/lib/tipos`.
 //
-// Restrição: apenas DIRIGENTE (RBAC do backend retorna 403 se FISCAL).
+// Restrição: apenas DIRIGENTE (RBAC do backend retorna 403 com
+// `detail.code === "ROLE_REQUIRED"`).
 // ============================================================================
 
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import {
   downloadBIPDF,
   getBIInsights,
@@ -34,18 +46,49 @@ import { BarChart } from "./_components/BarChart";
 import { EmptyState } from "@/app/_components/EmptyState";
 
 const PERIODOS: { value: PeriodoDias; label: string }[] = [
-  { value: 7, label: "7 dias" },
-  { value: 30, label: "30 dias" },
-  { value: 90, label: "90 dias" },
-  { value: 365, label: "1 ano" },
+  { value: 7, label: "7d" },
+  { value: 30, label: "30d" },
+  { value: 90, label: "90d" },
+  { value: 365, label: "365d" },
 ];
+
+/** TTL de auto-refresh: 5 min (espelha CACHE_TTL_SEGUNDOS=300 do backend). */
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
 
 // Formatadores.
 const brl = (v: number): string =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const pct = (v: number): string => `${v.toFixed(1)}%`;
 
+/** Formatador de horário HH:MM para o indicador "Atualizado às …". */
+function formatHoraAgora(d: Date): string {
+  return d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * Tenta extrair `code` de um `ApiError.detail` que o backend serializou
+ * como string JSON (caso `detail` seja objeto) — `apiFetch` faz
+ * `JSON.stringify` quando o detail não é string. Mantém fallback para
+ * a string crua, preservando mensagens legíveis em outros cenários.
+ */
+function extractDetailCode(detail: string): { code?: string; message: string } {
+  const trimmed = detail.trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      const obj = JSON.parse(trimmed) as { code?: unknown; message?: unknown };
+      if (typeof obj.code === "string" && typeof obj.message === "string") {
+        return { code: obj.code, message: obj.message };
+      }
+    } catch {
+      /* fallback: detail é texto livre */
+    }
+  }
+  return { message: detail };
+}
+
 export default function BIPage(): ReactNode {
+  const router = useRouter();
+
   const [periodo, setPeriodo] = useState<PeriodoDias>(30);
   const [kpis, setKpis] = useState<BIKpis | null>(null);
   const [porDia, setPorDia] = useState<RemanejamentosPorDia | null>(null);
@@ -53,13 +96,23 @@ export default function BIPage(): ReactNode {
   const [cards, setCards] = useState<TopCards | null>(null);
   const [insights, setInsights] = useState<Insights | null>(null);
   const [drillDown, setDrillDown] = useState<DrillDown | null>(null);
+  const [drillDownDate, setDrillDownDate] = useState<string | null>(null);
+  const [drillDownError, setDrillDownError] = useState<boolean>(false);
+  const [drillDownLoading, setDrillDownLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  /** Bloqueio total da UI quando o backend diz 403 ROLE_REQUIRED. */
+  const [forbidden, setForbidden] = useState<{
+    code: string;
+    message: string;
+  } | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [ultimaAtualizacao, setUltimaAtualizacao] = useState<Date | null>(null);
 
   const loadAll = useCallback(async (p: PeriodoDias): Promise<void> => {
     setLoading(true);
     setErro(null);
+    setForbidden(null);
     try {
       const [k, d, t, c, i] = await Promise.all([
         getBIKpis(p),
@@ -73,7 +126,16 @@ export default function BIPage(): ReactNode {
       setTop(t);
       setCards(c);
       setInsights(i);
+      setUltimaAtualizacao(new Date());
     } catch (e) {
+      if (e instanceof ApiError && e.status === 403) {
+        const { code, message } = extractDetailCode(e.detail);
+        if (code === "ROLE_REQUIRED") {
+          setForbidden({ code, message });
+          setLoading(false);
+          return;
+        }
+      }
       const msg =
         e instanceof ApiError
           ? `[${e.status}] ${e.detail}`
@@ -86,16 +148,41 @@ export default function BIPage(): ReactNode {
     }
   }, []);
 
+  // Carrega ao montar e quando o período muda.
   useEffect(() => {
     void loadAll(periodo);
   }, [periodo, loadAll]);
 
+  // Auto-refresh a cada 5 min — bate com CACHE_TTL_SEGUNDOS do Redis.
+  // Usa ref para evitar reiniciar o intervalo a cada re-render.
+  const periodoRef = useRef(periodo);
+  useEffect(() => {
+    periodoRef.current = periodo;
+  }, [periodo]);
+
+  useEffect(() => {
+    const handle = setInterval(() => {
+      void loadAll(periodoRef.current);
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(handle);
+  }, [loadAll]);
+
   const handleBarClick = useCallback(async (item: { data: string }): Promise<void> => {
+    setDrillDownDate(item.data);
+    setDrillDown(null);
+    setDrillDownError(false);
+    setDrillDownLoading(true);
     try {
       const d = await getBIDrillDown(item.data);
       setDrillDown(d);
     } catch (e) {
-      setErro(e instanceof Error ? e.message : "Erro no drill-down.");
+      if (e instanceof ApiError && e.status === 404) {
+        setDrillDownError(true);
+      } else {
+        setErro(e instanceof Error ? e.message : "Erro no drill-down.");
+      }
+    } finally {
+      setDrillDownLoading(false);
     }
   }, []);
 
@@ -110,22 +197,64 @@ export default function BIPage(): ReactNode {
     }
   }, [periodo]);
 
-  // Empty state (T7-12).
-  if (!loading && kpis && porDia && porDia.total === 0) {
+  const fecharDrillDown = useCallback((): void => {
+    setDrillDown(null);
+    setDrillDownDate(null);
+    setDrillDownError(false);
+  }, []);
+
+  // Banner dedicado de 403 ROLE_REQUIRED — tela inteira bloqueada.
+  if (forbidden) {
     return (
-      <main className="min-h-screen bg-[#0a1828] text-white p-6">
-        <header className="mb-6 flex items-center justify-between">
+      <main className="min-h-screen bg-[#0a1828] text-white p-4 md:p-6">
+        <div className="mb-6 rounded-md border border-[#e04a4a]/40 bg-[#e04a4a]/10 p-4">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">🚫</span>
+            <div className="flex-1">
+              <h2 className="text-base font-bold text-[#e04a4a]">
+                Acesso restrito
+              </h2>
+              <p className="mt-1 text-sm text-[#f3d4d4]">
+                Esta tela é restrita ao Dirigente (Presidente/Vice). Solicite
+                acesso ao administrador do sistema.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push("/centro-comando")}
+                className="mt-3 rounded bg-[#c8a04d] px-4 py-2 text-sm font-semibold text-[#0a1828] transition hover:bg-[#fbbf24]"
+              >
+                Voltar ao Centro de Comando
+              </button>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // EmptyState específico quando porDia.total === 0 (H15).
+  if (!loading && porDia && porDia.total === 0) {
+    return (
+      <main className="min-h-screen bg-[#0a1828] text-white p-4 md:p-6">
+        <header className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-[#e8eef4]">BI & Dashboards</h1>
-            <p className="text-sm text-[#94a8bd]">
-              Período: {kpis.periodo_inicio} → {kpis.periodo_fim}
-            </p>
+            {kpis && (
+              <p className="text-sm text-[#94a8bd]">
+                Período: {kpis.periodo_inicio} → {kpis.periodo_fim}
+              </p>
+            )}
+            {ultimaAtualizacao && (
+              <p className="mt-1 text-[11px] text-[#94a8bd]">
+                Atualizado às {formatHoraAgora(ultimaAtualizacao)} · auto-refresh em 5 min
+              </p>
+            )}
           </div>
           <PeriodoSelector value={periodo} onChange={setPeriodo} />
         </header>
         <EmptyState
           icon="📊"
-          title="Sem dados no período"
+          title="Sem remanejamentos no período"
           description={`Não há remanejamentos registrados nos últimos ${periodo} dias. Selecione outro período ou aguarde o início das operações.`}
         />
       </main>
@@ -140,6 +269,11 @@ export default function BIPage(): ReactNode {
           {kpis && (
             <p className="text-sm text-[#94a8bd]">
               Período: {kpis.periodo_inicio} → {kpis.periodo_fim}
+            </p>
+          )}
+          {ultimaAtualizacao && (
+            <p className="mt-1 text-[11px] text-[#94a8bd]">
+              Atualizado às {formatHoraAgora(ultimaAtualizacao)} · auto-refresh em 5 min
             </p>
           )}
         </div>
@@ -213,6 +347,73 @@ export default function BIPage(): ReactNode {
               <p className="mt-2 text-xs text-[#94a8bd]">
                 💡 Clique em uma barra para ver o detalhe do dia.
               </p>
+
+              {/* Drill-down expandido inline (sem modal). */}
+              {drillDownDate && (
+                <div className="mt-4 rounded border border-[#2a5070] bg-[#0a1828] p-4">
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-[#e8eef4]">
+                      Drill-down: {drillDownDate}
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={fecharDrillDown}
+                      className="rounded p-1 text-[#94a8bd] hover:bg-[#1a2540] hover:text-white"
+                      aria-label="Fechar drill-down"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {drillDownLoading ? (
+                    <p className="text-sm text-[#94a8bd]">Carregando detalhe…</p>
+                  ) : drillDownError ? (
+                    <EmptyState
+                      icon="📅"
+                      title="Sem remanejamentos nesta data"
+                      description="Nenhum remanejamento foi registrado nesse dia."
+                    />
+                  ) : drillDown && drillDown.items.length === 0 ? (
+                    <EmptyState
+                      icon="📅"
+                      title="Sem remanejamentos nesta data"
+                      description="Nenhum remanejamento foi registrado nesse dia."
+                    />
+                  ) : drillDown ? (
+                    <>
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-[#2a5070] text-left text-[10px] uppercase text-[#94a8bd]">
+                            <th className="py-2">SE</th>
+                            <th>TPA out</th>
+                            <th>Motivo</th>
+                            <th>Status</th>
+                            <th>Hora</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {drillDown.items.map((i) => (
+                            <tr key={i.id} className="border-b border-[#1a2540]">
+                              <td className="py-1.5 font-mono text-xs text-[#c8a04d]">
+                                {i.codigo_se}
+                              </td>
+                              <td className="text-[#e8eef4]">{i.tpa_out_nome}</td>
+                              <td className="text-[#94a8bd]">{i.motivo}</td>
+                              <td className="text-[#94a8bd]">{i.status}</td>
+                              <td className="text-xs text-[#94a8bd]">
+                                {new Date(i.hora_criacao).toLocaleTimeString("pt-BR")}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      <p className="mt-3 text-xs text-[#94a8bd]">
+                        Total: {drillDown.total} remanejamento(s)
+                      </p>
+                    </>
+                  ) : null}
+                </div>
+              )}
             </div>
 
             <div className="rounded-lg border border-[#2a5070] bg-[#0f2438] p-4">
@@ -297,11 +498,6 @@ export default function BIPage(): ReactNode {
               </ul>
             </section>
           )}
-
-          {/* 4. Drill-down modal */}
-          {drillDown && (
-            <DrillDownModal drillDown={drillDown} onClose={() => setDrillDown(null)} />
-          )}
         </>
       )}
     </main>
@@ -327,6 +523,7 @@ function PeriodoSelector({
           key={p.value}
           type="button"
           onClick={() => onChange(p.value)}
+          aria-pressed={value === p.value}
           className={`rounded px-3 py-1 transition ${
             value === p.value
               ? "bg-[#c8a04d] font-semibold text-[#0a1828]"
@@ -391,72 +588,6 @@ function TopCardBox({
       ) : (
         <p className="mt-2 text-sm italic text-[#94a8bd]">Sem dados</p>
       )}
-    </div>
-  );
-}
-
-function DrillDownModal({
-  drillDown,
-  onClose,
-}: {
-  drillDown: DrillDown;
-  onClose: () => void;
-}): ReactNode {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="max-h-[80vh] w-full max-w-3xl overflow-auto rounded-lg border border-[#2a5070] bg-[#0f2438] p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-[#e8eef4]">
-            Drill-down: {drillDown.data}
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded p-1 text-[#94a8bd] hover:bg-[#1a2540] hover:text-white"
-          >
-            ✕
-          </button>
-        </div>
-        {drillDown.items.length === 0 ? (
-          <p className="text-sm text-[#94a8bd]">Sem remanejamentos nesta data.</p>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[#2a5070] text-left text-[10px] uppercase text-[#94a8bd]">
-                <th className="py-2">SE</th>
-                <th>TPA out</th>
-                <th>Motivo</th>
-                <th>Status</th>
-                <th>Hora</th>
-              </tr>
-            </thead>
-            <tbody>
-              {drillDown.items.map((i) => (
-                <tr key={i.id} className="border-b border-[#1a2540]">
-                  <td className="py-1.5 font-mono text-xs text-[#c8a04d]">
-                    {i.codigo_se}
-                  </td>
-                  <td className="text-[#e8eef4]">{i.tpa_out_nome}</td>
-                  <td className="text-[#94a8bd]">{i.motivo}</td>
-                  <td className="text-[#94a8bd]">{i.status}</td>
-                  <td className="text-xs text-[#94a8bd]">
-                    {new Date(i.hora_criacao).toLocaleTimeString("pt-BR")}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-        <p className="mt-3 text-xs text-[#94a8bd]">
-          Total: {drillDown.total} remanejamento(s)
-        </p>
-      </div>
     </div>
   );
 }

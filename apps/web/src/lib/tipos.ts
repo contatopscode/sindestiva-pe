@@ -1,17 +1,16 @@
 // =============================================================================
 // SINDESTIVA-PE · Tipos do Centro de Comando
-// Espelha os schemas Pydantic de `apps/api/app/schemas/lousa.py` e
-// `apps/api/app/api/v1/lousa_public.py` (Sprint 0).
+// Espelha os schemas Pydantic de `apps/api/app/schemas/lousa.py`,
+// `apps/api/app/schemas/remanejamento.py` e `apps/api/app/schemas/ogmo.py`
+// (Sprint S2 — frontend com dados reais).
 //
-// Quando Sprint 1 fechar (RBAC + NextAuth) e Sprint 2 fechar (scraping real),
-// estes tipos podem ser compartilhados via `@sindestiva/shared`.
+// Para o enum `STATUS_NOTIFICACAO_OGMO` (5 valores da fila OGMO) usamos o
+// tipo derivado de `@sindestiva/shared` e o reexportamos localmente como
+// `StatusNotificacaoUi` para isolar a fronteira UI ↔ domínio.
 //
-// TODO Sprint 1: mover para `packages/shared/src/lousa.ts` e reexportar.
-// TODO Sprint 5: incluir `LousaAlocacao` (tabela normalizada) e
-//               `RemanejamentoOut` com hash_chain.
 // =============================================================================
 
-import type { Porto, Turno, StatusOgmo } from "@sindestiva/shared";
+import type { Porto, StatusNotificacaoOgmo, Turno } from "@sindestiva/shared";
 
 // ---- Catálogos -------------------------------------------------------------
 
@@ -50,6 +49,32 @@ export interface LousaCellOut {
   tpa_matricula: string | null;
   status: CellStatus;
   data_referencia: string; // YYYY-MM-DD
+}
+
+// ---- CCT (catálogo de cláusulas da Convenção Coletiva) ---------------------
+
+/**
+ * Cláusula da CCT (Convenção Coletiva de Trabalho) usada como base legal
+ * do remanejamento. Espelha `apps/api/app/models/catalogos.py:CctClausula`.
+ *
+ * O frontend recebe via prop opcional `cctClausulas` no modal; quando
+ * ausente (lacuna L02-Front — `LousaPreviewResponse` ainda não traz o
+ * catálogo), o modal abre direto com o textarea de texto livre.
+ */
+export interface CctClausula {
+  id: string; // UUID
+  versao_cct: string; // ex.: "2024-2026"
+  clausula: string; // ex.: "cl. 12ª, §3º"
+  descricao: string;
+  motivos_vinculados: string[] | null;
+  is_active: boolean;
+}
+
+/** Opção de TPA substituto derivada de `cells[]` do catálogo. */
+export interface TpaOption {
+  tpa_id: string;
+  tpa_nome: string;
+  tpa_matricula: string | null;
 }
 
 // ---- Snapshot --------------------------------------------------------------
@@ -97,32 +122,115 @@ export interface LousaPreviewResponse {
   stats: LousaPreviewStats;
 }
 
-// ---- Remanejamento (UI mock — Sprint 5 implementa de verdade) -------------
+// ---- Remanejamento (casado com `RemanejamentoRead` / `RemanejamentoBase`) -
 
+/**
+ * Status do remanejamento no ciclo de vida (espelha `StatusRemanejamentoEnum`
+ * em `apps/api/app/models/enums.py`). Exposto como union de strings para que
+ * o UI possa tratar o valor cru que vem do backend sem precisar importar o
+ * enum Python.
+ */
+export type StatusRemanejamentoUi =
+  | "PENDENTE"
+  | "APROVADO"
+  | "NOTIFICADO_OGMO"
+  | "ACK"
+  | "NACK"
+  | "CANCELADO";
+
+/** Motivo do remanejamento (espelha `MotivoRemanejamentoEnum`). */
+export type MotivoRemanejamentoUi =
+  | "ATESTADO_MEDICO"
+  | "FALTA_INJUSTIFICADA"
+  | "REFORCO_TERNO"
+  | "TROCA_TURNO"
+  | "ATRASO_15MIN"
+  | "FALTA_EPI"
+  | "LIBERACAO_ANTECIPADA"
+  | "OUTRO";
+
+/**
+ * Item de remanejamento para a UI.
+ *
+ * Espelha `apps/api/app/schemas/remanejamento.py:RemanejamentoRead` —
+ * IDs são UUIDs, `status`/`motivo` vêm como string do enum do backend
+ * (sem colapso). Resolução de nomes para exibição acontece no mapper
+ * (`mapRemanejamentoRead`) usando `LousaPreviewResponse.cells[]` e
+ * catálogos carregados em paralelo.
+ */
 export interface RemanejamentoItem {
-  id: string;
-  data_hora: string; // ISO
-  tpa_removido_nome: string;
-  tpa_removido_matricula: string;
-  funcao_codigo: string;
-  faina_codigo: string;
-  motivo: string;
-  base_legal: string;
-  status: StatusOgmo;
-  created_by: string; // fiscal
-  tpa_substituto_nome?: string;
-  hash_evento?: string; // SHA-256
+  id: string; // UUID
+  codigo_se: string;
+  fiscal_id: string; // UUID
+  snapshot_origem_id: string | null; // UUID
+  porto_id: string; // UUID
+  turno_id: string; // UUID
+  data_referencia: string; // YYYY-MM-DD
+  tpa_out_id: string; // UUID
+  tpa_in_id: string | null; // UUID
+  funcao_origem_id: string; // UUID
+  faina_origem_id: string; // UUID
+  cais_origem: string | null;
+  status: StatusRemanejamentoUi;
+  motivo: MotivoRemanejamentoUi;
+  motivo_outro_texto: string | null;
+  base_legal_cct_id: string | null;
+  base_legal_texto_livre: string | null;
+  observacoes: string | null;
+  anexo_url: string | null;
+  ack_at: string | null;
+  ack_por: string | null;
+  nack_motivo: string | null;
+  hash_evento: string;
+  hash_anterior_id: string | null;
+  created_at: string; // ISO
+  updated_at: string; // ISO
 }
 
+/**
+ * Payload de criação do remanejamento.
+ *
+ * Espelha `apps/api/app/schemas/remanejamento.py:RemanejamentoBase` — sem
+ * `notify_pwa`/`ack_cct` (removidos na Sprint S2, ver L03-Front).
+ */
 export interface RemanejamentoCreate {
-  tpa_removido_id: string;
-  funcao_codigo: string;
-  faina_codigo: string;
-  motivo: string;
-  base_legal: string;
-  observacoes?: string;
-  notify_pwa: boolean;
-  ack_cct: boolean;
+  porto_id: string;
+  turno_id: string;
+  data_referencia: string; // YYYY-MM-DD
+  tpa_out_id: string;
+  funcao_origem_id: string;
+  faina_origem_id: string;
+  cais_origem?: string | null;
+  tpa_in_id?: string | null;
+  motivo: MotivoRemanejamentoUi;
+  motivo_outro_texto?: string | null;
+  base_legal_cct_id?: string | null;
+  base_legal_texto_livre?: string | null;
+  observacoes?: string | null;
+  anexo_url?: string | null;
+  snapshot_origem_id?: string | null;
+}
+
+/**
+ * Resposta de `POST /api/v1/remanejamentos/{id}/notificar-ogmo` e
+ * `POST /api/v1/ogmo/notificacoes/{remanejamento_id}/enviar`.
+ *
+ * Reflete os campos serializados pelo backend em
+ * `apps/api/app/api/v1/remanejamentos.py` (linhas 138-167) e
+ * `apps/api/app/api/v1/ogmo.py` (linhas 53-92).
+ */
+export interface NotifyOgmoResponse {
+  id: string;
+  remanejamento_id: string;
+  status: StatusNotificacaoUi;
+  canal: string;
+  destinatario: string | null;
+  payload_hash_sha256: string;
+  enviado_at: string | null;
+  provider_message_id: string | null;
+  erro_detalhes: string | null;
+  pdf_anexo_url: string | null;
+  tentativas: number;
 }
 
 // ---- Auditoria (mock — Sprint 6 implementa) -------------------------------
@@ -137,7 +245,8 @@ export type AuditEventKind =
   | "OGMO_ACK"
   | "OGMO_NACK"
   | "LOGIN"
-  | "LOGOUT";
+  | "LOGOUT"
+  | "OUTRO";
 
 export interface AuditEvent {
   id: string;
@@ -152,15 +261,29 @@ export interface AuditEvent {
 
 // ---- Notificação OGMO -----------------------------------------------------
 
+/**
+ * Status da notificação ao OGMO/PE na fila (5 valores do
+ * `StatusNotificacaoEnum`). Reexportado localmente a partir do enum
+ * compartilhado para isolar a fronteira UI ↔ domínio e tornar
+ * importável em arquivos que ainda não importam `@sindestiva/shared`.
+ */
+export type StatusNotificacaoUi = StatusNotificacaoOgmo;
+
 export interface OgmoNotificacao {
   id: string;
   data_hora: string;
   remanejamento_id: string;
-  canal: "EMAIL" | "WEBHOOK" | "PAINEL";
+  canal: "EMAIL" | "WEBHOOK" | "PAINEL" | "WHATSAPP";
   destinatario: string;
-  status: StatusOgmo;
+  status: StatusNotificacaoUi;
   tentativas: number;
   ultimo_erro?: string;
+  /** URL do PDF anexo (quando disponível) — usado pelo tooltip E36. */
+  pdf_anexo_url?: string | null;
+  /** ID do provider (Evolution/SMTP) — usado pelo tooltip E21. */
+  provider_message_id?: string | null;
+  /** Timestamp ISO da entrega efetiva (status ENTREGUE). */
+  entregue_at?: string | null;
 }
 
 // ---- Usuário autenticado (mock — Sprint 1 implementa NextAuth) -----------

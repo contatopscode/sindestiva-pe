@@ -19,7 +19,7 @@ from uuid import UUID
 
 from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, Text, String, text
 from sqlalchemy.dialects.postgresql import INET, JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
 
@@ -73,6 +73,16 @@ class AuditEvent(Base):
     actor_role: Mapped[str | None] = mapped_column(Text, nullable=True)
     actor_ip: Mapped[str | None] = mapped_column(INET, nullable=True)
     actor_user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Relationship para carregar o User (e seus perfis TPA/Fiscal/Dirigente)
+    # via `selectin` em tempo de query — evita LEFT OUTER JOIN monolítico
+    # (decisão D20 da SPEC). `User` é resolvido por string para evitar
+    # import circular (users.py já referencia modelos daqui indiretamente).
+    actor_user: Mapped["User | None"] = relationship(
+        "User",
+        lazy="selectin",
+        foreign_keys=[actor_user_id],
+    )
 
     payload_before: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     payload_after: Mapped[dict] = mapped_column(JSONB, nullable=False)

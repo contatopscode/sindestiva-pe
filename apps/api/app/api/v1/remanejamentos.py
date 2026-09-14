@@ -40,7 +40,11 @@ async def list_remanejamentos(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[str, Depends(_user_id_or_401)],
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    # Teto `le=500` alinha com o volume esperado de ~300 remanejamentos/mês
+    # (discovery-notes) e permite ao frontend carregar todo o mês em uma
+    # única chamada para paginação/busca client-side sobre o conjunto
+    # completo. CR2 — achado ALTO da revisão.
+    limit: int = Query(50, ge=1, le=500),
     status: StatusRemanejamentoEnum | None = Query(None, description="Filtrar por status"),
 ) -> RemanejamentoListResponse:
     """Sprint 5: SELECT real com paginação + filtro opcional."""

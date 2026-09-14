@@ -23,6 +23,11 @@ class AuditEventRead(BaseModel):
     hash_anterior: str | None
     hash_evento: str
     criado_em: datetime
+    # Campos opcionais preenchidos em tempo de query via
+    # `resolver_actor_nome` (audit_service) — default None para
+    # não quebrar consumidores que não dependem do nome legível.
+    actor_nome: str | None = None
+    actor_user_email: str | None = None
 
 
 class VerificarHashChainResponse(BaseModel):

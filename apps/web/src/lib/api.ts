@@ -17,11 +17,14 @@ import {
   normalizeRemanejamentosList,
   type AuditEventApi,
   type OgmoNotificacaoApi,
+  type RemanejamentoCatalogo,
+  type RemanejamentoItemResolved,
   type RemanejamentoListResponseApi,
+  type RemanejamentoReadApi,
 } from "./api-mappers";
 import type {
   LousaPreviewResponse,
-  RemanejamentoItem,
+  NotifyOgmoResponse,
   OgmoNotificacao,
   AuditEvent,
   BIKpis,
@@ -324,26 +327,32 @@ export async function getLousaPreview(
 
 // ---- Endpoints de Remanejamento (Sprint 5+) -----------------------------
 
-export async function getRemanejamentos(filters?: {
-  skip?: number;
-  limit?: number;
-  status?: string;
-}): Promise<RemanejamentoItem[]> {
+export async function getRemanejamentos(
+  filters?: { skip?: number; limit?: number; status?: string },
+  catalogo?: RemanejamentoCatalogo,
+): Promise<RemanejamentoItemResolved[]> {
   const params = new URLSearchParams();
   if (filters?.skip !== undefined) params.set("skip", String(filters.skip));
   if (filters?.limit !== undefined) params.set("limit", String(filters.limit));
   if (filters?.status) params.set("status", filters.status);
   const q = params.toString() ? `?${params.toString()}` : "";
-  const raw = await apiFetch<RemanejamentoItem[] | RemanejamentoListResponseApi>(
+  const raw = await apiFetch<RemanejamentoItemResolved[] | RemanejamentoListResponseApi>(
     `/api/v1/remanejamentos${q}`,
   );
-  return normalizeRemanejamentosList(raw);
+  return normalizeRemanejamentosList(raw, catalogo);
 }
 
+/**
+ * `POST /api/v1/remanejamentos` — cria um remanejamento com o payload
+ * `RemanejamentoBase` do Pydantic (sem `notify_pwa`/`ack_cct`).
+ *
+ * Retorna o `RemanejamentoRead` cru do backend; a UI que precisa de
+ * nomes resolvidos chama `mapRemanejamentoRead` com um catálogo.
+ */
 export async function createRemanejamento(
   payload: unknown,
-): Promise<RemanejamentoItem> {
-  return apiFetch<RemanejamentoItem>("/api/v1/remanejamentos", {
+): Promise<RemanejamentoReadApi> {
+  return apiFetch<RemanejamentoReadApi>("/api/v1/remanejamentos", {
     method: "POST",
     body: payload as Record<string, unknown> | undefined,
   });
@@ -356,10 +365,45 @@ export async function getOgmoNotificacoes(): Promise<OgmoNotificacao[]> {
   return raw.map(mapOgmoNotificacao);
 }
 
+/**
+ * `POST /api/v1/remanejamentos/{id}/notificar-ogmo` — dispara Evolution
+ * API (WhatsApp) + fallback SMTP/Resend + PDF anexo. Sem body.
+ *
+ * Equivale ao botão "Notificar OGMO" da tabela de remanejamentos
+ * (HU002/CA03). Reaproveita `apiFetch` (mesma auth Bearer + cookie).
+ */
+export async function notifyOgmo(remanejamentoId: string): Promise<NotifyOgmoResponse> {
+  return apiFetch<NotifyOgmoResponse>(
+    `/api/v1/remanejamentos/${encodeURIComponent(remanejamentoId)}/notificar-ogmo`,
+    { method: "POST" },
+  );
+}
+
+/**
+ * `POST /api/v1/ogmo/notificacoes/{remanejamento_id}/enviar` — alias
+ * mantido para o botão "Reenviar" da Fila OGMO (HU005/RN06). Body:
+ * `{ canal: "WHATSAPP" }`.
+ *
+ * Equivale ao botão "Reenviar" da `OgmoNotificacoesList`. Reaproveita
+ * `apiFetch` (mesma auth Bearer + cookie).
+ */
+export async function resendOgmoNotificacao(remanejamentoId: string): Promise<NotifyOgmoResponse> {
+  return apiFetch<NotifyOgmoResponse>(
+    `/api/v1/ogmo/notificacoes/${encodeURIComponent(remanejamentoId)}/enviar`,
+    { method: "POST", body: { canal: "WHATSAPP" } },
+  );
+}
+
 // ---- Auditoria ------------------------------------------------------------
 
-export async function getAuditEvents(limit = 50): Promise<AuditEvent[]> {
-  const raw = await apiFetch<AuditEventApi[]>(`/api/v1/auditoria/eventos?limit=${limit}`);
+export async function getAuditEvents(
+  limit = 100,
+  entityType?: string,
+): Promise<AuditEvent[]> {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (entityType) params.set("entity_type", entityType);
+  const raw = await apiFetch<AuditEventApi[]>(`/api/v1/auditoria/eventos?${params.toString()}`);
   return raw.map(mapAuditEvent);
 }
 
