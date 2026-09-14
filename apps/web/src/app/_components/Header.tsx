@@ -30,6 +30,7 @@ const TITLES: Record<string, string> = {
   "/ogmo": "Fila de Notificação OGMO",
   "/auditoria": "Auditoria & Integridade",
   "/bi": "BI & Dashboards",
+  "/usuarios": "Gestão de Usuários",
 };
 
 export function Header(): ReactNode {

@@ -487,3 +487,70 @@ export async function downloadBIPDF(periodoDias: PeriodoDias = 30): Promise<void
   a.remove();
   URL.revokeObjectURL(a.href);
 }
+
+// ---- Gestão de usuários (DIRIGENTE) ---------------------------------------
+
+export type AdminUserRole = "FISCAL" | "DIRIGENTE";
+export type AdminUserStatus = "PENDENTE_ACEITE" | "ATIVO" | "BLOQUEADO" | "INATIVO";
+
+export interface AdminUser {
+  id: string;
+  email: string | null;
+  telefone: string | null;
+  role: AdminUserRole;
+  status: AdminUserStatus;
+  nome_completo: string | null;
+  cpf: string | null;
+  matricula_sindicato: string | null;
+  cargo: string | null;
+  porto_codigo: string | null;
+  turno_codigo: string | null;
+  fiscal_status: string | null;
+  data_inicio: string | null;
+  data_inicio_mandato: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminUserListResponse {
+  items: AdminUser[];
+  total: number;
+}
+
+export interface AdminUserCreatePayload {
+  email: string;
+  telefone: string;
+  password: string;
+  role: AdminUserRole;
+  status?: AdminUserStatus;
+  cpf: string;
+  nome_completo: string;
+  matricula_sindicato: string;
+  porto_codigo?: string;
+  turno_codigo?: string;
+  data_inicio?: string;
+  cargo?: string;
+  data_inicio_mandato?: string;
+}
+
+export type AdminUserUpdatePayload = Partial<
+  Omit<AdminUserCreatePayload, "password">
+> & { status?: AdminUserStatus };
+
+export async function listAdminUsers(): Promise<AdminUserListResponse> {
+  return apiFetch<AdminUserListResponse>("/api/v1/users");
+}
+
+export async function createAdminUser(payload: AdminUserCreatePayload): Promise<AdminUser> {
+  return apiFetch<AdminUser>("/api/v1/users", { method: "POST", body: payload });
+}
+
+export async function updateAdminUser(
+  userId: string,
+  payload: AdminUserUpdatePayload,
+): Promise<AdminUser> {
+  return apiFetch<AdminUser>(`/api/v1/users/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    body: payload,
+  });
+}
