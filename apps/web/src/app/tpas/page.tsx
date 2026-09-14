@@ -2,7 +2,6 @@
 
 import { EmptyState } from "@/app/_components/EmptyState";
 import {
-  ApiError,
   createAdminTpa,
   listAdminTpas,
   listTpaFuncoes,
@@ -10,6 +9,7 @@ import {
   type AdminTpa,
   type AdminTpaFuncaoMeta,
 } from "@/lib/api";
+import { parseApiError } from "@/lib/parse-api-error";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   emptyTpaFormValues,
@@ -20,19 +20,6 @@ import {
   type TpaFormValues,
 } from "./_components/tpa-form-modal";
 import { TpasTable } from "./_components/tpas-table";
-
-function parseApiError(err: unknown): string {
-  if (err instanceof ApiError) {
-    try {
-      const parsed = JSON.parse(err.detail) as { message?: string; code?: string };
-      if (parsed.message) return parsed.message;
-    } catch {
-      /* detail plain string */
-    }
-    return err.detail;
-  }
-  return err instanceof Error ? err.message : "Erro desconhecido";
-}
 
 export default function TpasPage(): ReactNode {
   const [items, setItems] = useState<AdminTpa[] | null>(null);
@@ -48,20 +35,34 @@ export default function TpasPage(): ReactNode {
 
   const reload = useCallback(async () => {
     setLoadError(null);
-    try {
-      const [data, funcoesData] = await Promise.all([listAdminTpas(), listTpaFuncoes()]);
-      setItems(data.items);
-      setTotal(data.total);
-      setFuncoes(funcoesData);
-    } catch (err) {
-      setLoadError(parseApiError(err));
+    const [tpasResult, funcoesResult] = await Promise.allSettled([
+      listAdminTpas(),
+      listTpaFuncoes(),
+    ]);
+
+    if (tpasResult.status === "fulfilled") {
+      setItems(tpasResult.value.items);
+      setTotal(tpasResult.value.total);
+    } else {
+      setLoadError(parseApiError(tpasResult.reason));
       setItems([]);
+    }
+
+    if (funcoesResult.status === "fulfilled") {
+      setFuncoes(funcoesResult.value);
     }
   }, []);
 
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (!modalOpen || modalMode !== "create") return;
+    if (!form.funcao_base_id && funcoes[0]) {
+      setForm((prev) => ({ ...prev, funcao_base_id: funcoes[0].id }));
+    }
+  }, [modalOpen, modalMode, funcoes, form.funcao_base_id]);
 
   function openCreate(): void {
     setModalMode("create");

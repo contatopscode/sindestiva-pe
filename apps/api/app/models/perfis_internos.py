@@ -89,6 +89,16 @@ class Fiscal(Base, TimestampMixin, SoftDeleteMixin):
         # Sem `foreign_keys`, o SQLAlchemy não sabe qual usar.
         foreign_keys=[user_id],
     )
+    porto: Mapped[object] = relationship(
+        "Porto",
+        foreign_keys=[porto_id],
+        lazy="raise",
+    )
+    turno: Mapped[object] = relationship(
+        "Turno",
+        foreign_keys=[turno_id],
+        lazy="raise",
+    )
 
     # Retenção: herdada do SoftDeleteMixin (5 anos via `default` Python-side).
     # Não precisa override aqui — o mixin já calcula `now() + 5 years`

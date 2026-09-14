@@ -2,6 +2,7 @@
 
 import type { AdminUser, AdminUserCreatePayload, AdminUserUpdatePayload } from "@/lib/api";
 import type { ReactNode } from "react";
+import { canSubmitUserForm, userFormMissingFields } from "./user-form-validation";
 
 export interface UserFormValues {
   email: string;
@@ -131,6 +132,9 @@ export function UserFormModal({
 }: UserFormModalProps): ReactNode {
   if (!open) return null;
 
+  const missing = userFormMissingFields(values, mode);
+  const canSubmit = canSubmitUserForm(values, mode);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
@@ -257,6 +261,12 @@ export function UserFormModal({
           </p>
         )}
 
+        {!canSubmit && missing.length > 0 && (
+          <p className="mt-3 rounded border border-[#d4a574]/30 bg-[#d4a574]/10 px-3 py-2 text-[12px] text-[#d4a574]">
+            Pendente: {missing.join(", ")}
+          </p>
+        )}
+
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
@@ -270,7 +280,8 @@ export function UserFormModal({
             type="button"
             className="rounded bg-[#d4a574] px-4 py-2 text-[13px] font-semibold text-[#0a1929] hover:bg-[#e0b585] disabled:opacity-50"
             onClick={onSubmit}
-            disabled={saving}
+            disabled={saving || !canSubmit}
+            title={canSubmit ? undefined : missing.join(", ")}
           >
             {saving ? "Salvando…" : "Salvar"}
           </button>

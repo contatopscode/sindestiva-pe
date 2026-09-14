@@ -2,6 +2,7 @@
 
 import type { AdminTpa, AdminTpaCreatePayload, AdminTpaUpdatePayload, AdminTpaFuncaoMeta } from "@/lib/api";
 import type { ReactNode } from "react";
+import { canSubmitTpaForm, tpaFormMissingFields } from "./tpa-form-validation";
 
 export interface TpaFormValues {
   cpf: string;
@@ -105,6 +106,9 @@ export function TpaFormModal({
 }: TpaFormModalProps): ReactNode {
   if (!open) return null;
 
+  const missing = tpaFormMissingFields(values);
+  const canSubmit = canSubmitTpaForm(values);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div
@@ -195,6 +199,12 @@ export function TpaFormModal({
           </p>
         )}
 
+        {!canSubmit && missing.length > 0 && (
+          <p className="mt-3 rounded border border-[#d4a574]/30 bg-[#d4a574]/10 px-3 py-2 text-[12px] text-[#d4a574]">
+            Pendente: {missing.join(", ")}
+          </p>
+        )}
+
         <div className="mt-5 flex justify-end gap-2">
           <button
             type="button"
@@ -208,7 +218,8 @@ export function TpaFormModal({
             type="button"
             className="rounded bg-[#d4a574] px-4 py-2 text-[13px] font-semibold text-[#0a1929] hover:bg-[#e0b585] disabled:opacity-50"
             onClick={onSubmit}
-            disabled={saving || !values.funcao_base_id}
+            disabled={saving || !canSubmit}
+            title={canSubmit ? undefined : missing.join(", ")}
           >
             {saving ? "Salvando…" : "Salvar"}
           </button>

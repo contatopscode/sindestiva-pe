@@ -2,13 +2,14 @@
 
 import { EmptyState } from "@/app/_components/EmptyState";
 import {
-  ApiError,
   createAdminUser,
   listAdminUsers,
   updateAdminUser,
   type AdminUser,
 } from "@/lib/api";
+import { parseApiError } from "@/lib/parse-api-error";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { userFormMissingFields } from "./_components/user-form-validation";
 import {
   emptyFormValues,
   toCreatePayload,
@@ -18,19 +19,6 @@ import {
   type UserFormValues,
 } from "./_components/user-form-modal";
 import { UsersTable } from "./_components/users-table";
-
-function parseApiError(err: unknown): string {
-  if (err instanceof ApiError) {
-    try {
-      const parsed = JSON.parse(err.detail) as { message?: string; code?: string };
-      if (parsed.message) return parsed.message;
-    } catch {
-      /* detail plain string */
-    }
-    return err.detail;
-  }
-  return err instanceof Error ? err.message : "Erro desconhecido";
-}
 
 export default function UsuariosPage(): ReactNode {
   const [items, setItems] = useState<AdminUser[] | null>(null);
@@ -75,14 +63,16 @@ export default function UsuariosPage(): ReactNode {
   }
 
   async function onSubmitForm(): Promise<void> {
+    const missing = userFormMissingFields(form, modalMode);
+    if (missing.length > 0) {
+      setFormError(`Preencha os campos obrigatórios: ${missing.join(", ")}`);
+      return;
+    }
+
     setSaving(true);
     setFormError(null);
     try {
       if (modalMode === "create") {
-        if (form.password.length < 8) {
-          setFormError("Senha inicial deve ter ao menos 8 caracteres.");
-          return;
-        }
         await createAdminUser(toCreatePayload(form));
       } else if (editing) {
         await updateAdminUser(editing.id, toUpdatePayload(form));
