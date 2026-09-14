@@ -396,8 +396,14 @@ export async function resendOgmoNotificacao(remanejamentoId: string): Promise<No
 
 // ---- Auditoria ------------------------------------------------------------
 
-export async function getAuditEvents(limit = 50): Promise<AuditEvent[]> {
-  const raw = await apiFetch<AuditEventApi[]>(`/api/v1/auditoria/eventos?limit=${limit}`);
+export async function getAuditEvents(
+  limit = 100,
+  entityType?: string,
+): Promise<AuditEvent[]> {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (entityType) params.set("entity_type", entityType);
+  const raw = await apiFetch<AuditEventApi[]>(`/api/v1/auditoria/eventos?${params.toString()}`);
   return raw.map(mapAuditEvent);
 }
 
