@@ -145,7 +145,7 @@ export function LousaTable({ fainas, funcoes, cells, onCellClick }: LousaTablePr
                     key={fn.id}
                     className={cls.join(" ")}
                     tabIndex={isEmpty ? -1 : 0}
-                    role="gridcell"
+                    role={isEmpty ? undefined : "gridcell"}
                     aria-label={
                       isEmpty
                         ? `${f.nome} · ${fn.nome} · vazio`
