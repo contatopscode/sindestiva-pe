@@ -110,7 +110,7 @@ export interface RemanejamentoModalProps {
   motivos: MotivoRemanejamentoUi[];
   /** Lista de cláusulas CCT — vazia = sem catálogo (textarea visível). */
   basesLegais: CctClausula[];
-  /** Após criar, aprova e chama notificar-ogmo (botão do protótipo). */
+  /** Quando true, encadeia createRemanejamento + aprovarRemanejamento + notifyOgmo (atômico). Rota /remanejamentos passa true (botão do protótipo); rota /remanejamentos/novo deixa false (default, só criar). Bifurcação deliberada — vide decisão D06 no plano SINDESTIVA-PE-FSW-2026-004. */
   executarENotificarOgmo?: boolean;
 }
 
@@ -250,43 +250,33 @@ export function RemanejamentoModal({
     if (cell.cais) setCaisOrigem(cell.cais);
   }
 
-  const canSubmit = useMemo(() => {
-    if (submitting) return false;
-    if (!confirmCct) return false;
-    if (!portoId || !turnoId) return false;
-    if (!tpaOutIdResolved) return false;
-    if (!funcaoId || !fainaId) return false;
-    if (!motivo) return false;
-    if (motivo === "OUTRO" && motivoOutro.trim() === "") return false;
-    if (motivo !== "OUTRO" && motivoOutro !== "" && motivoOutro.length > MAX_MOTIVO_OUTRO) return false;
-    if (baseLegalMode === "catalogo" && !baseLegalCctId) return false;
-    if (baseLegalMode === "livre") {
-      if (baseLegalLivre.trim() === "") return false;
-      if (baseLegalLivre.length > MAX_BASE_LEGAL_LIVRE) return false;
-    }
-    if (observacoes.length > MAX_OBSERVACOES) return false;
-    if (caisOrigem.length > 8) return false;
-    return true;
-  }, [
-    submitting,
-    portoId,
-    turnoId,
-    tpaOutIdResolved,
-    confirmCct,
-    funcaoId,
-    fainaId,
-    motivo,
-    motivoOutro,
-    baseLegalMode,
-    baseLegalCctId,
-    baseLegalLivre,
-    observacoes,
-    caisOrigem,
-  ]);
+  // UX2: além do flag `canSubmit`, devolvemos `camposPendentes` com a lista
+  // de rótulos dos campos que ainda bloqueiam o submit. Tudo derivado do
+  // mesmo `useMemo` para garantir sincronia entre a regra e a lista
+  // exibida (mitiga risco SPEC §5.3). UX silenciosa quando `canSubmit` é
+  // `true` (helper text não renderiza e `title` é `undefined`).
+  const canSubmit = useMemo<{ canSubmit: boolean; camposPendentes: string[] }>(() => {
+    const camposPendentes: string[] = [];
+    const valido: boolean = ((): boolean => {
+      if (submitting) { camposPendentes.push("envio em andamento"); return false; }
+      if (!confirmCct) { camposPendentes.push("ack CCT"); return false; }
+      if (!portoId || !turnoId) { camposPendentes.push("porto/turno"); return false; }
+      if (!tpaOutIdResolved) { camposPendentes.push("TPA a remover"); return false; }
+      if (!funcaoId || !fainaId) { camposPendentes.push("função e faina"); return false; }
+      if (!motivo) { camposPendentes.push("motivo"); return false; }
+      if (motivo === "OUTRO" && motivoOutro.trim() === "") { camposPendentes.push("motivo_outro_texto"); return false; }
+      if (motivo !== "OUTRO" && motivoOutro !== "" && motivoOutro.length > MAX_MOTIVO_OUTRO) { camposPendentes.push("motivo_outro_texto"); return false; }
+      if (baseLegalMode === "catalogo" && !baseLegalCctId) { camposPendentes.push("base legal"); return false; }
+      if (baseLegalMode === "livre" && (baseLegalLivre.trim() === "" || baseLegalLivre.length > MAX_BASE_LEGAL_LIVRE)) { camposPendentes.push("base legal"); return false; }
+      if (observacoes.length > MAX_OBSERVACOES || caisOrigem.length > 8) { camposPendentes.push("cais de origem/observações"); return false; }
+      return true;
+    })();
+    return { canSubmit: valido, camposPendentes };
+  }, [submitting, portoId, turnoId, tpaOutIdResolved, confirmCct, funcaoId, fainaId, motivo, motivoOutro, baseLegalMode, baseLegalCctId, baseLegalLivre, observacoes, caisOrigem]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit.canSubmit) return;
     setSubmitting(true);
     setSubmitError(null);
 
@@ -668,9 +658,24 @@ export function RemanejamentoModal({
               >
                 Cancelar
               </button>
+
+              {/* UX2 — feedback "o que falta" (SPEC §4.2 UX2): helper text
+                  `<p>Pendente: ...</p>` + tooltip acessível via `title` no
+                  botão submit abaixo. Só aparecem quando
+                  canSubmit.canSubmit === false (UX silenciosa no sucesso).
+                  Lista derivada do mesmo useMemo da regra de canSubmit
+                  (SPEC §5.3: mitigação de drift). */}
+
+              {!canSubmit.canSubmit && (
+                <p className="text-[10px] text-[#94a8bd] mt-1">
+                  Pendente: {canSubmit.camposPendentes.join(", ")}
+                </p>
+              )}
+
               <button
                 type="submit"
-                disabled={!canSubmit}
+                disabled={!canSubmit.canSubmit}
+                title={canSubmit.canSubmit ? undefined : canSubmit.camposPendentes.join(", ")}
                 className="rounded bg-[#d4a574] px-4 py-2 text-[12px] font-bold text-[#0a1929] hover:bg-[#e8c49a] disabled:opacity-50"
               >
                 {submitting
