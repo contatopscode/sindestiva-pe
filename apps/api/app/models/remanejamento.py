@@ -25,7 +25,7 @@ from uuid import UUID
 
 from sqlalchemy import Date, DateTime, ForeignKey, Index, Text, String, text
 from sqlalchemy.dialects.postgresql import INET
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 from app.models.enums import MotivoRemanejamentoEnum, StatusRemanejamentoEnum, pg_enum
@@ -134,6 +134,12 @@ class Remanejamento(Base, TimestampMixin, SoftDeleteMixin):
     hash_anterior_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("lousa_main.remanejamentos.id", ondelete="SET NULL"),
         nullable=True,
+    )
+
+    fiscal: Mapped["Fiscal"] = relationship(
+        "Fiscal",
+        lazy="selectin",
+        foreign_keys=[fiscal_id],
     )
 
 

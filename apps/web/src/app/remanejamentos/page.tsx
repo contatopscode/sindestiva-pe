@@ -1,16 +1,5 @@
 // =============================================================================
-// SINDESTIVA-PE · /remanejamentos — lista de remanejamentos (Sprint S4)
-//
-// Mudanças vs S3:
-//   - Catálogo entregue à `RemanejamentosTable` via prop `catalogo` —
-//     a resolução de IDs via catálogo passa a ser responsabilidade da
-//     tabela (memoizada) e não mais da página.
-//   - KPIs calculados em `useMemo` com base nos status crus do enum
-//     `StatusRemanejamentoUi` (PENDENTE / APROVADO /
-//     NOTIFICADO_OGMO|ACK / NACK|CANCELADO).
-//   - Botão "Notificar OGMO" (status APROVADO) + optimistic update + debounce
-//     expostos pela tabela; a página só repassa `onNotify` e mantém o estado.
-//   - Paginação client-side com `limit=50` (botões Anterior/Próximo).
+// SINDESTIVA-PE · /remanejamentos — lista + KPIs (dados reais GET)
 // =============================================================================
 
 "use client";
@@ -22,50 +11,75 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  getRemanejamentos,
-  getLousaPreview,
-  notifyOgmo,
-  ApiError,
-} from "@/lib/api";
-import type { Porto } from "@sindestiva/shared";
+import type { Porto, Turno } from "@sindestiva/shared";
+import { getLousaPreview, getRemanejamentos, ApiError } from "@/lib/api";
 import { EmptyState } from "@/app/_components/EmptyState";
 import { RemanejamentosTable } from "./_components/RemanejamentosTable";
-import { useToast } from "@/lib/toast";
+import {
+  RemanejamentoModal,
+  type RemanejamentoModalCatalogo,
+} from "./_components/RemanejamentoModal";
 import type {
-  LousaCellOut,
   LousaPreviewResponse,
+  MotivoRemanejamentoUi,
+  TpaOption,
 } from "@/lib/tipos";
-import type {
-  RemanejamentoItemResolved,
-} from "@/lib/api-mappers";
+import type { RemanejamentoItemResolved } from "@/lib/api-mappers";
+import { computeRemanejamentoKpis } from "@/lib/remanejamento-ui";
+
+const MOTIVOS: MotivoRemanejamentoUi[] = [
+  "ATESTADO_MEDICO",
+  "FALTA_INJUSTIFICADA",
+  "REFORCO_TERNO",
+  "TROCA_TURNO",
+  "ATRASO_15MIN",
+  "FALTA_EPI",
+  "LIBERACAO_ANTECIPADA",
+  "OUTRO",
+];
+
+function dataHojeISO(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function formatSubtitleDate(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 export default function RemanejamentosPage(): ReactNode {
   const [items, setItems] = useState<RemanejamentoItemResolved[]>([]);
   const [preview, setPreview] = useState<LousaPreviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const toast = useToast();
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const porto: Porto = "SUAPE";
+  const turno: Turno = "DIURNO";
+  const hojeIso = useMemo(() => dataHojeISO(), []);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Carrega remanejamentos + catálogo (preview público) em paralelo (D01).
-      // O backend aplica defaults skip=0&limit=50; para esgotar o volume
-      // esperado (~300 remanejamentos/mês segundo discovery-notes) e
-      // preservar a paginação client-side + busca em todas as páginas,
-      // solicitamos limit=500 (teto do backend — apps/api/app/api/v1/
-      // remanejamentos.py:43). A tabela pagina client-side sobre o
-      // total recebido. CR2 — correção do achado ALTO da revisão
-      // (frontend violava `le=200`; backend foi elevado para `le=500`).
-      const porto: Porto = "SUAPE";
-      const [remanejamentos, previewData] = await Promise.all([
-        getRemanejamentos({ skip: 0, limit: 500 }),
-        getLousaPreview(porto, "DIURNO").catch(() => null),
-      ]);
-      setItems(remanejamentos);
+      const previewData = await getLousaPreview(porto, turno).catch(() => null);
       setPreview(previewData);
+      const catalogo = previewData
+        ? {
+            cells: previewData.cells,
+            fainas: previewData.fainas,
+            funcoes: previewData.funcoes,
+          }
+        : undefined;
+      const remanejamentos = await getRemanejamentos(
+        { skip: 0, limit: 500 },
+        catalogo,
+      );
+      setItems(remanejamentos);
       setLoading(false);
     } catch (err) {
       const msg =
@@ -83,76 +97,35 @@ export default function RemanejamentosPage(): ReactNode {
     fetchAll();
   }, [fetchAll]);
 
-  // KPIs calculados em useMemo a partir dos status crus (E7 da SPEC §5.6).
-  const kpis = useMemo(() => {
-    const pendentes = items.filter((r) => r.status === "PENDENTE").length;
-    const aprovados = items.filter((r) => r.status === "APROVADO").length;
-    const notificados = items.filter(
-      (r) => r.status === "NOTIFICADO_OGMO" || r.status === "ACK",
-    ).length;
-    const recusados = items.filter(
-      (r) => r.status === "NACK" || r.status === "CANCELADO",
-    ).length;
-    return {
-      total: items.length,
-      pendentes,
-      aprovados,
-      notificados,
-      recusados,
-    };
-  }, [items]);
-
-  /**
-   * Ação "Notificar OGMO" (HU002/CA03) — disparada pela tabela.
-   * Faz optimistic update local (status → NOTIFICADO_OGMO) e revalida a
-   * lista em background. Em 409 INVALID_STATE mostra toast e mantém
-   * estado pendente (D13). Em outros erros reverte e mostra toast.
-   */
-  const onNotify = useCallback(
-    async (id: string) => {
-      const anterior = items.find((r) => r.id === id)?.status ?? "PENDENTE";
-      setItems((prev) =>
-        prev.map((r) => (r.id === id ? { ...r, status: "NOTIFICADO_OGMO" } : r)),
-      );
-      try {
-        await notifyOgmo(id);
-        toast.showSuccess("Notificação enviada ao OGMO.");
-        // Refresh em background — o backend pode ter persistido FALHOU
-        // (RNF-12) e isso precisa refletir na UI.
-        fetchAll();
-      } catch (err) {
-        // 409 INVALID_STATE: status mudou, mantém como PENDENTE (D13).
-        if (err instanceof ApiError && err.status === 409) {
-          setItems((prev) =>
-            prev.map((r) => (r.id === id ? { ...r, status: "PENDENTE" } : r)),
-          );
-          toast.showError("Status mudou. Atualize a fila.");
-          fetchAll();
-          return;
-        }
-        // Outros erros: restaura status anterior.
-        setItems((prev) =>
-          prev.map((r) => (r.id === id ? { ...r, status: anterior } : r)),
-        );
-        const detail =
-          err instanceof ApiError
-            ? err.detail
-            : err instanceof Error
-              ? err.message
-              : "Erro";
-        toast.showError(`Falha ao notificar OGMO: ${detail}`);
-      }
-    },
-    [items, toast, fetchAll],
+  const kpis = useMemo(
+    () => computeRemanejamentoKpis(items, hojeIso),
+    [items, hojeIso],
   );
 
-  // Catálogo derivado do preview (passado à tabela para resolução client-side).
-  const catalogo = useMemo(() => {
-    const cells: LousaCellOut[] = preview?.cells ?? [];
-    const fainas = preview?.fainas ?? [];
-    const funcoes = preview?.funcoes ?? [];
-    return { cells, fainas, funcoes };
+  const catalogo: RemanejamentoModalCatalogo = useMemo(() => {
+    const cells = preview?.cells ?? [];
+    const tpaMap = new Map<string, TpaOption>();
+    for (const c of cells) {
+      if (c.tpa_id && !tpaMap.has(c.tpa_id)) {
+        tpaMap.set(c.tpa_id, {
+          tpa_id: c.tpa_id,
+          tpa_nome: c.tpa_nome ?? "(sem nome)",
+          tpa_matricula: c.tpa_matricula ?? null,
+        });
+      }
+    }
+    return {
+      portos: preview?.porto ? [preview.porto] : [],
+      turnos: preview?.turno ? [preview.turno] : [],
+      fainas: preview?.fainas ?? [],
+      funcoes: preview?.funcoes ?? [],
+      cells,
+      tpaOptions: Array.from(tpaMap.values()),
+    };
   }, [preview]);
+
+  const subtitleTurno =
+    preview?.turno?.nome ?? (turno === "DIURNO" ? "Diurno" : "Noturno");
 
   return (
     <div className="p-6">
@@ -160,8 +133,31 @@ export default function RemanejamentosPage(): ReactNode {
         <div>
           <h1 className="section-title">Remanejamentos</h1>
           <p className="section-subtitle">
-            Histórico do turno · {new Date().toLocaleDateString("pt-BR")} · DIURNO
+            Histórico do turno · {formatSubtitleDate(hojeIso)} · {subtitleTurno}
           </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled
+            title="Exportação PDF ainda não disponível na API."
+            className="cursor-not-allowed rounded border border-[#2a5070] px-4 py-2 text-[12px] font-semibold text-[#5f7a92] opacity-70"
+          >
+            ⤓ Exportar PDF
+          </button>
+          <button
+            type="button"
+            disabled={!preview}
+            title={
+              preview
+                ? undefined
+                : "Aguarde o catálogo da lousa para registrar remanejamento."
+            }
+            onClick={() => setModalOpen(true)}
+            className="rounded bg-[#d4a574] px-4 py-2 text-[12px] font-bold text-[#0a1929] hover:bg-[#e8c49a] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            + Novo Remanejamento
+          </button>
         </div>
       </div>
 
@@ -176,24 +172,28 @@ export default function RemanejamentosPage(): ReactNode {
         <>
           <div className="kpi-row">
             <div className="kpi-card">
-              <div className="kpi-label">Total</div>
-              <div className="kpi-value">{kpis.total}</div>
+              <div className="kpi-label">Total Hoje</div>
+              <div className="kpi-value">{kpis.totalHoje}</div>
+              <div className="kpi-delta">registros do dia</div>
+            </div>
+            <div className="kpi-card green">
+              <div className="kpi-label">Aceitos OGMO</div>
+              <div className="kpi-value">{kpis.aceitosOgmo}</div>
+              <div className="kpi-delta up">
+                {kpis.totalHoje > 0
+                  ? `${kpis.taxaAceitosPct}% taxa`
+                  : "—"}
+              </div>
             </div>
             <div className="kpi-card amber">
               <div className="kpi-label">Pendentes</div>
               <div className="kpi-value">{kpis.pendentes}</div>
-            </div>
-            <div className="kpi-card cyan">
-              <div className="kpi-label">Prontos p/ OGMO</div>
-              <div className="kpi-value">{kpis.aprovados}</div>
-            </div>
-            <div className="kpi-card green">
-              <div className="kpi-label">Notificados</div>
-              <div className="kpi-value">{kpis.notificados}</div>
+              <div className="kpi-delta">SLA 5min</div>
             </div>
             <div className="kpi-card red">
-              <div className="kpi-label">Recusados/Cancelados</div>
+              <div className="kpi-label">Recusados</div>
               <div className="kpi-value">{kpis.recusados}</div>
+              <div className="kpi-delta down">NACK / cancelados</div>
             </div>
           </div>
 
@@ -204,13 +204,25 @@ export default function RemanejamentosPage(): ReactNode {
               description="Quando o fiscal registrar remanejamentos no turno, eles aparecerão aqui com status de notificação ao OGMO."
             />
           ) : (
-            <RemanejamentosTable
-              items={items}
-              catalogo={catalogo}
-              onNotify={onNotify}
-            />
+            <RemanejamentosTable items={items} hojeIso={hojeIso} />
           )}
         </>
+      )}
+
+      {modalOpen && preview && (
+        <RemanejamentoModal
+          open={modalOpen}
+          porto={porto}
+          turno={turno}
+          catalogo={catalogo}
+          motivos={MOTIVOS}
+          basesLegais={[]}
+          onClose={() => setModalOpen(false)}
+          onCreated={() => {
+            fetchAll();
+          }}
+          executarENotificarOgmo
+        />
       )}
     </div>
   );

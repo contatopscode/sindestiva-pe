@@ -162,6 +162,8 @@ export interface RemanejamentoItem {
   id: string; // UUID
   codigo_se: string;
   fiscal_id: string; // UUID
+  /** Nome do fiscal criador (quando a API envia join). */
+  fiscal_nome?: string | null;
   snapshot_origem_id: string | null; // UUID
   porto_id: string; // UUID
   turno_id: string; // UUID

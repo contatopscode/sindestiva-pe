@@ -24,6 +24,25 @@ router = APIRouter(prefix="/remanejamentos", tags=["remanejamentos"])
 log = get_logger(__name__)
 
 
+def _remanejamento_to_read(rem) -> RemanejamentoRead:
+    """Serializa ORM + `fiscal.nome_completo` quando carregado."""
+    data = RemanejamentoRead.model_validate(rem)
+    fiscal = getattr(rem, "fiscal", None)
+    if fiscal is not None:
+        return data.model_copy(update={"fiscal_nome": fiscal.nome_completo})
+    return data
+
+
+async def _fiscal_for_user(db, user_id: str):
+    """Perfil Fiscal vinculado ao user (FISCAL ou DIRIGENTE com cadastro fiscal)."""
+    from app.models import Fiscal  # noqa: PLC0415
+    from sqlalchemy import select  # noqa: PLC0415
+
+    return (
+        await db.execute(select(Fiscal).where(Fiscal.user_id == user_id))
+    ).scalar_one_or_none()
+
+
 def _user_id_or_401(token: Annotated[str | None, Depends(oauth2_scheme)]) -> str:
     """Helper: garante user autenticado e retorna o id."""
     user_id = get_current_user_id(token=token)
@@ -50,7 +69,7 @@ async def list_remanejamentos(
     """Sprint 5: SELECT real com paginação + filtro opcional."""
     items, total = await listar(db, skip=skip, limit=limit, status_filter=status)
     return RemanejamentoListResponse(
-        items=[RemanejamentoRead.model_validate(r) for r in items],
+        items=[_remanejamento_to_read(r) for r in items],
         total=total,
         skip=skip,
         limit=limit,
@@ -65,17 +84,16 @@ async def create_remanejamento(
 ) -> RemanejamentoRead:
     """Sprint 5: cria remanejamento com hash chain + audit + histórico."""
     # Pegar fiscal_id do user
-    from app.models import Fiscal  # noqa: PLC0415
-    from sqlalchemy import select  # noqa: PLC0415
-
-    fiscal_stmt = select(Fiscal).where(Fiscal.user_id == user_id)
-    fiscal = (await db.execute(fiscal_stmt)).scalar_one_or_none()
+    fiscal = await _fiscal_for_user(db, user_id)
     if fiscal is None:
         raise HTTPException(
             status_code=403,
             detail={
                 "code": "NOT_FISCAL",
-                "message": "Apenas fiscais podem criar remanejamentos.",
+                "message": (
+                    "Cadastro fiscal obrigatório para criar remanejamentos. "
+                    "Fiscais e dirigentes com perfil fiscal podem registrar."
+                ),
             },
         )
 
@@ -113,15 +131,14 @@ async def aprovar_remanejamento(
     user_id: Annotated[str, Depends(_user_id_or_401)],
 ) -> RemanejamentoRead:
     """Sprint 5: status PENDENTE → APROVADO."""
-    from app.models import Fiscal  # noqa: PLC0415
-    from sqlalchemy import select  # noqa: PLC0415
-
-    fiscal_stmt = select(Fiscal).where(Fiscal.user_id == user_id)
-    fiscal = (await db.execute(fiscal_stmt)).scalar_one_or_none()
+    fiscal = await _fiscal_for_user(db, user_id)
     if fiscal is None:
         raise HTTPException(
             status_code=403,
-            detail={"code": "NOT_FISCAL", "message": "Apenas fiscais podem aprovar."},
+            detail={
+                "code": "NOT_FISCAL",
+                "message": "Cadastro fiscal obrigatório para aprovar remanejamentos.",
+            },
         )
 
     try:
