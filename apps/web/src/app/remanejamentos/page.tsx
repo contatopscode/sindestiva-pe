@@ -52,9 +52,15 @@ export default function RemanejamentosPage(): ReactNode {
     setError(null);
     try {
       // Carrega remanejamentos + catálogo (preview público) em paralelo (D01).
+      // O backend aplica defaults skip=0&limit=50; para esgotar o volume
+      // esperado (~300 remanejamentos/mês segundo discovery-notes) e
+      // preservar a paginação client-side + busca em todas as páginas,
+      // solicitamos limit=500 (teto do backend — ver rota
+      // /api/v1/remanejamentos). A tabela pagina client-side sobre o
+      // total recebido (CR1 — achado MEDIO da revisão).
       const porto: Porto = "SUAPE";
       const [remanejamentos, previewData] = await Promise.all([
-        getRemanejamentos(),
+        getRemanejamentos({ skip: 0, limit: 500 }),
         getLousaPreview(porto, "DIURNO").catch(() => null),
       ]);
       setItems(remanejamentos);

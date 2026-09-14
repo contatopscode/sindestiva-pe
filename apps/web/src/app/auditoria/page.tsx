@@ -36,6 +36,10 @@ const KIND_LABEL: Record<AuditEvent["kind"], { label: string; tone: "green" | "a
   OGMO_NACK:           { label: "OGMO NACK",     tone: "red" },
   LOGIN:               { label: "Login",         tone: "muted" },
   LOGOUT:              { label: "Logout",        tone: "muted" },
+  // Sentinel neutro para entity_types/event_types não classificados
+  // — antes caía em LOGIN e confundia o auditor (CR1 — achado MEDIO
+  // da revisão). Mantém o badge legível sem atribuir semântica errada.
+  OUTRO:               { label: "Outro",         tone: "muted" },
 };
 
 /** Opções do filtro de entity_type. "TODOS" = sem filtro (string vazia no fetch). */

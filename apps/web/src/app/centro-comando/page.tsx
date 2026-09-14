@@ -335,7 +335,9 @@ function CentroComandoPageInner(): ReactNode {
               <div className="kpi-card cyan">
                 <div className="kpi-label">Sync OGMO</div>
                 <div className="kpi-value">
-                  {data.snapshot.id ? `${Math.max(1, Math.round((Date.now() - new Date(data.snapshot.scraped_at ?? 0).getTime()) / 1000))}s` : "—"}
+                  {data.snapshot.id && data.snapshot.scraped_at
+                    ? `${Math.max(1, Math.round((Date.now() - new Date(data.snapshot.scraped_at).getTime()) / 1000))}s`
+                    : "—"}
                 </div>
                 <div className="kpi-delta">Última há alguns segundos</div>
               </div>

@@ -104,9 +104,7 @@ export function RemanejamentosTable({
           : null,
         tpaIn: cellIn
           ? {
-              nome: cellOut?.tpa_nome
-                ? cellOut.tpa_nome
-                : (cellIn.tpa_nome ?? "(nome removido)"),
+              nome: cellIn.tpa_nome ?? "(nome removido)",
               matricula: cellIn.tpa_matricula ?? "—",
             }
           : null,

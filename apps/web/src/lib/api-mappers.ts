@@ -338,7 +338,11 @@ function inferAuditKind(entityType: string, eventType: string): AuditEventKind {
   }
   if (ev.includes("ACK")) return "OGMO_ACK";
   if (ev.includes("NACK")) return "OGMO_NACK";
-  return "LOGIN";
+  // Sentinel neutro para entity_types/event_types não classificados
+  // (ex.: LGDP_SOLICITACAO, BI_EXPORT, AUTH_*) — evita que um evento
+  // desconhecido seja renderizado como "Login" (CR1 — achado MEDIO da
+  // revisão, antes caía em LOGIN e confundia o auditor).
+  return "OUTRO";
 }
 
 function auditDescription(e: AuditEventApi): string {

@@ -245,7 +245,8 @@ export type AuditEventKind =
   | "OGMO_ACK"
   | "OGMO_NACK"
   | "LOGIN"
-  | "LOGOUT";
+  | "LOGOUT"
+  | "OUTRO";
 
 export interface AuditEvent {
   id: string;
