@@ -19,7 +19,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import type { Role } from "@/lib/auth";
-import { getRoleFromStoredToken } from "@/lib/api";
+import { fetchCurrentUser, getRoleFromStoredToken } from "@/lib/api";
 
 export interface SidebarItem {
   /** String para acomodar hrefs placeholder tipo "#". Cast para Route no Link. */
@@ -84,19 +84,12 @@ export function Sidebar(): ReactNode {
     const fromJwt = getRoleFromStoredToken();
     if (fromJwt) setUserRole(fromJwt);
 
-    fetch("/api/auth/me", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: unknown) => {
-        if (
-          data &&
-          typeof data === "object" &&
-          "role" in data &&
-          typeof (data as { role: unknown }).role === "string"
-        ) {
-          const role = (data as { role: string }).role;
-          if (role === "FISCAL" || role === "DIRIGENTE" || role === "TPA") {
-            setUserRole(role);
-          }
+    fetchCurrentUser()
+      .then((session) => {
+        if (!session?.role) return;
+        const role = session.role;
+        if (role === "FISCAL" || role === "DIRIGENTE" || role === "TPA") {
+          setUserRole(role);
         }
       })
       .catch(() => undefined);

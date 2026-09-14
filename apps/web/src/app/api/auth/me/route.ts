@@ -1,16 +1,25 @@
 /**
  * GET /api/auth/me
- * Server-side proxy para /api/v1/auth/me — repassa cookie httpOnly.
- * Usado pelo Header do WEB pra mostrar user.role sem acesso direto à API.
+ * Server-side proxy para /api/v1/auth/me — cookie httpOnly ou Authorization Bearer.
  */
 import { cookies } from "next/headers";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { API_URL } from "@/lib/api";
+import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
 
 const API = API_URL;
 
-export async function GET() {
-  const token = (await cookies()).get("sindestiva_token")?.value;
+function bearerFromRequest(req: NextRequest): string | null {
+  const raw = req.headers.get("authorization");
+  if (!raw?.startsWith("Bearer ")) return null;
+  const token = raw.slice(7).trim();
+  return token || null;
+}
+
+export async function GET(req: NextRequest) {
+  const cookieToken = (await cookies()).get(AUTH_COOKIE_NAME)?.value;
+  const bearer = bearerFromRequest(req);
+  const token = cookieToken ?? bearer;
   if (!token) {
     return NextResponse.json({ error: "No session" }, { status: 401 });
   }

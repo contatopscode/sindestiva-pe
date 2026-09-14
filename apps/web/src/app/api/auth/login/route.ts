@@ -1,32 +1,14 @@
 /**
  * POST /api/auth/login
  *
- * Server-side proxy que chama a API de prod, seta cookie httpOnly
- * `sindestiva_token` e retorna {ok, role, access_token}.
+ * Server-side proxy que chama a API, seta cookie httpOnly
+ * `sindestiva_token` (domain por ambiente) e retorna {ok, role, access_token}.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { API_URL } from "@/lib/api";
+import { buildLoginSetCookieHeaders } from "@/lib/auth-cookie";
 
 const API = API_URL;
-const COOKIE_NAME = "sindestiva_token";
-const COOKIE_MAX_AGE = 8 * 60 * 60;
-
-function buildCookieValue(data: { access_token: string }): string {
-  // Set-Cookie cru (Next.js cookies().set() pode ignorar campos extras
-  // como `domain` em algumas versões — montar na mão dá controle total).
-  const parts = [
-    `${COOKIE_NAME}=${data.access_token}`,
-    `Path=/`,
-    `Max-Age=${COOKIE_MAX_AGE}`,
-    `HttpOnly`,
-    `SameSite=Lax`,
-  ];
-  if (process.env.NODE_ENV === "production") {
-    parts.push("Secure");
-    parts.push("Domain=.pscode.ia.br"); // compartilha entre web.lousa.pscode.ia.br e api.lousa.pscode.ia.br
-  }
-  return parts.join("; ");
-}
 
 export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
@@ -72,15 +54,14 @@ export async function POST(req: NextRequest) {
     user: { role: string; id: string; email: string | null };
   };
 
-  // Constrói Set-Cookie com `Domain=.pscode.ia.br` (cookies() ignorado).
+  const host = req.headers.get("host") ?? "";
   const res = NextResponse.json({
     ok: true,
     role: data.user.role,
-    access_token: data.access_token,  // client-side também usa (Authorization header)
+    access_token: data.access_token,
   });
-  res.headers.append(
-    "Set-Cookie",
-    buildCookieValue({ access_token: data.access_token }),
-  );
+  for (const cookieHeader of buildLoginSetCookieHeaders(data.access_token, host)) {
+    res.headers.append("Set-Cookie", cookieHeader);
+  }
   return res;
 }
