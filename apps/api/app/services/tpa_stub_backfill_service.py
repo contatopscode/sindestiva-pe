@@ -8,14 +8,20 @@ from __future__ import annotations
 import hashlib
 from datetime import date, timedelta
 
-from sqlalchemy import distinct, select, update
+from sqlalchemy import distinct, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.models import Funcao, LousaAlocacao, Tpa, User
 from app.models.enums import RoleEnum, TpaStatusEnum, UserStatusEnum
-from app.services.tpa_match_service import load_tpas_by_matriculas, normalize_matricula_ogmo
+from app.services.tpa_match_service import (
+    expand_matriculas_from_valores,
+    is_valid_matricula_ogmo_storage,
+    load_tpas_by_matriculas,
+    normalize_matricula_ogmo,
+    split_matriculas_celula,
+)
 
 log = get_logger(__name__)
 
@@ -48,8 +54,8 @@ async def distinct_matriculas_recentes(
     db: AsyncSession,
     *,
     days: int = 30,
-) -> list[str]:
-    """Matrículas DISTINCT em alocações recentes (normalizadas)."""
+) -> tuple[list[str], int]:
+    """Matrículas individuais (split vírgula) válidas para `tpas.matricula_ogmo`."""
     since = date.today() - timedelta(days=days)
     stmt = (
         select(distinct(LousaAlocacao.trabalhador_matricula))
@@ -59,14 +65,18 @@ async def distinct_matriculas_recentes(
         )
     )
     raw = (await db.execute(stmt)).scalars().all()
-    out: list[str] = []
-    seen: set[str] = set()
-    for m in raw:
-        key = normalize_matricula_ogmo(m)
-        if key and key not in seen:
-            seen.add(key)
-            out.append(key)
-    return out
+    skipped_invalid = 0
+    for cell_value in raw:
+        for token in split_matriculas_celula(cell_value):
+            if not is_valid_matricula_ogmo_storage(token):
+                skipped_invalid += 1
+                log.warning(
+                    "tpa_stub_backfill.skip_matricula_invalida",
+                    token=token,
+                    celula=cell_value,
+                )
+    matriculas = expand_matriculas_from_valores(raw)
+    return matriculas, skipped_invalid
 
 
 async def ensure_stub_tpa_for_matricula(
@@ -79,6 +89,8 @@ async def ensure_stub_tpa_for_matricula(
     key = normalize_matricula_ogmo(matricula)
     if not key:
         raise ValueError("matricula vazia")
+    if not is_valid_matricula_ogmo_storage(key):
+        raise ValueError(f"matricula invalida para tpas: {key!r}")
 
     existing = await load_tpas_by_matriculas(db, [key])
     if key in existing:
@@ -129,6 +141,41 @@ async def ensure_stub_tpa_for_matricula(
     return tpa, True
 
 
+async def _link_trabalhador_ids(
+    db: AsyncSession,
+    *,
+    days: int,
+    tpa_map: dict[str, Tpa],
+) -> int:
+    """Preenche `trabalhador_id` (1 FK por célula — multi-TPA usa 1º token resolvido)."""
+    since = date.today() - timedelta(days=days)
+    stmt = select(LousaAlocacao).where(
+        LousaAlocacao.trabalhador_id.is_(None),
+        LousaAlocacao.trabalhador_matricula.is_not(None),
+        LousaAlocacao.data_referencia >= since,
+    )
+    alocs = (await db.execute(stmt)).scalars().all()
+    linked = 0
+    for aloc in alocs:
+        tokens = [
+            t
+            for t in split_matriculas_celula(aloc.trabalhador_matricula)
+            if is_valid_matricula_ogmo_storage(t)
+        ]
+        if not tokens:
+            continue
+        tpa = None
+        for token in tokens:
+            tpa = tpa_map.get(token)
+            if tpa is not None:
+                break
+        if tpa is None:
+            continue
+        aloc.trabalhador_id = tpa.id
+        linked += 1
+    return linked
+
+
 async def backfill_stubs_from_lousa_alocacao(
     db: AsyncSession,
     *,
@@ -146,7 +193,7 @@ async def backfill_stubs_from_lousa_alocacao(
             "linked_alocacoes": 0,
         }
 
-    matriculas = await distinct_matriculas_recentes(db, days=days)
+    matriculas, skipped_invalid = await distinct_matriculas_recentes(db, days=days)
     funcao = await _default_funcao(db)
     created = 0
     existing = 0
@@ -160,25 +207,14 @@ async def backfill_stubs_from_lousa_alocacao(
     linked = 0
     if link_alocacoes and matriculas:
         tpa_map = await load_tpas_by_matriculas(db, matriculas)
-        since = date.today() - timedelta(days=days)
-        for mat, tpa in tpa_map.items():
-            stmt = (
-                update(LousaAlocacao)
-                .where(
-                    LousaAlocacao.trabalhador_id.is_(None),
-                    LousaAlocacao.trabalhador_matricula == mat,
-                    LousaAlocacao.data_referencia >= since,
-                )
-                .values(trabalhador_id=tpa.id)
-            )
-            result = await db.execute(stmt)
-            linked += result.rowcount or 0
+        linked = await _link_trabalhador_ids(db, days=days, tpa_map=tpa_map)
 
     await db.commit()
     return {
         "ok": True,
         "skipped": False,
         "matriculas_seen": len(matriculas),
+        "skipped_invalid_tokens": skipped_invalid,
         "created": created,
         "existing": existing,
         "linked_alocacoes": linked,

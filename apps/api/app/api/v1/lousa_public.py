@@ -26,7 +26,7 @@ from app.core.logging import get_logger
 from app.models import Faina, Funcao, LousaAlocacao, LousaCell, LousaSnapshot, Porto, Tpa, Turno
 from app.models import LousaEscalaOrigem
 from app.models.enums import CellStatusEnum, SnapshotStatusEnum, StatusScrapingEnum
-from app.services.tpa_match_service import load_tpas_by_matriculas, normalize_matricula_ogmo
+from app.services.tpa_match_service import load_tpas_by_matriculas, normalize_matricula_ogmo, split_matriculas_celula
 
 router = APIRouter(prefix="/lousa/public", tags=["lousa-public"])
 log = get_logger(__name__)
@@ -186,7 +186,10 @@ async def preview(
                 if a.trabalhador_id and a.trabalhador_id in tpa_by_id:
                     tpa_obj = tpa_by_id[a.trabalhador_id]
                 elif matricula_exib:
-                    tpa_obj = tpa_by_mat.get(matricula_exib)
+                    for token in split_matriculas_celula(matricula_exib):
+                        tpa_obj = tpa_by_mat.get(token)
+                        if tpa_obj is not None:
+                            break
                 cells.append({
                     "id": str(a.id),
                     "faina_id": str(a.faina_id),
