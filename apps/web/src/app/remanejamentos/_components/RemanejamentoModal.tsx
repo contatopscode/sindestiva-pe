@@ -41,7 +41,10 @@ import {
   createRemanejamento,
   notifyOgmo,
 } from "@/lib/api";
-import { labelForMotivo } from "@/lib/remanejamento-ui";
+import {
+  labelForMotivo,
+  mensagemMatriculaSemCadastro,
+} from "@/lib/remanejamento-ui";
 import { StatusBadge } from "@/app/_components/StatusBadge";
 import type {
   CctClausula,
@@ -225,6 +228,11 @@ export function RemanejamentoModal({
     const cell = catalogo.cells.find((c) => c.tpa_matricula === mat);
     return cell?.tpa_id ?? "";
   }, [tpaInMatricula, catalogo.cells]);
+
+  const tpaOutSemCadastroMsg = useMemo(
+    () => mensagemMatriculaSemCadastro(tpaOutMatricula, tpaOutIdResolved),
+    [tpaOutMatricula, tpaOutIdResolved],
+  );
 
   const funcaoLabel =
     catalogo.funcoes.find((f) => f.id === funcaoId)?.nome ?? "—";
@@ -434,6 +442,14 @@ export function RemanejamentoModal({
                 placeholder="Ex.: 012"
                 className="w-full rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[13px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
               />
+              {tpaOutSemCadastroMsg ? (
+                <p
+                  role="status"
+                  className="mt-1 text-[11px] text-[#e8a33d]"
+                >
+                  {tpaOutSemCadastroMsg}
+                </p>
+              ) : null}
             </Field>
 
             <Field label="TPA a inserir (opcional)">

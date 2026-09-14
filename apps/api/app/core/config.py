@@ -112,6 +112,15 @@ class Settings(BaseSettings):
     # Header esperado: X-Admin-Token. Se vazio, endpoint retorna 503.
     admin_seed_token: str = ""
 
+    # ---------- TPA stub (homolog / MVP sem cadastro sindical real) ----------
+    # Quando 1, permite criar User+Tpa sintéticos a partir de matrículas
+    # raspadas (`lousa_alocacao`). Desligado em produção até import real.
+    allow_tpa_stub: bool = Field(
+        default=False,
+        validation_alias="ALLOW_TPA_STUB",
+        description="1/true habilita backfill de stubs TPA por matrícula OGMO.",
+    )
+
     @model_validator(mode="after")
     def _derive_database_url_sync(self) -> Settings:
         """Se `DATABASE_URL_SYNC` não foi setado, deriva de `DATABASE_URL_ASYNC`.

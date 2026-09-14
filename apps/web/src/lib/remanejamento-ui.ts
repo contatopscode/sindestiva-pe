@@ -126,3 +126,17 @@ export function borderClassForRemanejamentoItem(
   if (label === "PEND") return "border-l-[3px] border-l-[#e8a33d]";
   return "border-l-[3px] border-l-[#4fb8c9]";
 }
+
+/** Mensagem quando a matrícula veio da lousa mas não há TPA cadastrado. */
+export const MSG_MATRICULA_SEM_CADASTRO =
+  "Matrícula sem cadastro no Sindicato — cadastre o TPA ou execute o backfill de stubs.";
+
+export function mensagemMatriculaSemCadastro(
+  matricula: string,
+  tpaIdResolved: string,
+): string | null {
+  if (matricula.trim() !== "" && tpaIdResolved.trim() === "") {
+    return MSG_MATRICULA_SEM_CADASTRO;
+  }
+  return null;
+}

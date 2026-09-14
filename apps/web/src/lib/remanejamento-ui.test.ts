@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   badgeLabelForRemanejamentoStatus,
   computeRemanejamentoKpis,
+  mensagemMatriculaSemCadastro,
+  MSG_MATRICULA_SEM_CADASTRO,
 } from "./remanejamento-ui";
 
 describe("badgeLabelForRemanejamentoStatus", () => {
@@ -44,5 +46,15 @@ describe("computeRemanejamentoKpis", () => {
     expect(kpis.taxaAceitosPct).toBe(50);
     expect(kpis.pendentes).toBe(1);
     expect(kpis.recusados).toBe(0);
+  });
+});
+
+describe("mensagemMatriculaSemCadastro", () => {
+  it("alerta quando matrícula preenchida sem UUID resolvido", () => {
+    expect(mensagemMatriculaSemCadastro("162", "")).toBe(
+      MSG_MATRICULA_SEM_CADASTRO,
+    );
+    expect(mensagemMatriculaSemCadastro("162", "uuid-ok")).toBeNull();
+    expect(mensagemMatriculaSemCadastro("", "")).toBeNull();
   });
 });
