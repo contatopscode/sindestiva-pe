@@ -36,6 +36,7 @@ export function BarChart({ items, onBarClick, height = 320 }: BarChartProps): Re
       const datas = items.map((i) => i.data);
       const totais = items.map((i) => i.total);
       const maxV = Math.max(1, ...totais);
+      const lastIndex = totais.length > 0 ? totais.length - 1 : -1;
 
       chart.setOption({
         backgroundColor: "transparent",
@@ -67,10 +68,21 @@ export function BarChart({ items, onBarClick, height = 320 }: BarChartProps): Re
         series: [
           {
             type: "bar",
-            data: totais,
-            itemStyle: { color: "#c8a04d" },
+            data: totais.map((v, idx) => ({
+              value: v,
+              itemStyle: {
+                color: idx === lastIndex ? "#f59e0b" : "#c8a04d",
+              },
+            })),
             emphasis: { itemStyle: { color: "#fbbf24" } },
             barMaxWidth: 32,
+            label: {
+              show: true,
+              position: "top",
+              color: "#e8eef4",
+              fontSize: 11,
+              formatter: (params: { value: number }) => String(params.value),
+            },
           },
         ],
       });
