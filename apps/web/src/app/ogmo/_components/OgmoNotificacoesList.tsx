@@ -66,7 +66,7 @@ function tooltipEntregue(item: OgmoNotificacao): string | undefined {
 
 /** Tooltip "Anexo indisponível" quando pdf_anexo_url === null em ENTREGUE/ENVIADO (E36). */
 function tooltipAnexo(item: OgmoNotificacao): string | undefined {
-  if (item.pdf_anexo_url === null) return undefined;
+  if (item.pdf_anexo_url !== null) return undefined;
   if (item.status === "ENTREGUE" || item.status === "ENVIADO") {
     return "Anexo indisponível";
   }
