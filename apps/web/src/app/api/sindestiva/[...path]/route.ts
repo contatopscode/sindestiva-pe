@@ -14,6 +14,10 @@
  */
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import {
+  buildProxyResponseHeaders,
+  resolveUpstreamAuthorization,
+} from "@/lib/bff-proxy-headers";
 import { resolveApiUrl } from "@/lib/api-url";
 
 const API = resolveApiUrl();
@@ -32,11 +36,16 @@ async function proxy(
     .map((c) => `${c.name}=${c.value}`)
     .join("; ");
 
+  const authorization = resolveUpstreamAuthorization(
+    req.headers.get("authorization"),
+    tokenCookie,
+  );
+
   const init: RequestInit = {
     method: req.method,
     headers: {
       "Content-Type": req.headers.get("content-type") ?? "application/json",
-      ...(tokenCookie ? { Authorization: `Bearer ${tokenCookie}` } : {}),
+      ...(authorization ? { Authorization: authorization } : {}),
       ...(allCookies ? { Cookie: allCookies } : {}),
     },
     ...(req.method === "GET" || req.method === "HEAD"
@@ -47,17 +56,10 @@ async function proxy(
 
   const upstream = await fetch(url, init);
 
-  const resHeaders = new Headers();
-  const ct = upstream.headers.get("content-type");
-  if (ct) resHeaders.set("content-type", ct);
-  const ce = upstream.headers.get("content-encoding");
-  if (ce) resHeaders.set("content-encoding", ce);
-  const cd = upstream.headers.get("content-disposition");
-  if (cd) resHeaders.set("content-disposition", cd);
-  const origin = req.headers.get("origin") ?? `https://web.lousa.pscode.ia.br`;
-  resHeaders.set("Access-Control-Allow-Origin", origin);
-  resHeaders.set("Access-Control-Allow-Credentials", "true");
-  resHeaders.set("Vary", "Origin");
+  const resHeaders = buildProxyResponseHeaders(
+    upstream.headers,
+    req.headers.get("origin"),
+  );
 
   return new Response(upstream.body, {
     status: upstream.status,

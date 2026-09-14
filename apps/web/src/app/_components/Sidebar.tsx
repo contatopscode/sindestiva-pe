@@ -19,6 +19,7 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import type { Role } from "@/lib/auth";
+import { getRoleFromStoredToken } from "@/lib/api";
 
 export interface SidebarItem {
   /** String para acomodar hrefs placeholder tipo "#". Cast para Route no Link. */
@@ -71,12 +72,16 @@ const GROUPS: SidebarGroup[] = [
 
 export function Sidebar(): ReactNode {
   const pathname = usePathname();
-  const [userRole, setUserRole] = useState<Role | null>(null);
+  const [userRole, setUserRole] = useState<Role | null>(() =>
+    typeof window !== "undefined" ? getRoleFromStoredToken() : null,
+  );
 
   useEffect(() => {
-    // Busca role do usuário autenticado (cookie httpOnly). 401 → null
-    // (middleware já redirecionou — item com roles fica oculto até o
-    // próximo mount com sessão válida).
+    // JWT em sessionStorage como fallback imediato (apiFetch); /api/auth/me
+    // confirma role quando o cookie httpOnly responde (subdomínios).
+    const fromJwt = getRoleFromStoredToken();
+    if (fromJwt) setUserRole(fromJwt);
+
     fetch("/api/auth/me", { credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data: unknown) => {

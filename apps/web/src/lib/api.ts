@@ -130,6 +130,20 @@ function getStoredToken(): string | null {
   return raw;
 }
 
+/** Role do JWT em sessionStorage (best-effort, mesmo payload que o middleware). */
+export function getRoleFromStoredToken(): "FISCAL" | "DIRIGENTE" | "TPA" | null {
+  const token = getStoredToken();
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1] ?? "")) as { role?: string };
+    const role = payload.role;
+    if (role === "FISCAL" || role === "DIRIGENTE" || role === "TPA") return role;
+  } catch {
+    /* noop */
+  }
+  return null;
+}
+
 /** Repõe JWT no sessionStorage a partir do cookie httpOnly (refresh / nova aba). */
 async function hydrateTokenFromCookie(): Promise<string | null> {
   if (typeof window === "undefined") return null;
