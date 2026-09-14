@@ -110,7 +110,7 @@ export interface RemanejamentoModalProps {
   motivos: MotivoRemanejamentoUi[];
   /** Lista de cláusulas CCT — vazia = sem catálogo (textarea visível). */
   basesLegais: CctClausula[];
-  /** Após criar, aprova e chama notificar-ogmo (botão do protótipo). */
+  /** Quando true, encadeia createRemanejamento + aprovarRemanejamento + notifyOgmo (atômico). Rota /remanejamentos passa true (botão do protótipo); rota /remanejamentos/novo deixa false (default, só criar). Bifurcação deliberada — vide decisão D06 no plano SINDESTIVA-PE-FSW-2026-004. */
   executarENotificarOgmo?: boolean;
 }
 
