@@ -330,8 +330,35 @@ async def run_seeds(
             detail=f"Falha em seed_tpas_demo: {type(exc).__name__}: {exc}",
         ) from exc
 
+    try:
+        steps["tpas_from_lousa"] = await _executar_seed("seed_tpas_from_lousa")
+    except Exception as exc:
+        log.exception("admin.run_seeds.tpas_from_lousa_falhou")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Falha em seed_tpas_from_lousa: {type(exc).__name__}: {exc}",
+        ) from exc
+
     log.warning("admin.run_seeds.ok", steps=list(steps.keys()))
     return {"ok": True, "steps": steps}
+
+
+@router.post(
+    "/backfill-tpas-from-lousa",
+    summary="[ADMIN] Cria stubs TPA + FK trabalhador_id a partir da lousa",
+)
+async def backfill_tpas_from_lousa(
+    days: int = 14,
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Backfill idempotente. Exige `ALLOW_TPA_STUB=1` no servidor."""
+    from app.services.tpa_match_service import backfill_tpas_from_lousa_alocacao
+
+    _check_admin_token(x_admin_token)
+    log.warning("admin.backfill_tpas_from_lousa.invocado", days=days)
+    stats = await backfill_tpas_from_lousa_alocacao(db, days=days)
+    return {"ok": True, "stats": stats}
 
 
 __all__ = ["router"]

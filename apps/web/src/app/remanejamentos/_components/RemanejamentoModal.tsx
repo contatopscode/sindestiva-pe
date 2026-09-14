@@ -41,6 +41,7 @@ import {
   createRemanejamento,
   notifyOgmo,
 } from "@/lib/api";
+import { labelPendenciaTpaOut } from "@/lib/remanejamento-modal-validation";
 import { labelForMotivo } from "@/lib/remanejamento-ui";
 import { StatusBadge } from "@/app/_components/StatusBadge";
 import type {
@@ -261,7 +262,12 @@ export function RemanejamentoModal({
       if (submitting) { camposPendentes.push("envio em andamento"); return false; }
       if (!confirmCct) { camposPendentes.push("ack CCT"); return false; }
       if (!portoId || !turnoId) { camposPendentes.push("porto/turno"); return false; }
-      if (!tpaOutIdResolved) { camposPendentes.push("TPA a remover"); return false; }
+      if (!tpaOutIdResolved) {
+        camposPendentes.push(
+          labelPendenciaTpaOut(tpaOutMatricula, tpaOutIdResolved),
+        );
+        return false;
+      }
       if (!funcaoId || !fainaId) { camposPendentes.push("função e faina"); return false; }
       if (!motivo) { camposPendentes.push("motivo"); return false; }
       if (motivo === "OUTRO" && motivoOutro.trim() === "") { camposPendentes.push("motivo_outro_texto"); return false; }
@@ -272,7 +278,7 @@ export function RemanejamentoModal({
       return true;
     })();
     return { canSubmit: valido, camposPendentes };
-  }, [submitting, portoId, turnoId, tpaOutIdResolved, confirmCct, funcaoId, fainaId, motivo, motivoOutro, baseLegalMode, baseLegalCctId, baseLegalLivre, observacoes, caisOrigem]);
+  }, [submitting, portoId, turnoId, tpaOutIdResolved, tpaOutMatricula, confirmCct, funcaoId, fainaId, motivo, motivoOutro, baseLegalMode, baseLegalCctId, baseLegalLivre, observacoes, caisOrigem]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -434,6 +440,12 @@ export function RemanejamentoModal({
                 placeholder="Ex.: 012"
                 className="w-full rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[13px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
               />
+              {tpaOutMatricula.trim() !== "" && !tpaOutIdResolved && (
+                <p className="mt-1 text-[11px] text-[#e04a4a]">
+                  Matrícula sem cadastro no Sindicato — solicite backfill ou cadastro
+                  do TPA antes de remanejar.
+                </p>
+              )}
             </Field>
 
             <Field label="TPA a inserir (opcional)">

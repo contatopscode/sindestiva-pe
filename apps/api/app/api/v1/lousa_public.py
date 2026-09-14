@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db
 from app.core.logging import get_logger
 from app.models import Faina, Funcao, LousaAlocacao, LousaCell, LousaSnapshot, Porto, Tpa, Turno
+from app.services.tpa_match_service import map_tpas_by_matriculas, normalize_matricula_ogmo
 from app.models import LousaEscalaOrigem
 from app.models.enums import CellStatusEnum, SnapshotStatusEnum, StatusScrapingEnum
 
@@ -166,17 +167,28 @@ async def preview(
             alocacoes_db = (await db.execute(stmt_a)).scalars().all()
             if not alocacoes_db and latest_escala.status != StatusScrapingEnum.SEM_DADOS:
                 continue
-            # 3. Resolver TPAs em batch (1 query pra N matriculas)
-            matriculas = {a.trabalhador_matricula for a in alocacoes_db if a.trabalhador_matricula}
-            tpa_by_mat: dict[str, Tpa] = {}
-            if matriculas:
-                tpa_rows = (await db.execute(
-                    select(Tpa).where(Tpa.matricula_ogmo.in_(matriculas))
-                )).scalars().all()
-                tpa_by_mat = {t.matricula_ogmo: t for t in tpa_rows}
+            # 3. Resolver TPAs em batch (FK trabalhador_id ou matrícula)
+            tpa_by_mat = await map_tpas_by_matriculas(
+                db,
+                [a.trabalhador_matricula for a in alocacoes_db],
+            )
+            tpa_by_id = {str(t.id): t for t in tpa_by_mat.values()}
             # 4. Construir cells (já deduplicadas pela FK da escala_origem)
             for a in alocacoes_db:
-                tpa_obj = tpa_by_mat.get(a.trabalhador_matricula) if a.trabalhador_matricula else None
+                mat = normalize_matricula_ogmo(a.trabalhador_matricula)
+                tpa_obj = None
+                if a.trabalhador_id is not None:
+                    tpa_obj = tpa_by_id.get(str(a.trabalhador_id))
+                    if tpa_obj is None:
+                        tpa_obj = (
+                            await db.execute(
+                                select(Tpa).where(Tpa.id == a.trabalhador_id)
+                            )
+                        ).scalar_one_or_none()
+                        if tpa_obj is not None:
+                            tpa_by_id[str(tpa_obj.id)] = tpa_obj
+                if tpa_obj is None and mat:
+                    tpa_obj = tpa_by_mat.get(mat)
                 cells.append({
                     "id": str(a.id),
                     "faina_id": str(a.faina_id),
@@ -184,7 +196,7 @@ async def preview(
                     "cais": None,
                     "tpa_id": str(tpa_obj.id) if tpa_obj else None,
                     "tpa_nome": tpa_obj.nome_completo if tpa_obj else None,
-                    "tpa_matricula": a.trabalhador_matricula,
+                    "tpa_matricula": mat,
                     "status": "NORMAL",
                     "data_referencia": a.data_referencia.isoformat(),
                 })

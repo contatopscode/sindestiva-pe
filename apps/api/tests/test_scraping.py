@@ -300,6 +300,57 @@ async def test_scraping_service_upsert_idempotente(fake_http_factory, fakes_path
         origens = list(result.scalars().all())
     assert len(origens) == 1
 
+    # Com TPA cadastrado para matrícula do fake, alocações recebem trabalhador_id.
+    from sqlalchemy import select as sa_select
+
+    from app.models import Funcao, LousaAlocacao, Tpa, User
+    from app.models.enums import RoleEnum, TpaStatusEnum, UserStatusEnum
+
+    async with session_scope() as db:
+        funcao = (await db.execute(sa_select(Funcao).limit(1))).scalar_one()
+        mat_sample = "058"
+        user = User(
+            email="scraping-058@test.local",
+            role=RoleEnum.TPA,
+            status=UserStatusEnum.ATIVO,
+            password_hash=None,
+        )
+        db.add(user)
+        await db.flush()
+        db.add(
+            Tpa(
+                user_id=user.id,
+                cpf="99988877766",
+                nome_completo="Scrape Match 058",
+                matricula_ogmo=mat_sample,
+                telefone="+5581999999999",
+                funcao_base_id=funcao.id,
+                categoria=funcao.categoria,
+                status_cadastro=TpaStatusEnum.ATIVO,
+            )
+        )
+        await db.commit()
+
+    client3 = fake_http_factory(html=html)
+    async with session_scope() as db:
+        await executar_scraping(
+            db,
+            fonte=FonteEscalaEnum.TPA,
+            porto_slug="SUAPE",
+            turno_codigo="DIURNO",
+            data=data_ref,
+            http_client=client3,
+        )
+
+    async with session_scope() as db:
+        stmt_aloc = select(LousaAlocacao).where(
+            LousaAlocacao.data_referencia == data_ref,
+            LousaAlocacao.trabalhador_matricula == mat_sample,
+        )
+        matched = (await db.execute(stmt_aloc)).scalars().all()
+    assert matched, "esperava alocação com matrícula 058"
+    assert all(a.trabalhador_id is not None for a in matched)
+
     # Limpa estado depois.
     async with session_scope() as db:
         await db.execute(

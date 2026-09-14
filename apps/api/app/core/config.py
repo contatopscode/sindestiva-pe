@@ -18,7 +18,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -111,6 +111,25 @@ class Settings(BaseSettings):
     # Token compartilhado para endpoints admin (run-seeds, etc).
     # Header esperado: X-Admin-Token. Se vazio, endpoint retorna 503.
     admin_seed_token: str = ""
+
+    # ---------- TPA matcher / stubs (homolog) ----------
+    # Quando true, backfill cria User+Tpa sintéticos para matrículas da lousa.
+    allow_tpa_stub: bool = Field(
+        default=False,
+        validation_alias="ALLOW_TPA_STUB",
+        description="Permite stubs de TPA a partir de matrículas raspadas.",
+    )
+
+    @field_validator("allow_tpa_stub", mode="before")
+    @classmethod
+    def _coerce_allow_tpa_stub(cls, value: object) -> bool:
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return value != 0
+        if isinstance(value, str):
+            return value.strip().lower() in ("1", "true", "yes", "on")
+        return bool(value)
 
     @model_validator(mode="after")
     def _derive_database_url_sync(self) -> Settings:
