@@ -19,6 +19,17 @@ export type Porto = (typeof PORTOS)[number];
 export const TURNOS = ["DIURNO", "NOTURNO"] as const;
 export type Turno = (typeof TURNOS)[number];
 
-/** Status do workflow de notificação ao OGMO (Sprint 5, T5-10) */
+/** Status do workflow de notificação ao OGMO (Sprint 5, T5-10) — legado, contexto remanejamento */
 export const STATUS_OGMO = ["PEND", "SENT", "ACK", "NACK"] as const;
 export type StatusOgmo = (typeof STATUS_OGMO)[number];
+
+/** Status da notificação ao OGMO/PE (HU005) — fila de notificações, 5 valores.
+ *  Coexiste com STATUS_OGMO legado (contexto remanejamento) — não misturar. */
+export const STATUS_NOTIFICACAO_OGMO = [
+  "PENDENTE",
+  "ENVIADO",
+  "ENTREGUE",
+  "FALHOU",
+  "REJEITADO",
+] as const;
+export type StatusNotificacaoOgmo = (typeof STATUS_NOTIFICACAO_OGMO)[number];
