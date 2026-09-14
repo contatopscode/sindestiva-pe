@@ -53,10 +53,10 @@ export function toneForSnapshotStatus(s: SnapshotStatus | null | undefined): Bad
  * Tom do badge para o ciclo de vida do remanejamento
  * (`StatusRemanejamentoUi`, 6 valores).
  *
- * Mapeamento:
+ * Mapeamento (D09):
  *   - PENDENTE        → amber (aguarda ação do fiscal)
  *   - APROVADO        → cyan (pronto p/ OGMO)
- *   - NOTIFICADO_OGMO → purple (em trânsito)
+ *   - NOTIFICADO_OGMO → cyan (em trânsito; valor cru no tooltip — D09)
  *   - ACK             → green (confirmado pelo OGMO)
  *   - NACK            → red (rejeitado pelo OGMO)
  *   - CANCELADO       → muted
@@ -66,9 +66,8 @@ export function toneForStatusRemanejamento(s: StatusRemanejamentoUi): BadgeTone 
     case "PENDENTE":
       return "amber";
     case "APROVADO":
-      return "cyan";
     case "NOTIFICADO_OGMO":
-      return "purple";
+      return "cyan";
     case "ACK":
       return "green";
     case "NACK":

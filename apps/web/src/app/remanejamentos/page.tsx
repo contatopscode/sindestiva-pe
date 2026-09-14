@@ -1,56 +1,151 @@
 // =============================================================================
-// SINDESTIVA-PE · /remanejamentos — lista de remanejamentos (Sprint S2)
-// Agora client component (busca via apiFetch + useEffect).
-// Sprint S2: tipo do state migrou para `RemanejamentoItemResolved` (dados
-// crus do backend + campos resolvidos via catálogo carregado em paralelo).
+// SINDESTIVA-PE · /remanejamentos — lista de remanejamentos (Sprint S4)
+//
+// Mudanças vs S3:
+//   - Catálogo entregue à `RemanejamentosTable` via prop `catalogo` —
+//     a resolução de IDs via catálogo passa a ser responsabilidade da
+//     tabela (memoizada) e não mais da página.
+//   - KPIs calculados em `useMemo` com base nos status crus do enum
+//     `StatusRemanejamentoUi` (PENDENTE / APROVADO /
+//     NOTIFICADO_OGMO|ACK / NACK|CANCELADO).
+//   - Botão "Notificar OGMO" (status APROVADO) + optimistic update + debounce
+//     expostos pela tabela; a página só repassa `onNotify` e mantém o estado.
+//   - Paginação client-side com `limit=50` (botões Anterior/Próximo).
 // =============================================================================
 
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { getRemanejamentos, getLousaPreview, ApiError } from "@/lib/api";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  getRemanejamentos,
+  getLousaPreview,
+  notifyOgmo,
+  ApiError,
+} from "@/lib/api";
 import type { Porto } from "@sindestiva/shared";
 import { EmptyState } from "@/app/_components/EmptyState";
 import { RemanejamentosTable } from "./_components/RemanejamentosTable";
-import type { RemanejamentoItemResolved } from "@/lib/api-mappers";
+import { useToast } from "@/lib/toast";
+import type {
+  LousaCellOut,
+  LousaPreviewResponse,
+} from "@/lib/tipos";
+import type {
+  RemanejamentoItemResolved,
+} from "@/lib/api-mappers";
 
 export default function RemanejamentosPage(): ReactNode {
   const [items, setItems] = useState<RemanejamentoItemResolved[]>([]);
+  const [preview, setPreview] = useState<LousaPreviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     setError(null);
-    // Carrega remanejamentos + catálogo (preview público) em paralelo (D01).
-    Promise.all([
-      getRemanejamentos(),
-      getLousaPreview("SUAPE" as Porto, "DIURNO").catch(() => null),
-    ])
-      .then(([remanejamentos, preview]) => {
-        if (cancelled) return;
-        setItems(preview ? normalizeComCatalogo(remanejamentos, preview) : remanejamentos);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        const msg =
-          err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Erro";
-        setError(msg);
-        setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    try {
+      // Carrega remanejamentos + catálogo (preview público) em paralelo (D01).
+      const porto: Porto = "SUAPE";
+      const [remanejamentos, previewData] = await Promise.all([
+        getRemanejamentos(),
+        getLousaPreview(porto, "DIURNO").catch(() => null),
+      ]);
+      setItems(remanejamentos);
+      setPreview(previewData);
+      setLoading(false);
+    } catch (err) {
+      const msg =
+        err instanceof ApiError
+          ? err.detail
+          : err instanceof Error
+            ? err.message
+            : "Erro";
+      setError(msg);
+      setLoading(false);
+    }
   }, []);
 
-  // KPIs (réplica T5-09, ajustada para os 6 status do `StatusRemanejamentoUi`).
-  const total = items.length;
-  const pendentes = items.filter((r) => r.status === "PENDENTE").length;
-  const aprovados = items.filter((r) => r.status === "APROVADO").length;
-  const notificados = items.filter((r) => r.status === "NOTIFICADO_OGMO" || r.status === "ACK").length;
-  const recusados = items.filter((r) => r.status === "NACK" || r.status === "CANCELADO").length;
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  // KPIs calculados em useMemo a partir dos status crus (E7 da SPEC §5.6).
+  const kpis = useMemo(() => {
+    const pendentes = items.filter((r) => r.status === "PENDENTE").length;
+    const aprovados = items.filter((r) => r.status === "APROVADO").length;
+    const notificados = items.filter(
+      (r) => r.status === "NOTIFICADO_OGMO" || r.status === "ACK",
+    ).length;
+    const recusados = items.filter(
+      (r) => r.status === "NACK" || r.status === "CANCELADO",
+    ).length;
+    return {
+      total: items.length,
+      pendentes,
+      aprovados,
+      notificados,
+      recusados,
+    };
+  }, [items]);
+
+  /**
+   * Ação "Notificar OGMO" (HU002/CA03) — disparada pela tabela.
+   * Faz optimistic update local (status → NOTIFICADO_OGMO) e revalida a
+   * lista em background. Em 409 INVALID_STATE mostra toast e mantém
+   * estado pendente (D13). Em outros erros reverte e mostra toast.
+   */
+  const onNotify = useCallback(
+    async (id: string) => {
+      const anterior = items.find((r) => r.id === id)?.status ?? "PENDENTE";
+      setItems((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: "NOTIFICADO_OGMO" } : r)),
+      );
+      try {
+        await notifyOgmo(id);
+        toast.showSuccess("Notificação enviada ao OGMO.");
+        // Refresh em background — o backend pode ter persistido FALHOU
+        // (RNF-12) e isso precisa refletir na UI.
+        fetchAll();
+      } catch (err) {
+        // 409 INVALID_STATE: status mudou, mantém como PENDENTE (D13).
+        if (err instanceof ApiError && err.status === 409) {
+          setItems((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, status: "PENDENTE" } : r)),
+          );
+          toast.showError("Status mudou. Atualize a fila.");
+          fetchAll();
+          return;
+        }
+        // Outros erros: restaura status anterior.
+        setItems((prev) =>
+          prev.map((r) => (r.id === id ? { ...r, status: anterior } : r)),
+        );
+        const detail =
+          err instanceof ApiError
+            ? err.detail
+            : err instanceof Error
+              ? err.message
+              : "Erro";
+        toast.showError(`Falha ao notificar OGMO: ${detail}`);
+      }
+    },
+    [items, toast, fetchAll],
+  );
+
+  // Catálogo derivado do preview (passado à tabela para resolução client-side).
+  const catalogo = useMemo(() => {
+    const cells: LousaCellOut[] = preview?.cells ?? [];
+    const fainas = preview?.fainas ?? [];
+    const funcoes = preview?.funcoes ?? [];
+    return { cells, fainas, funcoes };
+  }, [preview]);
 
   return (
     <div className="p-6">
@@ -75,23 +170,23 @@ export default function RemanejamentosPage(): ReactNode {
           <div className="kpi-row">
             <div className="kpi-card">
               <div className="kpi-label">Total</div>
-              <div className="kpi-value">{total}</div>
+              <div className="kpi-value">{kpis.total}</div>
             </div>
             <div className="kpi-card amber">
               <div className="kpi-label">Pendentes</div>
-              <div className="kpi-value">{pendentes}</div>
+              <div className="kpi-value">{kpis.pendentes}</div>
             </div>
             <div className="kpi-card cyan">
               <div className="kpi-label">Prontos p/ OGMO</div>
-              <div className="kpi-value">{aprovados}</div>
+              <div className="kpi-value">{kpis.aprovados}</div>
             </div>
             <div className="kpi-card green">
               <div className="kpi-label">Notificados</div>
-              <div className="kpi-value">{notificados}</div>
+              <div className="kpi-value">{kpis.notificados}</div>
             </div>
             <div className="kpi-card red">
               <div className="kpi-label">Recusados/Cancelados</div>
-              <div className="kpi-value">{recusados}</div>
+              <div className="kpi-value">{kpis.recusados}</div>
             </div>
           </div>
 
@@ -102,41 +197,14 @@ export default function RemanejamentosPage(): ReactNode {
               description="Quando o fiscal registrar remanejamentos no turno, eles aparecerão aqui com status de notificação ao OGMO."
             />
           ) : (
-            <RemanejamentosTable items={items} />
+            <RemanejamentosTable
+              items={items}
+              catalogo={catalogo}
+              onNotify={onNotify}
+            />
           )}
         </>
       )}
     </div>
   );
-}
-
-/**
- * Aplica o catálogo (cells/fainas/funções) aos itens crus do backend para
- * resolver nomes legíveis (TPA, matrícula, faina, função). É uma forma
- * simplificada de aplicar o mapper no client quando o `getRemanejamentos`
- * não recebeu catálogo (helper local — equivalente ao uso de
- * `mapRemanejamentoRead` direto).
- */
-function normalizeComCatalogo(
-  itens: RemanejamentoItemResolved[],
-  preview: import("@/lib/tipos").LousaPreviewResponse,
-): RemanejamentoItemResolved[] {
-  return itens.map((item) => {
-    const cellOut = preview.cells.find((c) => c.tpa_id === item.tpa_out_id) ?? null;
-    const cellIn = item.tpa_in_id
-      ? preview.cells.find((c) => c.tpa_id === item.tpa_in_id) ?? null
-      : null;
-    const funcao = preview.funcoes.find((f) => f.id === item.funcao_origem_id) ?? null;
-    const faina = preview.fainas.find((f) => f.id === item.faina_origem_id) ?? null;
-    return {
-      ...item,
-      tpa_removido_nome: cellOut?.tpa_nome ?? "(nome removido)",
-      tpa_removido_matricula: cellOut?.tpa_matricula ?? "—",
-      funcao_origem_nome: funcao?.nome ?? "(função removida)",
-      funcao_origem_codigo: funcao?.codigo ?? "—",
-      faina_origem_nome: faina?.nome ?? "(faina removida)",
-      faina_origem_codigo: faina?.codigo ?? "—",
-      ...(cellIn?.tpa_nome ? { tpa_substituto_nome: cellIn.tpa_nome } : {}),
-    };
-  });
 }
