@@ -350,6 +350,20 @@ export async function createRemanejamento(
   });
 }
 
+/** `PATCH /api/v1/remanejamentos/{id}/aprovar` — PENDENTE → APROVADO. */
+export async function aprovarRemanejamento(
+  remanejamentoId: string,
+  observacoes?: string | null,
+): Promise<RemanejamentoReadApi> {
+  return apiFetch<RemanejamentoReadApi>(
+    `/api/v1/remanejamentos/${encodeURIComponent(remanejamentoId)}/aprovar`,
+    {
+      method: "PATCH",
+      body: { observacoes: observacoes ?? null },
+    },
+  );
+}
+
 // ---- OGMO -----------------------------------------------------------------
 
 export async function getOgmoNotificacoes(): Promise<OgmoNotificacao[]> {

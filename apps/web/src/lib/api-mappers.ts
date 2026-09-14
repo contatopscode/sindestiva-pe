@@ -41,6 +41,7 @@ export interface RemanejamentoReadApi {
   id: string;
   codigo_se: string;
   fiscal_id: string;
+  fiscal_nome?: string | null;
   snapshot_origem_id: string | null;
   porto_id: string;
   turno_id: string;
@@ -233,6 +234,7 @@ export function mapRemanejamentoRead(
     id: String(r.id),
     codigo_se: r.codigo_se,
     fiscal_id: String(r.fiscal_id),
+    fiscal_nome: r.fiscal_nome ?? null,
     snapshot_origem_id: r.snapshot_origem_id ? String(r.snapshot_origem_id) : null,
     porto_id: String(r.porto_id),
     turno_id: String(r.turno_id),

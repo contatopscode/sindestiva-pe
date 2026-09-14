@@ -15,7 +15,7 @@ Pré-requisito:
   - Manoel Costa (FISCAL) já seedado (seed_users.py → perfil Fiscal)
 
 Fixtures reusadas do `conftest.py`:
-  - `api_token_manoel` (FISCAL — único role que pode POST)
+  - `api_token_manoel` (FISCAL) e `api_token_paulo` (DIRIGENTE + perfil fiscal)
   - `seed_users`
   - `db_session`
 """
@@ -31,6 +31,7 @@ from sqlalchemy import select
 
 from app.core.security import hash_password
 from app.models import (
+    Fiscal,
     Funcao,
     Faina,
     Porto,
@@ -70,6 +71,36 @@ async def _primeiro_catalogo(db_session, *, codigo_porto: str = "SUAPE"):
         await db_session.execute(select(Faina).order_by(Faina.ordem_lousa).limit(1))
     ).scalar_one()
     return porto, turno, funcao, faina
+
+
+async def _ensure_fiscal_paulo(db_session, user: User) -> Fiscal:
+    """Garante perfil Fiscal para Paulo (DIRIGENTE) nos testes isolados."""
+    from datetime import date  # noqa: PLC0415
+
+    from app.models import FiscalStatusEnum  # noqa: PLC0415
+
+    existing = (
+        await db_session.execute(select(Fiscal).where(Fiscal.user_id == user.id))
+    ).scalar_one_or_none()
+    if existing is not None:
+        return existing
+
+    porto, turno, _, _ = await _primeiro_catalogo(db_session)
+    fiscal = Fiscal(
+        user_id=user.id,
+        cpf="11122233396",
+        nome_completo="Paulo Siqueira",
+        matricula_sindicato="FISCAL-DTO-TEST",
+        telefone="+5581999990001",
+        porto_id=porto.id,
+        turno_id=turno.id,
+        status=FiscalStatusEnum.ATIVO,
+        data_inicio=date.today(),
+    )
+    db_session.add(fiscal)
+    await db_session.commit()
+    await db_session.refresh(fiscal)
+    return fiscal
 
 
 async def _criar_tpa(db_session, *, nome: str = "TPA Teste Criar"):
@@ -237,3 +268,44 @@ async def test_tpa_out_not_found_404(
     detail = resp.json()["detail"]
     assert detail["code"] == "TPA_OUT_NOT_FOUND"
     assert tpa_inexistente in detail["message"]
+
+
+@pytest.mark.asyncio
+async def test_dirigente_com_perfil_fiscal_pode_criar(
+    client,
+    db_session,
+    seed_users,
+    api_token_paulo,
+) -> None:
+    """DIRIGENTE (Paulo) com perfil Fiscal seedado → POST 201 (HOM smoke)."""
+    from app.models import User  # noqa: PLC0415
+    from sqlalchemy import select  # noqa: PLC0415
+
+    user = (
+        await db_session.execute(
+            select(User).where(User.email == "paulo@pscode.ia.br")
+        )
+    ).scalar_one()
+    await _ensure_fiscal_paulo(db_session, user)
+
+    porto, turno, funcao, faina = await _primeiro_catalogo(db_session)
+    tpa_out = await _criar_tpa(db_session, nome="TPA Dirigente Create")
+
+    payload = {
+        "porto_id": str(porto.id),
+        "turno_id": str(turno.id),
+        "data_referencia": date.today().isoformat(),
+        "tpa_out_id": str(tpa_out.id),
+        "funcao_origem_id": str(funcao.id),
+        "faina_origem_id": str(faina.id),
+        "motivo": "ATESTADO_MEDICO",
+    }
+
+    resp = await client.post(
+        "/api/v1/remanejamentos",
+        json=payload,
+        headers={"Authorization": f"Bearer {api_token_paulo}"},
+    )
+
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["status"] == "PENDENTE"

@@ -35,7 +35,13 @@ import {
   type FormEvent,
 } from "react";
 import type { Porto, Turno } from "@sindestiva/shared";
-import { ApiError, createRemanejamento } from "@/lib/api";
+import {
+  ApiError,
+  aprovarRemanejamento,
+  createRemanejamento,
+  notifyOgmo,
+} from "@/lib/api";
+import { labelForMotivo } from "@/lib/remanejamento-ui";
 import { StatusBadge } from "@/app/_components/StatusBadge";
 import type {
   CctClausula,
@@ -104,6 +110,8 @@ export interface RemanejamentoModalProps {
   motivos: MotivoRemanejamentoUi[];
   /** Lista de cláusulas CCT — vazia = sem catálogo (textarea visível). */
   basesLegais: CctClausula[];
+  /** Após criar, aprova e chama notificar-ogmo (botão do protótipo). */
+  executarENotificarOgmo?: boolean;
 }
 
 function dataHojeISO(): string {
@@ -133,6 +141,7 @@ export function RemanejamentoModal({
   turno,
   motivos,
   basesLegais,
+  executarENotificarOgmo = false,
 }: RemanejamentoModalProps): ReactNode | null {
   const hoje = useMemo(() => dataHojeISO(), []);
   const minData = useMemo(() => dataOffsetISO(-7), []);
@@ -156,7 +165,6 @@ export function RemanejamentoModal({
   const [dataReferencia, setDataReferencia] = useState<string>(
     prefill?.data_referencia ?? hoje,
   );
-  const [tpaInId, setTpaInId] = useState<string>("");
   const [funcaoId, setFuncaoId] = useState<string>(prefill?.funcao_id ?? "");
   const [fainaId, setFainaId] = useState<string>(prefill?.faina_id ?? "");
 
@@ -172,6 +180,10 @@ export function RemanejamentoModal({
 
   const [observacoes, setObservacoes] = useState<string>("");
   const [anexoUrl, setAnexoUrl] = useState<string>("");
+  const [tpaOutMatricula, setTpaOutMatricula] = useState<string>("");
+  const [tpaInMatricula, setTpaInMatricula] = useState<string>("");
+  const [confirmCct, setConfirmCct] = useState<boolean>(false);
+  const [notifyPwa, setNotifyPwa] = useState<"sim" | "nao">("sim");
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [lastCreated, setLastCreated] = useState<
@@ -197,10 +209,52 @@ export function RemanejamentoModal({
     onClose();
   }
 
+  const tpaOutIdResolved = useMemo(() => {
+    if (prefill?.tpa_id) return prefill.tpa_id;
+    const mat = tpaOutMatricula.trim();
+    if (!mat) return "";
+    const cell =
+      catalogo.cells.find((c) => c.tpa_matricula === mat) ??
+      catalogo.cells.find((c) => c.tpa_id === mat);
+    return cell?.tpa_id ?? "";
+  }, [prefill?.tpa_id, tpaOutMatricula, catalogo.cells]);
+
+  const tpaInIdResolved = useMemo(() => {
+    const mat = tpaInMatricula.trim();
+    if (!mat) return "";
+    const cell = catalogo.cells.find((c) => c.tpa_matricula === mat);
+    return cell?.tpa_id ?? "";
+  }, [tpaInMatricula, catalogo.cells]);
+
+  const funcaoLabel =
+    catalogo.funcoes.find((f) => f.id === funcaoId)?.nome ?? "—";
+
+  useEffect(() => {
+    if (!prefill?.tpa_id) return;
+    const cell = catalogo.cells.find((c) => c.tpa_id === prefill.tpa_id);
+    if (cell?.tpa_matricula) {
+      setTpaOutMatricula(cell.tpa_matricula);
+    }
+    if (cell?.funcao_id && !funcaoId) setFuncaoId(cell.funcao_id);
+    if (cell?.faina_id && !fainaId) setFainaId(cell.faina_id);
+    if (cell?.cais && !caisOrigem) setCaisOrigem(cell.cais);
+  }, [prefill?.tpa_id, catalogo.cells, funcaoId, fainaId, caisOrigem]);
+
+  function applyMatriculaOutLookup() {
+    const mat = tpaOutMatricula.trim();
+    if (!mat) return;
+    const cell = catalogo.cells.find((c) => c.tpa_matricula === mat);
+    if (!cell) return;
+    if (cell.funcao_id) setFuncaoId(cell.funcao_id);
+    if (cell.faina_id) setFainaId(cell.faina_id);
+    if (cell.cais) setCaisOrigem(cell.cais);
+  }
+
   const canSubmit = useMemo(() => {
     if (submitting) return false;
+    if (!confirmCct) return false;
     if (!portoId || !turnoId) return false;
-    if (!prefill?.tpa_id) return false;
+    if (!tpaOutIdResolved) return false;
     if (!funcaoId || !fainaId) return false;
     if (!motivo) return false;
     if (motivo === "OUTRO" && motivoOutro.trim() === "") return false;
@@ -217,7 +271,8 @@ export function RemanejamentoModal({
     submitting,
     portoId,
     turnoId,
-    prefill?.tpa_id,
+    tpaOutIdResolved,
+    confirmCct,
     funcaoId,
     fainaId,
     motivo,
@@ -240,11 +295,11 @@ export function RemanejamentoModal({
       porto_id: portoId,
       turno_id: turnoId,
       data_referencia: dataReferencia,
-      tpa_out_id: prefill!.tpa_id!,
+      tpa_out_id: tpaOutIdResolved,
       funcao_origem_id: funcaoId,
       faina_origem_id: fainaId,
       cais_origem: caisOrigem || null,
-      tpa_in_id: tpaInId || null,
+      tpa_in_id: tpaInIdResolved || null,
       motivo,
       motivo_outro_texto:
         motivo === "OUTRO"
@@ -261,9 +316,30 @@ export function RemanejamentoModal({
 
     try {
       const created = await createRemanejamento(payload);
-      const codigoSe = (created as { codigo_se?: string }).codigo_se ?? "";
-      const hashEvento = (created as { hash_evento?: string }).hash_evento ?? "";
-      const id = (created as { id?: string }).id ?? "";
+      const codigoSe = created.codigo_se ?? "";
+      const hashEvento = created.hash_evento ?? "";
+      const id = created.id ?? "";
+
+      if (executarENotificarOgmo && id) {
+        try {
+          await aprovarRemanejamento(id);
+          await notifyOgmo(id);
+        } catch (notifyErr) {
+          const detail =
+            notifyErr instanceof ApiError
+              ? notifyErr.detail
+              : notifyErr instanceof Error
+                ? notifyErr.message
+                : "Falha ao notificar OGMO";
+          setSubmitError(
+            `Remanejamento criado (${codigoSe}), mas a notificação ao OGMO falhou: ${detail}`,
+          );
+          setSubmitting(false);
+          onCreated?.({ id, codigo_se: codigoSe, hash_evento: hashEvento });
+          return;
+        }
+      }
+
       setLastCreated({ id, codigo_se: codigoSe, hash_evento: hashEvento });
       // Mantém modal aberto 1,5s exibindo o sucesso (HU001/CA04), então
       // dispara `onCreated` e fecha. O reset de `submitting` é feito antes
@@ -339,42 +415,46 @@ export function RemanejamentoModal({
                 id="reman-modal-title"
                 className="text-lg font-bold text-[#e8eef4]"
               >
-                Novo Remanejamento
+                Remanejamento de TPA
               </h2>
-              <div className="flex items-center gap-2 text-[11px] text-[#94a8bd]">
-                <span className="rounded bg-[#1e3a52] px-2 py-0.5 font-mono">
-                  {porto}
-                </span>
-                <span className="rounded bg-[#1e3a52] px-2 py-0.5 font-mono">
-                  {turno}
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={handleClose}
+                disabled={submitting}
+                className="text-[#94a8bd] hover:text-[#e8eef4]"
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
             </div>
 
-            {/* Contexto pré-preenchido (HU001/CA03) */}
-            <div className="mb-4 rounded-md border border-[#1e3a52] bg-[#0f2438] p-3 text-[12px]">
-              <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#94a8bd]">
-                Contexto (pré-preenchido)
-              </div>
-              <dl className="grid grid-cols-[110px_1fr] gap-y-1 text-[#e8eef4]">
-                <dt className="text-[#94a8bd]">TPA removido</dt>
-                <dd className="font-mono text-[11px]">
-                  {prefill?.tpa_id ?? "—"}
-                </dd>
-                <dt className="text-[#94a8bd]">Função</dt>
-                <dd>
-                  {funcaoId
-                    ? catalogo.funcoes.find((f) => f.id === funcaoId)?.codigo ?? "—"
-                    : "—"}
-                </dd>
-                <dt className="text-[#94a8bd]">Faina</dt>
-                <dd>
-                  {fainaId
-                    ? catalogo.fainas.find((f) => f.id === fainaId)?.codigo ?? "—"
-                    : "—"}
-                </dd>
-              </dl>
+            <div className="remanejamento-contexto mb-4 text-[12px] text-[#94a8bd]">
+              Contexto:{" "}
+              <strong className="text-[#e8eef4]">
+                Cais {caisOrigem || "—"} · Turno {turno} · Função {funcaoLabel}
+              </strong>
             </div>
+
+            <Field label="TPA a remover (matrícula)">
+              <input
+                type="text"
+                value={tpaOutMatricula}
+                onChange={(e) => setTpaOutMatricula(e.target.value)}
+                onBlur={applyMatriculaOutLookup}
+                placeholder="Ex.: 012"
+                className="w-full rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[13px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
+              />
+            </Field>
+
+            <Field label="TPA a inserir (opcional)">
+              <input
+                type="text"
+                value={tpaInMatricula}
+                onChange={(e) => setTpaInMatricula(e.target.value)}
+                placeholder="Ex.: 245 ou vazio (OGMO decide)"
+                className="w-full rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[13px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
+              />
+            </Field>
 
             {/* Função / Faina — selects com códigos do catálogo
                 (modo "sem prefill" quando F3 não recebe query params). */}
@@ -409,24 +489,7 @@ export function RemanejamentoModal({
               </Field>
             </div>
 
-            {/* TPA substituto (E5) */}
-            <Field label="TPA substituto (opcional)">
-              <select
-                value={tpaInId}
-                onChange={(e) => setTpaInId(e.target.value)}
-                className="w-full rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[13px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
-              >
-                <option value="">— Selecionar —</option>
-                {catalogo.tpaOptions.map((t) => (
-                  <option key={t.tpa_id} value={t.tpa_id}>
-                    {t.tpa_matricula ?? "(sem matrícula)"} · {t.tpa_nome}
-                  </option>
-                ))}
-              </select>
-            </Field>
-
-            {/* Motivo (E1 — enum do backend) */}
-            <Field label="Motivo">
+            <Field label="Motivo do remanejamento">
               <select
                 value={motivo}
                 onChange={(e) => setMotivo(e.target.value as MotivoRemanejamentoUi)}
@@ -434,7 +497,7 @@ export function RemanejamentoModal({
               >
                 {motivos.map((m) => (
                   <option key={m} value={m}>
-                    {m}
+                    {labelForMotivo(m)}
                   </option>
                 ))}
               </select>
@@ -478,7 +541,7 @@ export function RemanejamentoModal({
             </Field>
 
             {/* Base legal — select CCT + textarea mutuamente exclusivos (E3) */}
-            <Field label="Base legal">
+            <Field label="Base legal / CCT">
               {baseLegalMode === "catalogo" ? (
                 <>
                   <select
@@ -530,29 +593,61 @@ export function RemanejamentoModal({
             </Field>
 
             {/* Observações (≤ 2000) com contador */}
-            <Field label="Observações (opcional)">
+            <Field label="Observações">
               <textarea
                 value={observacoes}
                 onChange={(e) =>
                   setObservacoes(e.target.value.slice(0, MAX_OBSERVACOES))
                 }
                 maxLength={MAX_OBSERVACOES}
-                rows={2}
+                rows={3}
+                placeholder="Detalhes que ajudem o OGMO a processar..."
                 className="w-full rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[13px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
               />
               <Counter value={observacoes.length} max={MAX_OBSERVACOES} />
             </Field>
 
-            {/* Anexo URL (E6 — sem validação de protocolo) */}
-            <Field label="URL do anexo (opcional)">
+            <Field label="Anexar documento (opcional)">
+              <input
+                type="file"
+                disabled
+                title="Upload de arquivo em breve — use URL abaixo se necessário."
+                className="w-full text-[12px] text-[#94a8bd]"
+              />
               <input
                 type="url"
                 value={anexoUrl}
                 onChange={(e) => setAnexoUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[13px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
+                placeholder="URL do anexo (opcional)"
+                className="mt-2 w-full rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[13px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
               />
             </Field>
+
+            <Field label="Notificar TPA via PWA">
+              <select
+                value={notifyPwa}
+                onChange={(e) =>
+                  setNotifyPwa(e.target.value === "nao" ? "nao" : "sim")
+                }
+                className="w-full rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[13px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
+              >
+                <option value="sim">Sim, push imediato</option>
+                <option value="nao">Não notificar agora</option>
+              </select>
+            </Field>
+
+            <label className="mb-4 flex cursor-pointer items-start gap-2 text-[12px] text-[#e8eef4]">
+              <input
+                type="checkbox"
+                checked={confirmCct}
+                onChange={(e) => setConfirmCct(e.target.checked)}
+                className="mt-0.5"
+              />
+              <span>
+                Confirmo que este remanejamento é lícito e respaldado pela CCT
+                vigente
+              </span>
+            </label>
 
             {/* Erro inline (HU001/CA05) */}
             {submitError && (
@@ -578,7 +673,11 @@ export function RemanejamentoModal({
                 disabled={!canSubmit}
                 className="rounded bg-[#d4a574] px-4 py-2 text-[12px] font-bold text-[#0a1929] hover:bg-[#e8c49a] disabled:opacity-50"
               >
-                {submitting ? "Enviando…" : "Criar Remanejamento"}
+                {submitting
+                  ? "Enviando…"
+                  : executarENotificarOgmo
+                    ? "Executar e notificar OGMO"
+                    : "Criar Remanejamento"}
               </button>
             </div>
           </form>

@@ -16,8 +16,9 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.logging import get_logger
 from app.models import (
@@ -318,14 +319,14 @@ async def listar(
     status_filter: StatusRemanejamentoEnum | None = None,
 ) -> tuple[list[Remanejamento], int]:
     """Lista remanejamentos com paginacao + filtro opcional por status."""
-    stmt = select(Remanejamento)
+    stmt = select(Remanejamento).options(selectinload(Remanejamento.fiscal))
     if status_filter:
         stmt = stmt.where(Remanejamento.status == status_filter)
-    count_stmt = select(Remanejamento.id)
+    count_stmt = select(func.count()).select_from(Remanejamento)
     if status_filter:
         count_stmt = count_stmt.where(Remanejamento.status == status_filter)
 
-    total = len((await db.execute(count_stmt)).scalars().all())
+    total = int((await db.execute(count_stmt)).scalar_one())
     rows = (await db.execute(
         stmt.order_by(Remanejamento.created_at.desc()).offset(skip).limit(limit)
     )).scalars().all()
