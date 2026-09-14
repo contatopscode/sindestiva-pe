@@ -130,6 +130,75 @@ function getStoredToken(): string | null {
   return raw;
 }
 
+/** JWT atual no sessionStorage (não exposto como valor bruto fora do módulo). */
+export function getClientAuthToken(): string | null {
+  return getStoredToken();
+}
+
+export interface ClientSessionUser {
+  id: string;
+  email: string | null;
+  telefone: string | null;
+  role: string;
+  fiscal_id?: string;
+  tpa_id?: string;
+}
+
+/**
+ * Resolve usuário para Header/Sidebar: cookie httpOnly primeiro; se falhar,
+ * Bearer do sessionStorage (mesmo JWT do login) e por último claims mínimas.
+ */
+export async function fetchCurrentUser(): Promise<ClientSessionUser | null> {
+  if (typeof window === "undefined") return null;
+
+  const parseUser = (data: unknown): ClientSessionUser | null => {
+    if (!data || typeof data !== "object" || !("id" in data) || !("role" in data)) {
+      return null;
+    }
+    const u = data as ClientSessionUser;
+    return u;
+  };
+
+  try {
+    const r = await fetch("/api/auth/me", { credentials: "include", cache: "no-store" });
+    if (r.ok) {
+      return parseUser(await r.json());
+    }
+  } catch {
+    /* noop */
+  }
+
+  const token = getStoredToken();
+  if (!token) return null;
+
+  try {
+    const r2 = await fetch("/api/auth/me", {
+      credentials: "include",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (r2.ok) {
+      return parseUser(await r2.json());
+    }
+  } catch {
+    /* noop */
+  }
+
+  const role = getRoleFromStoredToken();
+  if (!role) return null;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1] ?? "")) as { sub?: string };
+    return {
+      id: typeof payload.sub === "string" ? payload.sub : "",
+      email: null,
+      telefone: null,
+      role,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Role do JWT em sessionStorage (best-effort, mesmo payload que o middleware). */
 export function getRoleFromStoredToken(): "FISCAL" | "DIRIGENTE" | "TPA" | null {
   const token = getStoredToken();

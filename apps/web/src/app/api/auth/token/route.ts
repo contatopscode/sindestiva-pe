@@ -6,8 +6,9 @@
  */
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
 
-const COOKIE_NAME = "sindestiva_token";
+const COOKIE_NAME = AUTH_COOKIE_NAME;
 
 export async function GET() {
   const token = (await cookies()).get(COOKIE_NAME)?.value;

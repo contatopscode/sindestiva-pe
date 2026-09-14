@@ -19,6 +19,7 @@ import {
   resolveUpstreamAuthorization,
 } from "@/lib/bff-proxy-headers";
 import { resolveApiUrl } from "@/lib/api-url";
+import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
 
 const API = resolveApiUrl();
 
@@ -30,7 +31,7 @@ async function proxy(
   const fullPath = path.join("/");
   const url = `${API}/${fullPath}${req.nextUrl.search}`;
   const cookieStore = await cookies();
-  const tokenCookie = cookieStore.get("sindestiva_token")?.value;
+  const tokenCookie = cookieStore.get(AUTH_COOKIE_NAME)?.value;
   const allCookies = cookieStore
     .getAll()
     .map((c) => `${c.name}=${c.value}`)

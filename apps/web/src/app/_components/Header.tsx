@@ -7,17 +7,8 @@
 
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { logout } from "@/lib/api";
+import { fetchCurrentUser, logout, type ClientSessionUser } from "@/lib/api";
 import { useEffect, useState } from "react";
-
-interface SessionUser {
-  id: string;
-  email: string | null;
-  telefone: string | null;
-  role: string;
-  fiscal_id?: string;
-  tpa_id?: string;
-}
 
 const TITLES: Record<string, string> = {
   "/centro-comando": "Centro de Comando",
@@ -36,16 +27,14 @@ const TITLES: Record<string, string> = {
 
 export function Header(): ReactNode {
   const pathname = usePathname();
-  const [user, setUser] = useState<SessionUser | null>(null);
+  const [user, setUser] = useState<ClientSessionUser | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    // Busca user via API (cookie httpOnly). 401 → null (middleware já redirecionou).
-    fetch("/api/auth/me", { credentials: "include" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data && typeof data === "object" && "id" in data) setUser(data as SessionUser);
+    fetchCurrentUser()
+      .then((session) => {
+        if (session) setUser(session);
       })
       .catch(() => undefined);
   }, []);
