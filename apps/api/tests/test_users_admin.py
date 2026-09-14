@@ -118,6 +118,15 @@ async def test_users_create_fiscal_login(
     created = resp.json()
     assert created["email"] == email
     assert created["role"] == "FISCAL"
+    assert created["porto_codigo"] == "SUAPE"
+    assert created["turno_codigo"] == "DIURNO"
+
+    listed = await client.get("/api/v1/users", headers=_auth(api_token_paulo))
+    assert listed.status_code == 200
+    match = next((i for i in listed.json()["items"] if i["email"] == email), None)
+    assert match is not None
+    assert match["porto_codigo"] == "SUAPE"
+    assert match["turno_codigo"] == "DIURNO"
 
     login = await client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert login.status_code == 200, login.text

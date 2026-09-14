@@ -42,9 +42,9 @@ def _serialize_user(user: User, *, porto_codigo: str | None = None, turno_codigo
         fiscal_status = user.fiscal.status.value
         data_inicio = user.fiscal.data_inicio
         if porto_codigo is None and user.fiscal.porto_id:
-            porto_codigo = getattr(user.fiscal, "_porto_codigo", None)
+            porto_codigo = user.fiscal.porto.codigo
         if turno_codigo is None and user.fiscal.turno_id:
-            turno_codigo = getattr(user.fiscal, "_turno_codigo", None)
+            turno_codigo = user.fiscal.turno.codigo
     if user.dirigente:
         if nome is None:
             nome = user.dirigente.nome_completo
@@ -80,7 +80,8 @@ async def _load_user(db: AsyncSession, user_id: UUID) -> User | None:
         select(User)
         .where(User.id == user_id, User.deleted_at.is_(None))
         .options(
-            selectinload(User.fiscal),
+            selectinload(User.fiscal).selectinload(Fiscal.porto),
+            selectinload(User.fiscal).selectinload(Fiscal.turno),
             selectinload(User.dirigente),
         )
     )
@@ -158,7 +159,11 @@ async def list_admin_users(db: AsyncSession) -> tuple[list[AdminUserRead], int]:
             User.role.in_([RoleEnum.FISCAL, RoleEnum.DIRIGENTE]),
             User.deleted_at.is_(None),
         )
-        .options(selectinload(User.fiscal), selectinload(User.dirigente))
+        .options(
+            selectinload(User.fiscal).selectinload(Fiscal.porto),
+            selectinload(User.fiscal).selectinload(Fiscal.turno),
+            selectinload(User.dirigente),
+        )
         .order_by(User.role, User.email)
     )
     users = list((await db.execute(stmt)).scalars().all())
