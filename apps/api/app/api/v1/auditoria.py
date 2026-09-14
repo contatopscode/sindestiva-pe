@@ -5,11 +5,13 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_db, require_user
 from app.core.logging import get_logger
 from app.models import AuditEvent
 from app.schemas.auditoria import AuditEventRead, VerificarHashChainResponse
+from app.services.audit_service import resolver_actor_nome
 from app.services.hash_chain import verify_chain
 
 router = APIRouter(prefix="/auditoria", tags=["auditoria"])
@@ -24,13 +26,35 @@ async def list_eventos(
     skip: int = 0,
     limit: int = 100,
 ) -> list[AuditEventRead]:
-    """Sprint 0: SELECT direto. Sprint 6 T6-01: filtros + paginação cursor."""
-    stmt = select(AuditEvent).order_by(AuditEvent.sequencia.desc()).offset(skip).limit(limit)
+    """Sprint 0: SELECT direto. Sprint 6 T6-01: filtros + paginação cursor.
+
+    HU006 (S1/F4): carrega `actor_user` via `selectinload` para evitar
+    LEFT OUTER JOIN monolítico — `User` tem 3 sub-relationships 1:1
+    (tpa/fiscal/dirigente) e `selectin` faz 1 round-trip por coleção
+    em vez de 1 JOIN por linha. `actor_nome`/`actor_user_email` são
+    populados em Python via `resolver_actor_nome`.
+    """
+    stmt = (
+        select(AuditEvent)
+        .options(selectinload(AuditEvent.actor_user))
+        .order_by(AuditEvent.sequencia.desc())
+        .offset(skip)
+        .limit(limit)
+    )
     if entity_type:
         stmt = stmt.where(AuditEvent.entity_type == entity_type)
     result = await db.execute(stmt)
     events = list(result.scalars().all())
-    return [AuditEventRead.model_validate(e) for e in events]
+
+    out: list[AuditEventRead] = []
+    for ev in events:
+        actor_nome, actor_email = resolver_actor_nome(ev.actor_user)
+        item = AuditEventRead.model_validate(ev)
+        # model_validate não popula campos não existentes no ORM; set explícito.
+        item.actor_nome = actor_nome
+        item.actor_user_email = actor_email
+        out.append(item)
+    return out
 
 
 @router.post(
