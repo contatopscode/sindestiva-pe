@@ -51,6 +51,32 @@ export interface LousaCellOut {
   data_referencia: string; // YYYY-MM-DD
 }
 
+// ---- CCT (catálogo de cláusulas da Convenção Coletiva) ---------------------
+
+/**
+ * Cláusula da CCT (Convenção Coletiva de Trabalho) usada como base legal
+ * do remanejamento. Espelha `apps/api/app/models/catalogos.py:CctClausula`.
+ *
+ * O frontend recebe via prop opcional `cctClausulas` no modal; quando
+ * ausente (lacuna L02-Front — `LousaPreviewResponse` ainda não traz o
+ * catálogo), o modal abre direto com o textarea de texto livre.
+ */
+export interface CctClausula {
+  id: string; // UUID
+  versao_cct: string; // ex.: "2024-2026"
+  clausula: string; // ex.: "cl. 12ª, §3º"
+  descricao: string;
+  motivos_vinculados: string[] | null;
+  is_active: boolean;
+}
+
+/** Opção de TPA substituto derivada de `cells[]` do catálogo. */
+export interface TpaOption {
+  tpa_id: string;
+  tpa_nome: string;
+  tpa_matricula: string | null;
+}
+
 // ---- Snapshot --------------------------------------------------------------
 
 export type SnapshotStatus = "OK" | "PARCIAL" | "ERRO" | "LAYOUT_MUDOU" | "SEM_DADOS";
