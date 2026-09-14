@@ -55,9 +55,10 @@ export default function RemanejamentosPage(): ReactNode {
       // O backend aplica defaults skip=0&limit=50; para esgotar o volume
       // esperado (~300 remanejamentos/mês segundo discovery-notes) e
       // preservar a paginação client-side + busca em todas as páginas,
-      // solicitamos limit=500 (teto do backend — ver rota
-      // /api/v1/remanejamentos). A tabela pagina client-side sobre o
-      // total recebido (CR1 — achado MEDIO da revisão).
+      // solicitamos limit=500 (teto do backend — apps/api/app/api/v1/
+      // remanejamentos.py:43). A tabela pagina client-side sobre o
+      // total recebido. CR2 — correção do achado ALTO da revisão
+      // (frontend violava `le=200`; backend foi elevado para `le=500`).
       const porto: Porto = "SUAPE";
       const [remanejamentos, previewData] = await Promise.all([
         getRemanejamentos({ skip: 0, limit: 500 }),
