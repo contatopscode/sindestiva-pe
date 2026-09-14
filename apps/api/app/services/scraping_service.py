@@ -36,6 +36,7 @@ from app.models import (
 )
 from app.models.enums import FonteEscalaEnum, StatusScrapingEnum
 from app.scrapers import raspar_escalanet, raspar_tpa
+from app.services.tpa_match_service import map_tpas_by_matriculas, normalize_matricula_ogmo
 
 log = get_logger(__name__)
 
@@ -283,6 +284,12 @@ async def executar_scraping(
         )
         await db.execute(delete_stmt)
 
+        matriculas_celulas = [
+            normalize_matricula_ogmo(c.trabalhador_matricula)
+            for c in bruto_para_persistir.celulas
+        ]
+        tpa_by_mat = await map_tpas_by_matriculas(db, matriculas_celulas)
+
         # 5c. Insere alocações (apenas fainas/funções conhecidas no catálogo).
         alocacoes_inserir: list[dict[str, Any]] = []
         for celula in bruto_para_persistir.celulas:
@@ -297,6 +304,8 @@ async def executar_scraping(
                     origem=str(escala_origem_id),
                 )
                 continue
+            mat_norm = normalize_matricula_ogmo(celula.trabalhador_matricula)
+            tpa = tpa_by_mat.get(mat_norm) if mat_norm else None
             alocacoes_inserir.append({
                 "escala_origem_id": escala_origem_id,
                 "porto_id": porto.id,
@@ -304,7 +313,8 @@ async def executar_scraping(
                 "faina_id": faina.id,
                 "funcao_id": funcao.id,
                 "data_referencia": data,
-                "trabalhador_matricula": celula.trabalhador_matricula,
+                "trabalhador_matricula": mat_norm,
+                "trabalhador_id": tpa.id if tpa else None,
                 "fk_mando": 1 if funcao.categoria == "MANDO" else None,
                 "fk_terno": 1 if funcao.categoria == "TERNO" else None,
                 "fk_tecnica": 1 if funcao.categoria == "TECNICA" else None,
