@@ -1,40 +1,54 @@
 // =============================================================================
 // SINDESTIVA-PE · RemanejamentosTable
-// Tabela do histórico (T5-09) com filtros turno/data/TPA/fiscal/status.
-// Mock até Sprint 5 (T5-09+T5-10) implementar.
+// Tabela do histórico com filtros turno/data/TPA/fiscal/status.
+// Sprint S2: renderiza dados reais do backend via `RemanejamentoItemResolved`
+// (UUIDs crus do `RemanejamentoRead` + campos resolvidos via catálogo).
+// A migração completa para a UX descrita na SPEC §5.2 (KPIs, paginação,
+// ordenação, busca, ações) acontece em sprints futuras — este sprint só
+// garante compat de tipo e usa os campos disponíveis.
 // =============================================================================
 
 "use client";
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { StatusBadge, toneForOgmoStatus } from "@/app/_components/StatusBadge";
-import type { RemanejamentoItem } from "@/lib/tipos";
-import type { StatusOgmo, Turno } from "@sindestiva/shared";
+import { StatusBadge, toneForStatusRemanejamento } from "@/app/_components/StatusBadge";
+import type { StatusRemanejamentoUi } from "@/lib/tipos";
+import type { RemanejamentoItemResolved } from "@/lib/api-mappers";
+import type { Turno } from "@sindestiva/shared";
 
-const STATUSES: Array<StatusOgmo | "TODOS"> = ["TODOS", "PEND", "SENT", "ACK", "NACK"];
+const STATUSES: Array<StatusRemanejamentoUi | "TODOS"> = [
+  "TODOS",
+  "PENDENTE",
+  "APROVADO",
+  "NOTIFICADO_OGMO",
+  "ACK",
+  "NACK",
+  "CANCELADO",
+];
 
 export interface RemanejamentosTableProps {
-  items: RemanejamentoItem[];
+  items: RemanejamentoItemResolved[];
   turnoDefault?: Turno;
 }
 
 export function RemanejamentosTable({ items, turnoDefault = "DIURNO" }: RemanejamentosTableProps): ReactNode {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusOgmo | "TODOS">("TODOS");
+  const [statusFilter, setStatusFilter] = useState<StatusRemanejamentoUi | "TODOS">("TODOS");
   const [turnoFilter, setTurnoFilter] = useState<Turno | "TODOS">(turnoDefault);
 
   const filtered = items.filter((r) => {
     if (statusFilter !== "TODOS" && r.status !== statusFilter) return false;
-    if (turnoFilter !== "TODOS" && !r.data_hora.toUpperCase().endsWith(turnoFilter)) {
+    if (turnoFilter !== "TODOS" && !r.created_at.toUpperCase().endsWith(turnoFilter)) {
       // heurística — em produção, viria do backend
     }
     if (search.trim() !== "") {
       const q = search.toLowerCase();
       if (
         !r.tpa_removido_nome.toLowerCase().includes(q) &&
-        !r.tpa_removido_matricula.includes(q) &&
-        !r.motivo.toLowerCase().includes(q)
+        !r.tpa_removido_matricula.toLowerCase().includes(q) &&
+        !r.motivo.toLowerCase().includes(q) &&
+        !r.codigo_se.toLowerCase().includes(q)
       ) {
         return false;
       }
@@ -44,18 +58,18 @@ export function RemanejamentosTable({ items, turnoDefault = "DIURNO" }: Remaneja
 
   return (
     <div className="rounded-lg border border-[#1e3a52] bg-[#0f2438]">
-      {/* Toolbar de filtros (T5-09) */}
+      {/* Toolbar de filtros */}
       <div className="flex flex-wrap items-center gap-2 border-b border-[#1e3a52] p-3">
         <input
           type="text"
-          placeholder="Buscar por TPA, matrícula, motivo…"
+          placeholder="Buscar por TPA, matrícula, motivo, código SE…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="min-w-[260px] flex-1 rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[12px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
         />
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusOgmo | "TODOS")}
+          onChange={(e) => setStatusFilter(e.target.value as StatusRemanejamentoUi | "TODOS")}
           className="rounded border border-[#2a5070] bg-[#0a1929] px-2 py-2 text-[12px] text-[#e8eef4]"
         >
           {STATUSES.map((s) => (
@@ -85,6 +99,7 @@ export function RemanejamentosTable({ items, turnoDefault = "DIURNO" }: Remaneja
           <thead>
             <tr className="border-b border-[#1e3a52] bg-[#0a1929] text-left text-[10px] font-bold uppercase tracking-wider text-[#94a8bd]">
               <th className="px-3 py-2">Data/Hora</th>
+              <th className="px-3 py-2">Código SE</th>
               <th className="px-3 py-2">TPA Removido</th>
               <th className="px-3 py-2">Substituto</th>
               <th className="px-3 py-2">Faina · Função</th>
@@ -96,7 +111,7 @@ export function RemanejamentosTable({ items, turnoDefault = "DIURNO" }: Remaneja
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-[#94a8bd]">
+                <td colSpan={8} className="px-3 py-8 text-center text-[#94a8bd]">
                   Nenhum remanejamento encontrado com os filtros atuais.
                 </td>
               </tr>
@@ -104,8 +119,9 @@ export function RemanejamentosTable({ items, turnoDefault = "DIURNO" }: Remaneja
               filtered.map((r) => (
                 <tr key={r.id} className="border-b border-[#1e3a52] hover:bg-[#163554]/40">
                   <td className="px-3 py-2 font-mono text-[#d4a574]">
-                    {new Date(r.data_hora).toLocaleString("pt-BR")}
+                    {new Date(r.created_at).toLocaleString("pt-BR")}
                   </td>
+                  <td className="px-3 py-2 font-mono text-[#d4a574]">{r.codigo_se}</td>
                   <td className="px-3 py-2">
                     <div className="font-semibold text-[#e8eef4]">{r.tpa_removido_nome}</div>
                     <div className="font-mono text-[10px] text-[#94a8bd]">{r.tpa_removido_matricula}</div>
@@ -114,13 +130,13 @@ export function RemanejamentosTable({ items, turnoDefault = "DIURNO" }: Remaneja
                     {r.tpa_substituto_nome ?? <span className="text-[#5f7a92]">—</span>}
                   </td>
                   <td className="px-3 py-2">
-                    <div className="text-[#e8eef4]">{r.faina_codigo}</div>
-                    <div className="text-[10px] text-[#94a8bd]">{r.funcao_codigo}</div>
+                    <div className="text-[#e8eef4]">{r.faina_origem_codigo}</div>
+                    <div className="text-[10px] text-[#94a8bd]">{r.funcao_origem_codigo}</div>
                   </td>
                   <td className="px-3 py-2 text-[#e8eef4]">{r.motivo}</td>
-                  <td className="px-3 py-2 text-[11px] text-[#94a8bd]">{r.base_legal}</td>
+                  <td className="px-3 py-2 text-[11px] text-[#94a8bd]">{r.base_legal_texto}</td>
                   <td className="px-3 py-2">
-                    <StatusBadge tone={toneForOgmoStatus(r.status)}>
+                    <StatusBadge tone={toneForStatusRemanejamento(r.status)}>
                       {r.status}
                     </StatusBadge>
                   </td>

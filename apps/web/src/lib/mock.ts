@@ -22,8 +22,6 @@ import type {
   LousaCellOut,
   LousaPreviewResponse,
   LousaSnapshotOut,
-  RemanejamentoItem,
-  OgmoNotificacao,
   AuditEvent,
   UserSession,
 } from "./tipos";
@@ -191,99 +189,9 @@ export function getMockLousaPreview(porto: Porto, turno: Turno): LousaPreviewRes
   };
 }
 
-// ---- Remanejamentos mock (Sprint 5 implementa de verdade) ---------------
+// ---- Remanejamentos mock removidos (Sprint S2 — dados reais via API) -----
 
-export const MOCK_REMANEJAMENTOS: RemanejamentoItem[] = [
-  {
-    id: "rem-001",
-    data_hora: "2026-09-01T07:14:00",
-    tpa_removido_nome: "José Bezerra da Silva",
-    tpa_removido_matricula: "012",
-    funcao_codigo: "GUINCHO_A",
-    faina_codigo: "PRODUCAO",
-    motivo: "Atestado médico — NR-7",
-    base_legal: "CCT 2024-2026 · Cláusula 7ª, §2º",
-    status: "PEND",
-    created_by: "Manoel Costa (Fiscal)",
-    tpa_substituto_nome: "Paulo Henrique",
-    hash_evento: "a1b2c3d4e5f6...",
-  },
-  {
-    id: "rem-002",
-    data_hora: "2026-09-01T06:58:00",
-    tpa_removido_nome: "Manoel Florêncio",
-    tpa_removido_matricula: "247",
-    funcao_codigo: "EMP_GP",
-    faina_codigo: "EMPILHADOR",
-    motivo: "Trocou p/ turno noturno",
-    base_legal: "CCT 2024-2026 · Cláusula 5ª",
-    status: "SENT",
-    created_by: "Manoel Costa (Fiscal)",
-    tpa_substituto_nome: "Francisco das Chagas",
-    hash_evento: "b2c3d4e5f6a7...",
-  },
-  {
-    id: "rem-003",
-    data_hora: "2026-09-01T06:42:00",
-    tpa_removido_nome: "Antônio José da Silva",
-    tpa_removido_matricula: "058",
-    funcao_codigo: "CM_GERAL",
-    faina_codigo: "PRODUCAO",
-    motivo: "Reforço de terno — navio extra",
-    base_legal: "CCT 2024-2026 · Cláusula 7ª, §3º",
-    status: "SENT",
-    created_by: "Manoel Costa (Fiscal)",
-    tpa_substituto_nome: "Marcos Antônio",
-    hash_evento: "c3d4e5f6a7b8...",
-  },
-  {
-    id: "rem-004",
-    data_hora: "2026-09-01T06:30:00",
-    tpa_removido_nome: "Severino Ramos",
-    tpa_removido_matricula: "163",
-    funcao_codigo: "SINALEIRO",
-    faina_codigo: "SUPLEMENTAR",
-    motivo: "Substituição rotina",
-    base_legal: "CCT 2024-2026 · Cláusula 7ª, §1º",
-    status: "ACK",
-    created_by: "Manoel Costa (Fiscal)",
-    tpa_substituto_nome: "João Batista",
-    hash_evento: "d4e5f6a7b8c9...",
-  },
-];
-
-// ---- OGMO mock ----------------------------------------------------------
-
-export const MOCK_OGMO: OgmoNotificacao[] = [
-  {
-    id: "ogmo-001",
-    data_hora: "2026-09-01T07:14:30",
-    remanejamento_id: "rem-001",
-    canal: "EMAIL",
-    destinatario: "escala@ogmo-pe.com.br",
-    status: "SENT",
-    tentativas: 1,
-  },
-  {
-    id: "ogmo-002",
-    data_hora: "2026-09-01T07:00:15",
-    remanejamento_id: "rem-002",
-    canal: "EMAIL",
-    destinatario: "escala@ogmo-pe.com.br",
-    status: "ACK",
-    tentativas: 1,
-  },
-  {
-    id: "ogmo-003",
-    data_hora: "2026-09-01T06:45:08",
-    remanejamento_id: "rem-003",
-    canal: "WEBHOOK",
-    destinatario: "https://ogmo-pe.com.br/webhook/sindestiva",
-    status: "PEND",
-    tentativas: 3,
-    ultimo_erro: "Timeout 5s — endpoint recusando conexão (Risco R1 do plano).",
-  },
-];
+// ---- OGMO mock removido (Sprint S2 — dados reais via API) ---------------
 
 // ---- Auditoria mock (Sprint 6 implementa de verdade) --------------------
 

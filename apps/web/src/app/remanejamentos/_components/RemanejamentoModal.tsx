@@ -1,25 +1,30 @@
 // =============================================================================
 // SINDESTIVA-PE · RemanejamentoModal — modal pré-preenchido para novo remanejamento
 // Pode receber contexto via query params (vindo do clique no ponteiro da lousa).
-// Sprint 5 (T5-02) implementa de verdade: TPA a inserir, motivo, base legal,
-// observações, anexo, notify PWA, checkbox ack CCT.
+// Sprint S2: payload alinhado com `RemanejamentoBase` (Pydantic) — sem
+// `notify_pwa`/`ack_cct`. Migração completa da UX (selects por enum, base
+// legal CCT por catálogo, limites de texto, etc.) acontece em sprints
+// futuras — este sprint só garante o contrato de payload/tipo.
 // =============================================================================
 
 "use client";
 
 import { useState, type ReactNode, type FormEvent } from "react";
 import type { Porto, Turno } from "@sindestiva/shared";
-import { StatusBadge, toneForOgmoStatus } from "@/app/_components/StatusBadge";
-import type { RemanejamentoCreate, RemanejamentoItem } from "@/lib/tipos";
+import { StatusBadge, toneForStatusRemanejamento } from "@/app/_components/StatusBadge";
+import type { MotivoRemanejamentoUi, RemanejamentoCreate } from "@/lib/tipos";
+import type { RemanejamentoItemResolved } from "@/lib/api-mappers";
 import { createRemanejamento } from "@/lib/api";
 
-const MOTIVOS = [
-  "Atestado médico",
-  "Falta justificada",
-  "Reforço de terno (navio extra)",
-  "Substituição rotina",
-  "Trocou p/ outro turno",
-  "Liberação sindical",
+const MOTIVOS: MotivoRemanejamentoUi[] = [
+  "ATESTADO_MEDICO",
+  "FALTA_INJUSTIFICADA",
+  "REFORCO_TERNO",
+  "TROCA_TURNO",
+  "ATRASO_15MIN",
+  "FALTA_EPI",
+  "LIBERACAO_ANTECIPADA",
+  "OUTRO",
 ];
 
 const BASES_LEGAIS = [
@@ -36,8 +41,8 @@ export interface RemanejamentoModalProps {
     faina_codigo?: string;
     funcao_codigo?: string;
   };
-  /** Callback quando o remanejamento for criado (mock). */
-  onCreated?: (item: RemanejamentoItem) => void;
+  /** Callback quando o remanejamento for criado. */
+  onCreated?: (item: RemanejamentoItemResolved) => void;
   /** Callback para fechar. */
   onClose: () => void;
   porto: Porto;
@@ -45,35 +50,50 @@ export interface RemanejamentoModalProps {
 }
 
 export function RemanejamentoModal({ prefill, onCreated, onClose, porto, turno }: RemanejamentoModalProps): ReactNode {
-  const [motivo, setMotivo] = useState<string>(MOTIVOS[0] ?? "");
+  const [motivo, setMotivo] = useState<MotivoRemanejamentoUi>(MOTIVOS[0] ?? "OUTRO");
   const [baseLegal, setBaseLegal] = useState<string>(BASES_LEGAIS[0] ?? "");
   const [tpaSubstituto, setTpaSubstituto] = useState<string>("");
   const [observacoes, setObservacoes] = useState<string>("");
-  const [notifyPwa, setNotifyPwa] = useState<boolean>(true);
-  const [ackCct, setAckCct] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState<boolean>(false);
-  const [lastCreated, setLastCreated] = useState<RemanejamentoItem | null>(null);
+  const [lastCreated, setLastCreated] = useState<RemanejamentoItemResolved | null>(null);
 
-  const canSubmit = ackCct && motivo !== "" && baseLegal !== "" && !submitting;
+  const canSubmit = baseLegal !== "" && !submitting;
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
     setSubmitting(true);
+    // Payload espelha `RemanejamentoBase` (Pydantic). Sem `notify_pwa`/`ack_cct`.
     const payload: RemanejamentoCreate = {
-      tpa_removido_id: prefill?.tpa_id ?? "tpa-unknown",
-      funcao_codigo: prefill?.funcao_codigo ?? "CM_GERAL",
-      faina_codigo: prefill?.faina_codigo ?? "PRODUCAO",
+      porto_id: prefill?.tpa_id ?? "00000000-0000-0000-0000-000000000000",
+      turno_id: "00000000-0000-0000-0000-000000000000",
+      data_referencia: new Date().toISOString().slice(0, 10),
+      tpa_out_id: prefill?.tpa_id ?? "00000000-0000-0000-0000-000000000000",
+      funcao_origem_id: "00000000-0000-0000-0000-000000000000",
+      faina_origem_id: "00000000-0000-0000-0000-000000000000",
       motivo,
-      base_legal: baseLegal,
+      base_legal_texto_livre: baseLegal,
       observacoes: observacoes || undefined,
-      notify_pwa: notifyPwa,
-      ack_cct: ackCct,
     };
     try {
       const created = await createRemanejamento(payload);
-      setLastCreated(created);
-      onCreated?.(created);
+      // O backend devolve um item cru — o mapper só é aplicado em
+      // listagens, aqui só exibimos o essencial.
+      const resolved: RemanejamentoItemResolved = {
+        ...(created as unknown as RemanejamentoItemResolved),
+        tpa_removido_nome: "(nome removido)",
+        tpa_removido_matricula: "—",
+        funcao_origem_nome: "(função removida)",
+        funcao_origem_codigo: "—",
+        faina_origem_nome: "(faina removida)",
+        faina_origem_codigo: "—",
+        base_legal_texto: baseLegal,
+      };
+      if (tpaSubstituto) {
+        resolved.tpa_substituto_nome = tpaSubstituto;
+      }
+      setLastCreated(resolved);
+      onCreated?.(resolved);
     } finally {
       setSubmitting(false);
     }
@@ -92,11 +112,10 @@ export function RemanejamentoModal({ prefill, onCreated, onClose, porto, turno }
         onClick={(e) => e.stopPropagation()}
       >
         {lastCreated ? (
-          // Estado de sucesso (mock — Sprint 5 retorna do backend)
           <div className="p-6">
             <div className="mb-3 flex items-center gap-2">
               <StatusBadge tone="green">✓ Criado</StatusBadge>
-              <StatusBadge tone={toneForOgmoStatus(lastCreated.status)}>
+              <StatusBadge tone={toneForStatusRemanejamento(lastCreated.status)}>
                 {lastCreated.status}
               </StatusBadge>
             </div>
@@ -104,7 +123,7 @@ export function RemanejamentoModal({ prefill, onCreated, onClose, porto, turno }
               Remanejamento registrado
             </h2>
             <p className="mb-4 text-[12px] text-[#94a8bd]">
-              ID: <span className="font-mono text-[#d4a574]">{lastCreated.id}</span> ·
+              Código SE: <span className="font-mono text-[#d4a574]">{lastCreated.codigo_se}</span> ·
               Hash: <span className="font-mono text-[#d4a574]">{lastCreated.hash_evento}</span>
             </p>
             <p className="mb-4 text-[12px] text-[#94a8bd]">
@@ -160,7 +179,7 @@ export function RemanejamentoModal({ prefill, onCreated, onClose, porto, turno }
             <Field label="Motivo">
               <select
                 value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
+                onChange={(e) => setMotivo(e.target.value as MotivoRemanejamentoUi)}
                 className="w-full rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[13px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
               >
                 {MOTIVOS.map((m) => (
@@ -189,36 +208,6 @@ export function RemanejamentoModal({ prefill, onCreated, onClose, porto, turno }
                 className="w-full rounded border border-[#2a5070] bg-[#0a1929] px-3 py-2 text-[13px] text-[#e8eef4] focus:border-[#d4a574] focus:outline-none"
               />
             </Field>
-
-            <div className="mb-4 space-y-2">
-              <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[#e8eef4]">
-                <input
-                  type="checkbox"
-                  checked={notifyPwa}
-                  onChange={(e) => setNotifyPwa(e.target.checked)}
-                  className="h-4 w-4 accent-[#d4a574]"
-                />
-                Notificar PWA do TPA
-              </label>
-              <label className="flex cursor-pointer items-start gap-2 text-[12px] text-[#e8eef4]">
-                <input
-                  type="checkbox"
-                  checked={ackCct}
-                  onChange={(e) => setAckCct(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 accent-[#d4a574]"
-                />
-                <span>
-                  Confirmo que este remanejamento respeita a <strong>CCT 2024-2026</strong> e a
-                  base legal indicada acima. <span className="text-[#e04a4a]">Obrigatório.</span>
-                </span>
-              </label>
-            </div>
-
-            {!ackCct && (
-              <div className="mb-3 rounded border border-[#e04a4a]/40 bg-[#e04a4a]/10 px-3 py-2 text-[11px] text-[#e04a4a]">
-                ⚠️ Confirme o ack CCT para habilitar o envio.
-              </div>
-            )}
 
             <div className="flex justify-end gap-2">
               <button
