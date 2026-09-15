@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildProxyResponseHeaders,
+  proxyMethodOmitsBody,
   resolveUpstreamAuthorization,
 } from "./bff-proxy-headers";
 import { BFF_PROXY_PREFIX, buildBffProxyUrl } from "./bff-proxy";
@@ -51,6 +52,20 @@ describe("buildProxyResponseHeaders", () => {
     expect(out.get("access-control-allow-origin")).toBe(
       "https://web.hom.lousa.pscode.ia.br",
     );
+  });
+});
+
+describe("proxyMethodOmitsBody", () => {
+  it("omite body em GET e HEAD", () => {
+    expect(proxyMethodOmitsBody("GET")).toBe(true);
+    expect(proxyMethodOmitsBody("head")).toBe(true);
+  });
+
+  it("inclui body em POST, PATCH, PUT e DELETE", () => {
+    expect(proxyMethodOmitsBody("POST")).toBe(false);
+    expect(proxyMethodOmitsBody("patch")).toBe(false);
+    expect(proxyMethodOmitsBody("PUT")).toBe(false);
+    expect(proxyMethodOmitsBody("DELETE")).toBe(false);
   });
 });
 

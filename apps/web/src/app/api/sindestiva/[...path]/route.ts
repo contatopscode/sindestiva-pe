@@ -16,6 +16,7 @@ import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import {
   buildProxyResponseHeaders,
+  proxyMethodOmitsBody,
   resolveUpstreamAuthorization,
 } from "@/lib/bff-proxy-headers";
 import { resolveApiUrl } from "@/lib/api-url";
@@ -42,6 +43,11 @@ async function proxy(
     tokenCookie,
   );
 
+  let body: ArrayBuffer | undefined;
+  if (!proxyMethodOmitsBody(req.method)) {
+    body = await req.arrayBuffer();
+  }
+
   const init: RequestInit = {
     method: req.method,
     headers: {
@@ -49,23 +55,35 @@ async function proxy(
       ...(authorization ? { Authorization: authorization } : {}),
       ...(allCookies ? { Cookie: allCookies } : {}),
     },
-    ...(req.method === "GET" || req.method === "HEAD"
-      ? {}
-      : { body: req.body ?? undefined }),
+    ...(body !== undefined ? { body } : {}),
     cache: "no-store",
   };
 
-  const upstream = await fetch(url, init);
+  try {
+    const upstream = await fetch(url, init);
 
-  const resHeaders = buildProxyResponseHeaders(
-    upstream.headers,
-    req.headers.get("origin"),
-  );
+    const resHeaders = buildProxyResponseHeaders(
+      upstream.headers,
+      req.headers.get("origin"),
+    );
 
-  return new Response(upstream.body, {
-    status: upstream.status,
-    headers: resHeaders,
-  });
+    return new Response(upstream.body, {
+      status: upstream.status,
+      headers: resHeaders,
+    });
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Falha ao contactar a API upstream";
+    return Response.json(
+      {
+        error: {
+          code: "BFF_PROXY_ERROR",
+          message,
+        },
+      },
+      { status: 500 },
+    );
+  }
 }
 
 function handler(
