@@ -17,8 +17,12 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import structlog
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1 import api_v1_router
 from app.core.config import settings
@@ -134,6 +138,82 @@ app.add_middleware(
 # Middleware (Sprint 6 T6-09 — access_log Art. 37 LGPD)
 # ---------------------------------------------------------------------------
 app.add_middleware(AccessLogMiddleware)
+
+
+# ---------------------------------------------------------------------------
+# Exception handlers (Sprint FSW-2026-001 S1 — C1+C3)
+#
+#   Exception             → 500 com detail JSON {code, message}
+#                            + stack trace preservado no log
+#                            (NÃO engolir HTTPException legítimo, ver handler
+#                            dedicado abaixo).
+#   StarletteHTTPException → preserva status_code e detail originais;
+#                            necessário para que `HTTPException` levantado
+#                            manualmente pelos endpoints/routers continue
+#                            propagando o detail que eles já emitem.
+#   RequestValidationError → mantém o formato Pydantic v2 {detail: [...]}
+#                            que o frontend já consome via parseApiError.
+# ---------------------------------------------------------------------------
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Captura qualquer exceção não tratada e devolve 500 com detail JSON.
+
+    O log preserva stack trace completo via processor `format_exc_info` do
+    structlog (ver `app.core.logging`). Contrato da resposta segue o
+    padrão dos demais erros da API: ``{"detail": {"code", "message"}}``.
+    """
+    log = structlog.get_logger("sindestiva.unhandled")
+    log.exception(
+        "api.unhandled_exception",
+        method=request.method,
+        path=request.url.path,
+        exc_type=type(exc).__name__,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": {
+                "code": "INTERNAL_ERROR",
+                "message": "Erro interno do servidor.",
+            }
+        },
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _starlette_http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
+    """Preserva ``status_code`` e ``detail`` originais.
+
+    Necessário porque o handler genérico de ``Exception`` rodaria antes
+    e engoliria ``HTTPException`` legítimo levantado pelos routers
+    (ex.: 401, 403, 404 com ``detail`` já no formato correto). Mantemos
+    o body tal como foi emitido pelo chamador.
+    """
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _request_validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Mantém o formato default do Pydantic v2 (``{"detail": [...]}``).
+
+    O frontend já trata esse formato em ``parseApiError``; qualquer
+    mudança aqui exigiria atualizar ``apps/web/src/lib/parse-api-error.ts``.
+    """
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
 
 
 # ---------------------------------------------------------------------------
