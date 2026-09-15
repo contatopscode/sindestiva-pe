@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -195,9 +195,17 @@ async def create_admin_user(db: AsyncSession, data: AdminUserCreate) -> AdminUse
     db.add(user)
     try:
         await db.flush()
-    except IntegrityError as exc:
+    except (IntegrityError, SQLAlchemyError) as exc:
         await db.rollback()
-        raise _map_integrity(exc) from exc
+        if isinstance(exc, IntegrityError):
+            raise _map_integrity(exc) from exc
+        log.exception(
+            "user_admin.create_db_error",
+            exc_type=type(exc).__name__,
+        )
+        raise UserAdminError(
+            500, "DB_ERROR", "Falha ao persistir usuário."
+        ) from exc
 
     try:
         if data.role == RoleEnum.FISCAL:
@@ -227,9 +235,26 @@ async def create_admin_user(db: AsyncSession, data: AdminUserCreate) -> AdminUse
             )
             db.add(dirigente)
         await db.commit()
-    except IntegrityError as exc:
+    except (IntegrityError, SQLAlchemyError) as exc:
         await db.rollback()
-        raise _map_integrity(exc) from exc
+        if isinstance(exc, IntegrityError):
+            raise _map_integrity(exc) from exc
+        log.exception(
+            "user_admin.create_db_error",
+            exc_type=type(exc).__name__,
+        )
+        raise UserAdminError(
+            500, "DB_ERROR", "Falha ao criar perfil interno."
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        await db.rollback()
+        log.exception(
+            "user_admin.create_unexpected",
+            exc_type=type(exc).__name__,
+        )
+        raise UserAdminError(
+            500, "INTERNAL_ERROR", "Falha ao criar perfil interno."
+        ) from exc
 
     await db.refresh(user)
     loaded = await _load_user(db, user.id)
