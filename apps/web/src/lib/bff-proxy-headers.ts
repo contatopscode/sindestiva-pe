@@ -52,3 +52,9 @@ export function resolveUpstreamAuthorization(
   if (cookieToken) return `Bearer ${cookieToken}`;
   return undefined;
 }
+
+/** Métodos sem corpo na request — não ler `req.body` / não repassar body ao upstream. */
+export function proxyMethodOmitsBody(method: string): boolean {
+  const m = method.toUpperCase();
+  return m === "GET" || m === "HEAD";
+}
