@@ -194,6 +194,37 @@ def test_escalanet_normaliza_rotulos_fn_ambipar_440(fakes_path) -> None:
     assert not any(c.funcao_codigo.startswith("FUNCAO_RAW_") for c in celulas)
 
 
+@pytest.mark.parametrize(
+    "rotulo_html,codigo_esperado",
+    [
+        # Sinônimos de Guincho (GB = Guincho de Bordo, do próprio navio).
+        ("OPERADOR DE GB TIPO A", "TECNICA_02"),
+        ("OPERADOR DE GB TIPO B", "TECNICA_03"),
+        # Variante singular de Vigia Porto.
+        ("VIGIA PORTUARIO", "VIGIA_01"),
+        # Forma abreviada com sufixo FN - EMB PEQ (deve cair em TERNO_01).
+        ("TRAB. PORÃO (FN - EMB PEQ)", "TERNO_01"),
+    ],
+)
+def test_escalanet_rotulos_observados_set_2026(
+    rotulo_html: str, codigo_esperado: str
+) -> None:
+    """Rótulos novos do EscalaNet (15-16/09/2026) caem no catálogo seed.
+
+    Cada rótulo representa uma string REAL que apareceu no HTML do OGMO
+    Recife mas que NÃO estava no `ESCALANET_FUNCAO_PARA_CODIGO` original.
+    Sem essas entradas, viravam `FUNCAO_RAW_*` e a célula ficava órfã.
+    """
+    from app.scrapers.escalanet import _normalizar_funcao
+
+    funcao_codigo, faina_codigo = _normalizar_funcao(rotulo_html)
+    assert funcao_codigo == codigo_esperado, (
+        f"Rótulo {rotulo_html!r} deveria virar {codigo_esperado!r}, "
+        f"veio {funcao_codigo!r}"
+    )
+    assert faina_codigo == "PRODUCAO"
+
+
 @pytest.mark.asyncio
 async def test_scraper_escalanet_filtra_turno(fake_http_factory, fakes_path) -> None:
     """Com `turno_codigo`, só dispara POST dos períodos daquele turno."""
