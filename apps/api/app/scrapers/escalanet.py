@@ -107,6 +107,11 @@ ESCALANET_FUNCAO_PARA_CODIGO: dict[str, tuple[str, str]] = {
     "SINALEIRO DIVERSOS": ("TECNICA_01", "PRODUCAO"),
     "OPERADOR DE GUINCHO TIPO A": ("TECNICA_02", "PRODUCAO"),
     "OPERADOR DE GUINCHO TIPO B": ("TECNICA_03", "PRODUCAO"),
+    # Sinônimos observados no EscalaNet (15-16/09/2026): "GB" = Guincho de Bordo,
+    # operador de guincho do próprio navio (vs o de terra). Mesma função,
+    # mesmo código de catálogo — só muda a procedência do equipamento.
+    "OPERADOR DE GB TIPO A": ("TECNICA_02", "PRODUCAO"),
+    "OPERADOR DE GB TIPO B": ("TECNICA_03", "PRODUCAO"),
     "OPERADOR DE EMPILHADEIRA GP": ("TECNICA_04", "PRODUCAO"),
     "OPERADOR DE EMPILHADEIRA PP": ("TECNICA_05", "PRODUCAO"),
     "OPERADOR DE VEÍCULO PESADO": ("TECNICA_06", "PRODUCAO"),
@@ -116,6 +121,11 @@ ESCALANET_FUNCAO_PARA_CODIGO: dict[str, tuple[str, str]] = {
     "PÁ CARREGADEIRA": ("TECNICA_10", "PRODUCAO"),
     "VIGIA PORTO": ("VIGIA_01", "PRODUCAO"),
     "VIGIA CAIS": ("VIGIA_02", "PRODUCAO"),
+    # Variante observada no EscalaNet (16/09/2026): rótulo no singular
+    # "VIGIA PORTUARIO" é a mesma função do "VIGIA PORTO". Mapeamos pra
+    # o mesmo código VIGIA_01 pra evitar criar entrada nova à toa no
+    # catálogo (lousa_funcao é compartilhado entre portos).
+    "VIGIA PORTUARIO": ("VIGIA_01", "PRODUCAO"),
 }
 
 # Regex que captura uma linha de TPA: <td>FUNÇÃO</td><td>NOME</td><td>MATRICULA</td><td>ORD</td><td>EXTRA</td>
