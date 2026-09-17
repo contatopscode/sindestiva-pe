@@ -18,9 +18,11 @@
  *   - Mesmo cookie serve para API de prod (cross-origin via CORS).
  */
 import { cookies } from "next/headers";
+import { API_URL } from "@/lib/api";
+import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "https://api.lousa.pscode.ia.br";
-const COOKIE_NAME = "sindestiva_token";
+const API = API_URL;
+const COOKIE_NAME = AUTH_COOKIE_NAME;
 const COOKIE_MAX_AGE = 8 * 60 * 60;  // 8h, mesmo do JWT
 
 export type Role = "FISCAL" | "DIRIGENTE" | "TPA";

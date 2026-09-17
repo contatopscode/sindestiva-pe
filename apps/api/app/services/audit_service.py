@@ -7,7 +7,7 @@ Placeholder Sprint 0. Sprint 6 (T6-01, T6-09) implementa:
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +15,38 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.services.hash_chain import GENESIS_HASH, compute_hash
 
+if TYPE_CHECKING:
+    from app.models.users import User
+
 log = get_logger(__name__)
+
+
+def resolver_actor_nome(actor_user: "User | None") -> tuple[str | None, str | None]:
+    """Resolve o nome legível do autor do AuditEvent (HU006/RN03).
+
+    Cadeia de fallback TPA → Fiscal → Dirigente → email — cobre
+    todas as roles do projeto sem branching adicional no mapper.
+
+    Returns:
+        Tupla (actor_nome, actor_email). Quando o `actor_user` é None,
+        retorna (None, None). Quando há usuário mas nenhum perfil de
+        negócio cadastrado, cai no email como nome e como email.
+    """
+    if actor_user is None:
+        return (None, None)
+
+    email = actor_user.email
+
+    if actor_user.tpa is not None:
+        return (actor_user.tpa.nome_completo, email)
+    if actor_user.fiscal is not None:
+        return (actor_user.fiscal.nome_completo, email)
+    if actor_user.dirigente is not None:
+        return (actor_user.dirigente.nome_completo, email)
+
+    # Usuário existe mas sem perfil de negócio — usa o email como nome
+    # legível (mantém auditoria rastreável mesmo para ADMIN sem perfil).
+    return (email, email)
 
 
 class AuditService:
@@ -50,4 +81,4 @@ class AuditService:
         return {"hash_evento": hash_evento, "stub": True}
 
 
-__all__ = ["AuditService"]
+__all__ = ["AuditService", "resolver_actor_nome"]

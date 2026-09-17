@@ -12,13 +12,17 @@
  * A validação real é server-side no `getSession()`.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { AUTH_COOKIE_NAME } from "@/lib/auth-cookie";
 
-const COOKIE_NAME = "sindestiva_token";
+const COOKIE_NAME = AUTH_COOKIE_NAME;
 
 const PUBLIC_ROUTES = new Set(["/login"]);
 
 const ROLE_RULES: Array<{ prefix: string; allowed: string[] }> = [
   { prefix: "/bi", allowed: ["DIRIGENTE"] },
+  { prefix: "/usuarios", allowed: ["DIRIGENTE"] },
+  { prefix: "/tpas", allowed: ["DIRIGENTE"] },
+  { prefix: "/configuracoes", allowed: ["DIRIGENTE"] },
   { prefix: "/centro-comando", allowed: ["FISCAL", "DIRIGENTE", "TPA"] },
   { prefix: "/remanejamentos", allowed: ["FISCAL", "DIRIGENTE"] },
   { prefix: "/ogmo", allowed: ["FISCAL", "DIRIGENTE"] },

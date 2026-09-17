@@ -46,6 +46,69 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # ---------------------------------------------------------------------
+      # Barreira de regressão: impede que o fallback NXDOMAIN
+      # 'https://api.lousa.pscode.ia.br' seja reintroduzido em
+      # apps/web/src fora da lista branca documentada abaixo.
+      # (SINDESTIVA-PE-FSW-2026-001 · S3 · F2 — C3 da SPEC §4,
+      # atualizado em CR1 após S1 remover o fallback inline de
+      # centro-comando/page.tsx — entrada morta retirada da whitelist.)
+      #
+      # Lista branca — cada entrada documentada (evitar lista silenciosa):
+      #   1. api\.ts:.*DEFAULT_API_URL
+      #      → apps/web/src/lib/api.ts — origem canônica da constante de
+      #        dev de API_URL (única ocorrência de runtime permitida).
+      #   2. api\.ts:.*scoped
+      #      → apps/web/src/lib/api.ts (~linha 42) — comentário sobre o
+      #        scoping do cookie httpOnly entre web.lousa.pscode.ia.br e
+      #        api.lousa.pscode.ia.br (contexto arquitetural).
+      #   3. api/sindestiva/\[...path\]/route\.ts:
+      #      → handler catch-all do proxy BFF — origin default
+      #        `web.lousa.pscode.ia.br`. Único arquivo server-side (além
+      #        de api-url) que pode falar de api.lousa no repasse upstream.
+      #   4. api/auth/login/route\.ts:.*Domain=\.pscode\.ia\.br
+      #      → apps/web/src/app/api/auth/login/route.ts (~linha 25) —
+      #        comentário explicando o `Domain=.pscode.ia.br` do cookie
+      #        httpOnly (compartilhamento entre web.lousa e api.lousa).
+      #
+      # NOTA — entradas mortas removidas em CR1 (não recolocar):
+      #   - centro-comando/page\.tsx:.*server-side → arquivo não contém
+      #     mais a string (S1 substituiu o fallback inline por import
+      #     API_URL); manter a entrada reintroduziria um falso positivo
+      #     e mascararia regressões reais.
+      # ---------------------------------------------------------------------
+      - name: Verify no NXDOMAIN fallback drift (C3)
+        run: |
+          set -e
+          HITS=$(grep -rnE 'lousa\.pscode\.ia\.br' apps/web/src \
+            | grep -vE '(api\.ts:.*DEFAULT_API_URL|api\.ts:.*scoped|api/sindestiva/\[...path\]/route\.ts:|api-url\.ts:.*DEFAULT_API_URL|api/auth/login/route\.ts:.*Domain=\.pscode\.ia\.br)' \
+            || true)
+          if [ -n "$HITS" ]; then
+            echo "::error::NXDOMAIN fallback drift detectado em apps/web/src:"
+            echo "$HITS"
+            echo "Veja SPEC SINDESTIVA-PE-FSW-2026-001 §4 C3 — só as entradas na lista branca podem conter 'lousa.pscode.ia.br'."
+            exit 1
+          fi
+          echo "OK — nenhuma ocorrência fora da lista branca."
+
+      - name: Verify BFF proxy route is public (App Router)
+        run: |
+          set -e
+          ROUTE="apps/web/src/app/api/sindestiva/[...path]/route.ts"
+          if [ ! -f "$ROUTE" ]; then
+            echo "::error::Rota BFF ausente: $ROUTE"
+            exit 1
+          fi
+          if [ -d "apps/web/src/app/__sindestiva" ]; then
+            echo "::error::Pasta privada apps/web/src/app/__sindestiva ainda existe (Next.js não registra rotas _*)"
+            exit 1
+          fi
+          if grep -qE 'BFF_PROXY_PREFIX.*=.*"/_' apps/web/src/lib/bff-proxy.ts; then
+            echo "::error::BFF_PROXY_PREFIX não pode começar com underscore (private folder)"
+            exit 1
+          fi
+          echo "OK — proxy BFF em rota pública."
+
   # ---------------------------------------------------------------------------
   # Backend / Scraper — ruff + pytest
   # ---------------------------------------------------------------------------

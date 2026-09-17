@@ -49,6 +49,8 @@ class RemanejamentoRead(RemanejamentoBase):
     id: UUID
     codigo_se: str
     fiscal_id: UUID
+    # Nome do fiscal criador (join opcional na listagem).
+    fiscal_nome: str | None = None
     status: StatusRemanejamentoEnum
     ack_at: datetime | None
     ack_por: str | None

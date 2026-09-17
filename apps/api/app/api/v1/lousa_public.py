@@ -26,6 +26,7 @@ from app.core.logging import get_logger
 from app.models import Faina, Funcao, LousaAlocacao, LousaCell, LousaSnapshot, Porto, Tpa, Turno
 from app.models import LousaEscalaOrigem
 from app.models.enums import CellStatusEnum, SnapshotStatusEnum, StatusScrapingEnum
+from app.services.tpa_match_service import load_tpas_by_matriculas, normalize_matricula_ogmo, split_matriculas_celula
 
 router = APIRouter(prefix="/lousa/public", tags=["lousa-public"])
 log = get_logger(__name__)
@@ -166,17 +167,29 @@ async def preview(
             alocacoes_db = (await db.execute(stmt_a)).scalars().all()
             if not alocacoes_db and latest_escala.status != StatusScrapingEnum.SEM_DADOS:
                 continue
-            # 3. Resolver TPAs em batch (1 query pra N matriculas)
-            matriculas = {a.trabalhador_matricula for a in alocacoes_db if a.trabalhador_matricula}
-            tpa_by_mat: dict[str, Tpa] = {}
-            if matriculas:
-                tpa_rows = (await db.execute(
-                    select(Tpa).where(Tpa.matricula_ogmo.in_(matriculas))
-                )).scalars().all()
-                tpa_by_mat = {t.matricula_ogmo: t for t in tpa_rows}
+            # 3. Resolver TPAs em batch (trim; exact match em matricula_ogmo)
+            tpa_by_mat = await load_tpas_by_matriculas(
+                db,
+                [a.trabalhador_matricula for a in alocacoes_db],
+            )
+            tpa_ids = {a.trabalhador_id for a in alocacoes_db if a.trabalhador_id}
+            tpa_by_id: dict = {}
+            if tpa_ids:
+                id_rows = (
+                    await db.execute(select(Tpa).where(Tpa.id.in_(tpa_ids)))
+                ).scalars().all()
+                tpa_by_id = {t.id: t for t in id_rows}
             # 4. Construir cells (já deduplicadas pela FK da escala_origem)
             for a in alocacoes_db:
-                tpa_obj = tpa_by_mat.get(a.trabalhador_matricula) if a.trabalhador_matricula else None
+                matricula_exib = normalize_matricula_ogmo(a.trabalhador_matricula)
+                tpa_obj = None
+                if a.trabalhador_id and a.trabalhador_id in tpa_by_id:
+                    tpa_obj = tpa_by_id[a.trabalhador_id]
+                elif matricula_exib:
+                    for token in split_matriculas_celula(matricula_exib):
+                        tpa_obj = tpa_by_mat.get(token)
+                        if tpa_obj is not None:
+                            break
                 cells.append({
                     "id": str(a.id),
                     "faina_id": str(a.faina_id),
@@ -184,7 +197,7 @@ async def preview(
                     "cais": None,
                     "tpa_id": str(tpa_obj.id) if tpa_obj else None,
                     "tpa_nome": tpa_obj.nome_completo if tpa_obj else None,
-                    "tpa_matricula": a.trabalhador_matricula,
+                    "tpa_matricula": matricula_exib or a.trabalhador_matricula,
                     "status": "NORMAL",
                     "data_referencia": a.data_referencia.isoformat(),
                 })

@@ -211,6 +211,70 @@ async def fix_purge_after_default(
 
 
 @router.post(
+    "/ensure-schema",
+    summary="[ADMIN] Extensions + Alembic upgrade head + drift check",
+)
+async def ensure_schema(
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+) -> dict:
+    """Reaplica bootstrap de Postgres e migrations com repair de drift.
+
+    Se `alembic_version` estiver à frente de tabelas críticas (`portos`,
+    `lousa_escala_origem`), faz `alembic stamp` seguro (sem downgrade DDL)
+    e reexecuta `upgrade head`. Fallback: `create_all(checkfirst=True)`.
+
+    Uso:
+        curl -X POST https://api.hom.lousa.pscode.ia.br/api/v1/admin/ensure-schema \\
+             -H "X-Admin-Token: $ADMIN_SEED_TOKEN"
+    """
+    from app.core.postgres_bootstrap import (
+        ensure_schema_and_extensions,
+        run_migrations_with_drift_repair,
+    )
+
+    _check_admin_token(x_admin_token)
+    log.warning("admin.ensure_schema.invocado")
+
+    try:
+        bootstrap = ensure_schema_and_extensions()
+    except Exception as exc:
+        log.exception("admin.ensure_schema.bootstrap_falhou")
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Bootstrap Postgres falhou: {type(exc).__name__}: {exc}. "
+                "Se o role não tem CREATE EXTENSION, peça ao DBA: "
+                "CREATE EXTENSION IF NOT EXISTS pgcrypto, citext, pg_trgm;"
+            ),
+        ) from exc
+
+    migrate = run_migrations_with_drift_repair()
+    if not migrate.get("ok"):
+        log.error("admin.ensure_schema.migrate_falhou", migrate=migrate)
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": migrate.get("error"),
+                "missing_after": migrate.get("missing_after"),
+                "actions": migrate.get("actions"),
+                "log_tail": migrate.get("log_tail"),
+            },
+        )
+
+    log.warning(
+        "admin.ensure_schema.ok",
+        revision=migrate.get("revision_after"),
+        missing_tables=migrate.get("missing_after"),
+    )
+    return {
+        "ok": True,
+        "bootstrap": bootstrap,
+        "migrate": migrate,
+        "next_step": "POST /api/v1/admin/run-seeds",
+    }
+
+
+@router.post(
     "/run-seeds",
     summary="[ADMIN] Roda seed_catalogos + seed_users + seed_tpas (idempotente)",
 )
@@ -218,6 +282,8 @@ async def run_seeds(
     x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
 ) -> dict:
     """Roda os 3 seeds em ordem. Cada um é idempotente.
+
+    Pré-requisito: tabelas existem (entrypoint ou `POST /admin/ensure-schema`).
 
     Uso:
         curl -X POST https://sindestiva-api.onrender.com/api/v1/admin/run-seeds \\
@@ -264,8 +330,48 @@ async def run_seeds(
             detail=f"Falha em seed_tpas_demo: {type(exc).__name__}: {exc}",
         ) from exc
 
+    if settings.allow_tpa_stub:
+        try:
+            steps["tpas_from_lousa"] = await _executar_seed("seed_tpas_from_lousa")
+        except Exception as exc:
+            log.exception("admin.run_seeds.tpas_from_lousa_falhou")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Falha em seed_tpas_from_lousa: {type(exc).__name__}: {exc}",
+            ) from exc
+    else:
+        steps["tpas_from_lousa"] = {
+            "skipped": True,
+            "reason": "ALLOW_TPA_STUB=0",
+        }
+
     log.warning("admin.run_seeds.ok", steps=list(steps.keys()))
     return {"ok": True, "steps": steps}
+
+
+@router.post(
+    "/backfill-tpas-from-lousa",
+    summary="[ADMIN] Cria stubs TPA das matrículas em lousa_alocacao (ALLOW_TPA_STUB)",
+)
+async def backfill_tpas_from_lousa(
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+    days: int = 30,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Backfill idempotente de User+Tpa + link `trabalhador_id` em alocações."""
+    _check_admin_token(x_admin_token)
+    if not settings.allow_tpa_stub:
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "ALLOW_TPA_STUB=0 — configure ALLOW_TPA_STUB=1 no servidor.",
+        }
+    log.warning("admin.backfill_tpas_from_lousa.invocado", days=days)
+    from app.services.tpa_stub_backfill_service import backfill_stubs_from_lousa_alocacao
+
+    result = await backfill_stubs_from_lousa_alocacao(db, days=days)
+    log.warning("admin.backfill_tpas_from_lousa.ok", result=result)
+    return result
 
 
 __all__ = ["router"]

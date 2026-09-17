@@ -32,8 +32,13 @@ function shortHash(h: string | null | undefined): string {
 }
 
 export function SnapshotStatus({ snapshot, onRefresh, loading }: SnapshotStatusProps): ReactNode {
-  const tone = toneForSnapshotStatus(snapshot?.status);
-  const label = snapshot?.status ? SNAPSHOT_STATUS_LABEL[snapshot.status] : "Sem snapshot";
+  const inferredStatus =
+    snapshot?.status ??
+    (snapshot && snapshot.total_celulas === 0 && snapshot.total_tpas_escalados === 0
+      ? "SEM_DADOS"
+      : null);
+  const tone = toneForSnapshotStatus(inferredStatus);
+  const label = inferredStatus ? SNAPSHOT_STATUS_LABEL[inferredStatus] : "Sem snapshot";
 
   return (
     <div className="flex flex-wrap items-center gap-3 rounded-md border border-[#1e3a52] bg-[#0f2438] px-3 py-2">
@@ -44,7 +49,7 @@ export function SnapshotStatus({ snapshot, onRefresh, loading }: SnapshotStatusP
         </span>
       )}
 
-      <StatusBadge tone={tone} pulse={snapshot?.status === "OK"}>
+      <StatusBadge tone={tone} pulse={inferredStatus === "OK"}>
         ● {label}
       </StatusBadge>
 

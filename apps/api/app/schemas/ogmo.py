@@ -16,6 +16,7 @@ class OgmoNotificacaoBase(BaseModel):
     assunto: str | None = None
     payload_json: dict
     destinatario_email: str | None = None
+    destinatario_whatsapp: str | None = None
     destinatario_webhook_id: UUID | None = None
 
 

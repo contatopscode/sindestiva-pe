@@ -41,6 +41,10 @@ WORKDIR /app
 COPY apps/web ./apps/web
 COPY packages ./packages
 
+# NEXT_PUBLIC_* é embutido no bundle no `next build` — precisa existir no builder.
+ARG NEXT_PUBLIC_API_URL=
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 # Build via Turbo (respeita cache config do turbo.json)
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm turbo run build --filter=@sindestiva/web...
@@ -69,6 +73,6 @@ EXPOSE 3000
 
 # Health check (Alpine não tem curl; wget vem built-in)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD wget -qO- http://localhost:3000/ || exit 1
+    CMD wget -qO- http://127.0.0.1:3000/ || exit 1
 
 CMD ["node", "apps/web/server.js"]

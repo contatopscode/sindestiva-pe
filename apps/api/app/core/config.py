@@ -99,10 +99,27 @@ class Settings(BaseSettings):
     # ---------- Observabilidade ----------
     sentry_dsn: str = ""
 
+    # ---------- CORS (browser → API) ----------
+    # Vírgula-separado; união com lista base em `app.core.cors` (não substitui).
+    cors_origins: str = Field(
+        default="",
+        validation_alias="CORS_ORIGINS",
+        description="Origins extras permitidos (ex.: preview custom).",
+    )
+
     # ---------- Admin (one-shot operations) ----------
     # Token compartilhado para endpoints admin (run-seeds, etc).
     # Header esperado: X-Admin-Token. Se vazio, endpoint retorna 503.
     admin_seed_token: str = ""
+
+    # ---------- TPA stub (homolog / MVP sem cadastro sindical real) ----------
+    # Quando 1, permite criar User+Tpa sintéticos a partir de matrículas
+    # raspadas (`lousa_alocacao`). Desligado em produção até import real.
+    allow_tpa_stub: bool = Field(
+        default=False,
+        validation_alias="ALLOW_TPA_STUB",
+        description="1/true habilita backfill de stubs TPA por matrícula OGMO.",
+    )
 
     @model_validator(mode="after")
     def _derive_database_url_sync(self) -> Settings:
@@ -118,6 +135,12 @@ class Settings(BaseSettings):
                 "postgresql+asyncpg://", "postgresql+psycopg://", 1
             )
         return self
+
+    def resolved_cors_allow_origins(self) -> list[str]:
+        """Origins efetivos para o middleware CORS."""
+        from app.core.cors import build_cors_allow_origins
+
+        return build_cors_allow_origins(self.cors_origins)
 
 
 @lru_cache(maxsize=1)

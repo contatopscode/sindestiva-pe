@@ -500,6 +500,13 @@ body {
 .tag.amber { background: rgba(232, 163, 61, 0.15); color: var(--accent-amber); }
 .tag.red { background: rgba(224, 74, 74, 0.15); color: var(--accent-red); }
 
+.remanejamento-contexto {
+  background: var(--bg-base);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
 .remanejamento-item {
   display: grid;
   grid-template-columns: 48px 1fr auto;

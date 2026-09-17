@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
-from app.core.security import get_current_user_id, oauth2_scheme
+from app.core.security import get_current_user_id, get_current_user_role, oauth2_scheme
 from app.core.logging import get_logger
 from app.models.enums import StatusRemanejamentoEnum
 from app.schemas.remanejamento import (
@@ -17,11 +17,31 @@ from app.schemas.remanejamento import (
     RemanejamentoListResponse,
     RemanejamentoRead,
 )
-from app.services.ogmo_notifier import OgmoNotifierError, enviar_email
+from app.schemas.configuracoes import NotificacaoPreviewRead
+from app.services.ogmo_notifier import OgmoNotifierError, enviar_email, preview_notificacao_whatsapp
 from app.services.remanejamento_service import RemanejamentoError, aprovar, criar, listar
 
 router = APIRouter(prefix="/remanejamentos", tags=["remanejamentos"])
 log = get_logger(__name__)
+
+
+def _remanejamento_to_read(rem) -> RemanejamentoRead:
+    """Serializa ORM + `fiscal.nome_completo` quando carregado."""
+    data = RemanejamentoRead.model_validate(rem)
+    fiscal = getattr(rem, "fiscal", None)
+    if fiscal is not None:
+        return data.model_copy(update={"fiscal_nome": fiscal.nome_completo})
+    return data
+
+
+async def _fiscal_for_user(db, user_id: str):
+    """Perfil Fiscal vinculado ao user (FISCAL ou DIRIGENTE com cadastro fiscal)."""
+    from app.models import Fiscal  # noqa: PLC0415
+    from sqlalchemy import select  # noqa: PLC0415
+
+    return (
+        await db.execute(select(Fiscal).where(Fiscal.user_id == user_id))
+    ).scalar_one_or_none()
 
 
 def _user_id_or_401(token: Annotated[str | None, Depends(oauth2_scheme)]) -> str:
@@ -35,18 +55,55 @@ def _user_id_or_401(token: Annotated[str | None, Depends(oauth2_scheme)]) -> str
     return user_id
 
 
+def _require_fiscal_ou_dirigente(
+    token: Annotated[str | None, Depends(oauth2_scheme)],
+) -> str:
+    user_id = _user_id_or_401(token)
+    role = get_current_user_role(token=token)
+    if role not in ("FISCAL", "DIRIGENTE"):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "ROLE_REQUIRED",
+                "message": f"Operação restrita a FISCAL ou DIRIGENTE (você é {role}).",
+            },
+        )
+    return user_id
+
+
+def _notificacao_to_dict(notif) -> dict:
+    dest = notif.destinatario_whatsapp or notif.destinatario_email
+    return {
+        "id": str(notif.id),
+        "remanejamento_id": str(notif.remanejamento_id),
+        "status": notif.status.value,
+        "canal": notif.canal.value,
+        "destinatario": dest,
+        "payload_hash_sha256": notif.payload_hash_sha256,
+        "enviado_at": notif.enviado_at.isoformat() if notif.enviado_at else None,
+        "provider_message_id": notif.provider_message_id,
+        "erro_detalhes": notif.erro_detalhes,
+        "pdf_anexo_url": notif.pdf_anexo_url,
+        "tentativas": notif.tentativas,
+    }
+
+
 @router.get("", response_model=RemanejamentoListResponse, summary="Lista remanejamentos (paginado)")
 async def list_remanejamentos(
     db: Annotated[AsyncSession, Depends(get_db)],
     _: Annotated[str, Depends(_user_id_or_401)],
     skip: int = Query(0, ge=0),
-    limit: int = Query(50, ge=1, le=200),
+    # Teto `le=500` alinha com o volume esperado de ~300 remanejamentos/mês
+    # (discovery-notes) e permite ao frontend carregar todo o mês em uma
+    # única chamada para paginação/busca client-side sobre o conjunto
+    # completo. CR2 — achado ALTO da revisão.
+    limit: int = Query(50, ge=1, le=500),
     status: StatusRemanejamentoEnum | None = Query(None, description="Filtrar por status"),
 ) -> RemanejamentoListResponse:
     """Sprint 5: SELECT real com paginação + filtro opcional."""
     items, total = await listar(db, skip=skip, limit=limit, status_filter=status)
     return RemanejamentoListResponse(
-        items=[RemanejamentoRead.model_validate(r) for r in items],
+        items=[_remanejamento_to_read(r) for r in items],
         total=total,
         skip=skip,
         limit=limit,
@@ -61,17 +118,16 @@ async def create_remanejamento(
 ) -> RemanejamentoRead:
     """Sprint 5: cria remanejamento com hash chain + audit + histórico."""
     # Pegar fiscal_id do user
-    from app.models import Fiscal  # noqa: PLC0415
-    from sqlalchemy import select  # noqa: PLC0415
-
-    fiscal_stmt = select(Fiscal).where(Fiscal.user_id == user_id)
-    fiscal = (await db.execute(fiscal_stmt)).scalar_one_or_none()
+    fiscal = await _fiscal_for_user(db, user_id)
     if fiscal is None:
         raise HTTPException(
             status_code=403,
             detail={
                 "code": "NOT_FISCAL",
-                "message": "Apenas fiscais podem criar remanejamentos.",
+                "message": (
+                    "Cadastro fiscal obrigatório para criar remanejamentos. "
+                    "Fiscais e dirigentes com perfil fiscal podem registrar."
+                ),
             },
         )
 
@@ -109,15 +165,14 @@ async def aprovar_remanejamento(
     user_id: Annotated[str, Depends(_user_id_or_401)],
 ) -> RemanejamentoRead:
     """Sprint 5: status PENDENTE → APROVADO."""
-    from app.models import Fiscal  # noqa: PLC0415
-    from sqlalchemy import select  # noqa: PLC0415
-
-    fiscal_stmt = select(Fiscal).where(Fiscal.user_id == user_id)
-    fiscal = (await db.execute(fiscal_stmt)).scalar_one_or_none()
+    fiscal = await _fiscal_for_user(db, user_id)
     if fiscal is None:
         raise HTTPException(
             status_code=403,
-            detail={"code": "NOT_FISCAL", "message": "Apenas fiscais podem aprovar."},
+            detail={
+                "code": "NOT_FISCAL",
+                "message": "Cadastro fiscal obrigatório para aprovar remanejamentos.",
+            },
         )
 
     try:
@@ -133,6 +188,26 @@ async def aprovar_remanejamento(
     return RemanejamentoRead.model_validate(rem)
 
 
+@router.get(
+    "/{remanejamento_id}/notificacao-preview",
+    response_model=NotificacaoPreviewRead,
+    summary="Preview da mensagem WhatsApp ao OGMO",
+)
+async def notificacao_preview(
+    remanejamento_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[str, Depends(_require_fiscal_ou_dirigente)],
+) -> NotificacaoPreviewRead:
+    try:
+        data = await preview_notificacao_whatsapp(
+            db,
+            remanejamento_id=str(remanejamento_id),
+        )
+    except OgmoNotifierError as e:
+        raise HTTPException(status_code=e.status, detail={"code": e.code, "message": e.message})
+    return NotificacaoPreviewRead.model_validate(data)
+
+
 @router.post(
     "/{remanejamento_id}/notificar-ogmo",
     response_model=dict,
@@ -141,26 +216,12 @@ async def aprovar_remanejamento(
 async def notificar_ogmo(
     remanejamento_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[str, Depends(_user_id_or_401)],
+    _: Annotated[str, Depends(_require_fiscal_ou_dirigente)],
 ) -> dict:
-    """Sprint 5: dispara envio de e-mail ao OGMO com PDF + hash.
-
-    Funciona mesmo sem resposta do OGMO (R1 do plano).
-    """
+    """Dispara notificação formal ao OGMO via WhatsApp (Evolution API)."""
     try:
         notif = await enviar_email(db, remanejamento_id=str(remanejamento_id))
     except OgmoNotifierError as e:
         raise HTTPException(status_code=e.status, detail={"code": e.code, "message": e.message})
 
-    return {
-        "id": str(notif.id),
-        "remanejamento_id": str(notif.remanejamento_id),
-        "status": notif.status.value,
-        "canal": notif.canal.value,
-        "destinatario": notif.destinatario_email,
-        "payload_hash_sha256": notif.payload_hash_sha256,
-        "enviado_at": notif.enviado_at.isoformat() if notif.enviado_at else None,
-        "provider_message_id": notif.provider_message_id,
-        "erro_detalhes": notif.erro_detalhes,
-        "pdf_anexo_url": notif.pdf_anexo_url,
-    }
+    return _notificacao_to_dict(notif)

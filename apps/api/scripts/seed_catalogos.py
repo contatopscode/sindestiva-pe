@@ -27,9 +27,10 @@ from typing import Any
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Permite rodar tanto como `python scripts/seed_catalogos.py`
-# (precisa sys.path) quanto como módulo.
-sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parent.parent.parent))
+# /app/scripts → /app (package `app`), igual ensure_db_*.py
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core.config import settings
 from app.core.database import session_scope

@@ -6,6 +6,7 @@ Routers expostos:
   - /health         → health check (sem DB) + DB ping
   - /auth           → login, me, config (T1-08 Sprint 1)
   - /users          → CRUD users (admin)
+  - /tpas           → CRUD TPAs (admin DIRIGENTE)
   - /lousa          → GET lousa atual, por porto/turno, /escalas (Sprint 2)
   - /lousa/public   → GET preview sem auth (Sprint 0 — remover em prod)
   - /scraping       → POST /disparar, GET /status (Sprint 2)
@@ -24,6 +25,7 @@ from app.api.v1 import (
     auditoria,
     auth,
     bi,
+    configuracoes,
     dpo,
     health,
     lgpd,
@@ -32,6 +34,7 @@ from app.api.v1 import (
     ogmo,
     remanejamentos,
     scraping,
+    tpas,
     users,
 )
 
@@ -39,6 +42,7 @@ api_v1_router = APIRouter(prefix="/api/v1")
 api_v1_router.include_router(health.router)
 api_v1_router.include_router(auth.router)
 api_v1_router.include_router(users.router)
+api_v1_router.include_router(tpas.router)
 api_v1_router.include_router(lousa.router)
 api_v1_router.include_router(lousa_public.router)
 api_v1_router.include_router(scraping.router)
@@ -48,6 +52,7 @@ api_v1_router.include_router(auditoria.router)
 api_v1_router.include_router(lgpd.router)
 api_v1_router.include_router(dpo.router)
 api_v1_router.include_router(bi.router)  # Sprint 7
+api_v1_router.include_router(configuracoes.router)
 api_v1_router.include_router(admin.router)  # Sprint A — one-shot ops
 
 __all__ = ["api_v1_router"]

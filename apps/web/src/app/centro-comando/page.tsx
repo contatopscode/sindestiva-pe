@@ -1,44 +1,116 @@
 // =============================================================================
-// SINDESTIVA-PE · /centro-comando — Lousa Espelhada (tela principal)
+// SINDESTIVA-PE · /centro-comando — Lousa Espelhada (HU004, Sprint S3)
 //
-// Réplica fiel do protótipo (SINDESTIVA-PE-PROTOTIPO.html, sec-lousa).
-// Stack atual: client component + fetch + auto-refresh 30s + mock fallback.
-// Sprint 4 (T4-01..T4-10 do plano v1.0).
-//
-// O que ainda NÃO está aqui (todas as pendências registradas no fim do
-// arquivo):
-//   - WebSocket (T4-05) — só Sprint 3 do 45d (PWA + WS)
-//   - Toast notifications (T4-07)
-//   - Filtros e busca (T4-09)
-//   - Banner "Sync paused" (T4-10)
-//   - Modal de remanejamento completo (T5-02) — placeholder abaixo
+// Mudanças vs S2:
+//   - Auto-refresh de 30s pausa enquanto `remanejarCtx !== null`
+//     (clearInterval/setInterval controlado por `remanejarCtx` — RR-01).
+//   - Placeholder substituído pelo `RemanejamentoModal` real passando
+//     `catalogo` (portos, turnos, fainas, funcoes, cells, tpaOptions).
+//   - Guard `if (!cell.tpa_id) return;` antes de `setRemanejarCtx` no
+//     handler de célula (decisão D04 + RNF-10).
+//   - Banner verde de sucesso no TOPO da página com copy
+//     "✅ Remanejamento SE-YYYYMMDD-NNN criado" + link discreto para
+//     /remanejamentos, auto-hide 6s (D38/D40).
+//   - `useEffect` em `remanejarCtx → null` dispara `fetchLousa()`
+//     imediato (D39/E17).
+//   - `LousaTable` mantém `tabIndex={isEmpty ? -1 : 0}` e
+//     `role='gridcell'` condicional ao `cell.tpa_id` (já preparado).
 // =============================================================================
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
+import { useSearchParams } from "next/navigation";
 import type { Porto, Turno } from "@sindestiva/shared";
 import { LousaTable } from "./_components/LousaTable";
 import { PortoSwitcher } from "./_components/PortoSwitcher";
 import { TurnoSwitcher } from "./_components/TurnoSwitcher";
 import { SnapshotStatus } from "./_components/SnapshotStatus";
-import { getLousaPreview } from "@/lib/api";
-import type { LousaCellOut, LousaPreviewResponse, Funcao, Faina } from "@/lib/tipos";
+import {
+  RemanejamentoModal,
+  type RemanejamentoModalCatalogo,
+} from "../remanejamentos/_components/RemanejamentoModal";
+import {
+  getLousaPreview,
+  API_URL,
+} from "@/lib/api";
+import type {
+  LousaPreviewResponse,
+  TpaOption,
+} from "@/lib/tipos";
+import type { MotivoRemanejamentoUi } from "@/lib/tipos";
 
-const API_PUBLIC =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ||
-  "https://api.lousa.pscode.ia.br";
+const API_PUBLIC = API_URL;
+const SUCCESS_BANNER_MS = 6_000;
+
+/** Lista canônica de motivos (espelha `MotivoRemanejamentoEnum`). */
+const MOTIVOS: MotivoRemanejamentoUi[] = [
+  "ATESTADO_MEDICO",
+  "FALTA_INJUSTIFICADA",
+  "REFORCO_TERNO",
+  "TROCA_TURNO",
+  "ATRASO_15MIN",
+  "FALTA_EPI",
+  "LIBERACAO_ANTECIPADA",
+  "OUTRO",
+];
 
 export default function CentroComandoPage(): ReactNode {
+  return (
+    <Suspense fallback={<div className="loading p-6">Carregando…</div>}>
+      <CentroComandoPageInner />
+    </Suspense>
+  );
+}
+
+function CentroComandoPageInner(): ReactNode {
   const [porto, setPorto] = useState<Porto>("SUAPE");
   const [turno, setTurno] = useState<Turno>("DIURNO");
   const [data, setData] = useState<LousaPreviewResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [remanejarCtx, setRemanejarCtx] = useState<
-    { cell: LousaCellOut; funcao: Funcao; faina: Faina } | null
+    | {
+        cell: import("@/lib/tipos").LousaCellOut;
+        funcao: import("@/lib/tipos").Funcao;
+        faina: import("@/lib/tipos").Faina;
+      }
+    | null
   >(null);
+
+  // Banner de "forbidden" — feedback do redirect silencioso do middleware.
+  const searchParams = useSearchParams();
+  const forbiddenPath = searchParams?.get("forbidden");
+  const [bannerVisible, setBannerVisible] = useState(true);
+
+  useEffect(() => {
+    setBannerVisible(true);
+  }, [forbiddenPath]);
+
+  useEffect(() => {
+    if (!forbiddenPath) return;
+    const id = setTimeout(() => setBannerVisible(false), 8000);
+    return () => clearTimeout(id);
+  }, [forbiddenPath]);
+
+  // Banner verde de sucesso (HU004/CA05/D40).
+  const [successBanner, setSuccessBanner] = useState<{
+    codigo_se: string;
+    hash_evento: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!successBanner) return;
+    const id = setTimeout(() => setSuccessBanner(null), SUCCESS_BANNER_MS);
+    return () => clearTimeout(id);
+  }, [successBanner]);
 
   const fetchLousa = useCallback(async () => {
     setLoading(true);
@@ -57,15 +129,54 @@ export default function CentroComandoPage(): ReactNode {
     fetchLousa();
   }, [fetchLousa]);
 
-  // Auto-refresh 30s — T4-05 (WebSocket) substitui isto.
+  // Auto-refresh 30s — pausado enquanto modal aberto (RR-01).
   useEffect(() => {
+    if (remanejarCtx !== null) return; // pausa
     const id = setInterval(() => {
-      getLousaPreview(porto, turno).then(setData).catch(() => {});
+      getLousaPreview(porto, turno)
+        .then((d) => setData(d))
+        .catch(() => {
+          /* mantém último snapshot em caso de falha transitória */
+        });
     }, 30_000);
     return () => clearInterval(id);
-  }, [porto, turno]);
+  }, [porto, turno, remanejarCtx]);
 
-  // KPIs (do protótipo, sec-lousa linhas 1282-1305).
+  // Refetch imediato ao fechar o modal (E17/D39) — não depende do
+  // tick de 30s. O `fetchLousa` é intencionalmente excluído das deps
+  // para evitar refetch em mudanças irrelevantes (ele já roda via
+  // efeito próprio em [porto, turno]).
+  useEffect(() => {
+    if (remanejarCtx === null && data !== null) {
+      fetchLousa();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remanejarCtx]);
+
+  // Catálogo derivado de `data` para o modal (D16).
+  const catalogo: RemanejamentoModalCatalogo = useMemo(() => {
+    const tpaMap = new Map<string, TpaOption>();
+    for (const c of data?.cells ?? []) {
+      if (c.tpa_id && !tpaMap.has(c.tpa_id)) {
+        tpaMap.set(c.tpa_id, {
+          tpa_id: c.tpa_id,
+          tpa_nome: c.tpa_nome ?? "(sem nome)",
+          tpa_matricula: c.tpa_matricula ?? null,
+        });
+      }
+    }
+    return {
+      portos: data?.porto ? [data.porto] : [],
+      turnos: data?.turno ? [data.turno] : [],
+      fainas: data?.fainas ?? [],
+      funcoes: data?.funcoes ?? [],
+      cells: data?.cells ?? [],
+      tpaOptions: Array.from(tpaMap.values()),
+      // lacuna L02-Front: catálogo de CCT ainda não vem do /lousa/public/preview
+      cctClausulas: undefined,
+    };
+  }, [data]);
+
   const kpis = useMemo(() => {
     if (!data) return null;
     const totalCells = data.stats.total_cells;
@@ -77,8 +188,98 @@ export default function CentroComandoPage(): ReactNode {
     return { totalTpas, ausentes, remanejados, confirmados, presenca };
   }, [data]);
 
+  const turnoSemDados = useMemo(() => {
+    if (!data) return false;
+    if (data.snapshot.status === "SEM_DADOS") return true;
+    return (
+      data.stats.total_tpas_escalados === 0 &&
+      data.cells.every((c) => !c.tpa_id)
+    );
+  }, [data]);
+
+  function handleCellClick(
+    cell: import("@/lib/tipos").LousaCellOut,
+    funcao: import("@/lib/tipos").Funcao,
+    faina: import("@/lib/tipos").Faina,
+  ) {
+    // Guard obrigatório (D04 + RNF-10): descarta cliques em célula
+    // sem TPA escalado.
+    if (!cell.tpa_id) return;
+    setRemanejarCtx({ cell, funcao, faina });
+  }
+
+  function handleCloseModal() {
+    setRemanejarCtx(null);
+  }
+
+  function handleCreated(item: {
+    id: string;
+    codigo_se: string;
+    hash_evento: string;
+  }) {
+    setSuccessBanner({
+      codigo_se: item.codigo_se,
+      hash_evento: item.hash_evento,
+    });
+    // Modal já dispara onClose no fluxo interno; garantimos aqui também.
+    setRemanejarCtx(null);
+  }
+
   return (
     <div className="p-6">
+      {/* Banner verde de sucesso no TOPO da página (D38/E18) */}
+      {successBanner && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-4 flex items-start justify-between gap-4 rounded border border-[#5dbb7d]/40 bg-[#5dbb7d]/10 px-4 py-3"
+        >
+          <div className="text-[12px] text-[#5dbb7d]">
+            ✅ Remanejamento{" "}
+            <span className="font-mono text-[#d4a574]">{successBanner.codigo_se}</span>{" "}
+            criado
+            {" · "}
+            <a
+              href="/remanejamentos"
+              className="text-[10px] text-[#5dbb7d] underline-offset-2 hover:underline"
+            >
+              ver em /remanejamentos
+            </a>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSuccessBanner(null)}
+            className="shrink-0 rounded border border-[#5dbb7d]/40 px-2 py-1 text-[11px] font-semibold text-[#5dbb7d] hover:bg-[#5dbb7d]/20"
+            aria-label="Fechar aviso de sucesso"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Banner de forbidden — feedback do redirect silencioso do middleware */}
+      {forbiddenPath && bannerVisible && (
+        <div
+          role="alert"
+          className="mb-4 flex items-start justify-between gap-4 rounded border border-[#d4a574]/40 bg-[#d4a574]/10 px-4 py-3"
+        >
+          <div className="text-[12px] text-[#d4a574]">
+            🔒 Você não tem permissão para acessar{" "}
+            <code className="font-mono">{forbiddenPath}</code> (restrito a{" "}
+            {forbiddenPath === "/bi" ? "DIRIGENTE" : "outros perfis"}). Voltar
+            ao menu.
+          </div>
+          <button
+            type="button"
+            onClick={() => setBannerVisible(false)}
+            className="shrink-0 rounded border border-[#d4a574]/40 px-2 py-1 text-[11px] font-semibold text-[#d4a574] hover:bg-[#d4a574]/20"
+            aria-label="Fechar aviso"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Cabeçalho da seção */}
       <div className="section-header">
         <div>
@@ -111,7 +312,7 @@ export default function CentroComandoPage(): ReactNode {
 
       {data && (
         <>
-          {/* KPIs (réplica T4-01) */}
+          {/* KPIs */}
           {kpis && (
             <div className="kpi-row">
               <div className="kpi-card">
@@ -134,14 +335,16 @@ export default function CentroComandoPage(): ReactNode {
               <div className="kpi-card cyan">
                 <div className="kpi-label">Sync OGMO</div>
                 <div className="kpi-value">
-                  {data.snapshot.id ? `${Math.max(1, Math.round((Date.now() - new Date(data.snapshot.scraped_at ?? 0).getTime()) / 1000))}s` : "—"}
+                  {data.snapshot.id && data.snapshot.scraped_at
+                    ? `${Math.max(1, Math.round((Date.now() - new Date(data.snapshot.scraped_at).getTime()) / 1000))}s`
+                    : "—"}
                 </div>
                 <div className="kpi-delta">Última há alguns segundos</div>
               </div>
             </div>
           )}
 
-          {/* Snapshot status (T4-10 — banner "Sync paused" se status=ERRO) */}
+          {/* Snapshot status */}
           <div className="mb-4">
             <SnapshotStatus
               snapshot={data.snapshot}
@@ -159,7 +362,7 @@ export default function CentroComandoPage(): ReactNode {
                 scraper (Risco R2 do plano v1.0).
               </div>
             )}
-            {data.snapshot.status === "SEM_DADOS" && (
+            {turnoSemDados && (
               <div className="mt-2 rounded border border-[#d4a574]/40 bg-[#d4a574]/10 px-3 py-2 text-[12px] text-[#d4a574]">
                 ℹ️ Scrape concluído, mas o OGMO não publicou TPAs para{" "}
                 <strong>{porto}</strong> · <strong>{turno}</strong> nesta data
@@ -179,12 +382,12 @@ export default function CentroComandoPage(): ReactNode {
             </p>
           </div>
 
-          {/* Tabela principal (T4-02) */}
+          {/* Tabela principal */}
           <LousaTable
             fainas={data.fainas}
             funcoes={data.funcoes}
             cells={data.cells}
-            onCellClick={(cell, funcao, faina) => setRemanejarCtx({ cell, funcao, faina })}
+            onCellClick={handleCellClick}
           />
 
           {/* Legenda */}
@@ -223,7 +426,7 @@ export default function CentroComandoPage(): ReactNode {
             </div>
           </div>
 
-          {/* Footer: timestamp + ação "Atualizar" */}
+          {/* Footer: timestamp */}
           <div className="mt-3 text-right text-[11px] text-[#94a8bd]">
             Última atualização:{" "}
             <span className="font-mono text-[#d4a574]">
@@ -233,56 +436,25 @@ export default function CentroComandoPage(): ReactNode {
         </>
       )}
 
-      {/* Modal de remanejamento placeholder (Sprint 5 T5-02) */}
+      {/* Modal de remanejamento real (HU001 + HU004) */}
       {remanejarCtx && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="remanejamento-modal-title"
-          className="fixed inset-0 z-[100] grid place-items-center bg-black/60 p-4"
-          onClick={() => setRemanejarCtx(null)}
-        >
-          <div
-            className="w-full max-w-md rounded-lg border border-[#2a5070] bg-[#0a1929] p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="remanejamento-modal-title" className="mb-1 text-lg font-bold text-[#e8eef4]">
-              Remanejar TPA
-            </h2>
-            <p className="mb-4 text-[12px] text-[#94a8bd]">
-              Modal pré-preenchido — implementação completa em Sprint 5 (T5-02).
-            </p>
-            <dl className="mb-4 grid grid-cols-[110px_1fr] gap-y-2 text-[12px]">
-              <dt className="text-[#94a8bd]">TPA a remover</dt>
-              <dd className="font-mono">
-                {remanejarCtx.cell.tpa_matricula} · {remanejarCtx.cell.tpa_nome ?? "—"}
-              </dd>
-              <dt className="text-[#94a8bd]">Função</dt>
-              <dd>{remanejarCtx.funcao.nome}</dd>
-              <dt className="text-[#94a8bd]">Faina</dt>
-              <dd>{remanejarCtx.faina.nome}</dd>
-              <dt className="text-[#94a8bd]">Cais</dt>
-              <dd className="font-mono">{remanejarCtx.cell.cais ?? "—"}</dd>
-              <dt className="text-[#94a8bd]">Data</dt>
-              <dd className="font-mono">{remanejarCtx.cell.data_referencia}</dd>
-            </dl>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setRemanejarCtx(null)}
-                className="rounded border border-[#2a5070] px-4 py-2 text-[12px] font-semibold text-[#94a8bd] hover:text-[#e8eef4]"
-              >
-                Fechar
-              </button>
-              <a
-                href={`/remanejamentos/novo?tpa=${remanejarCtx.cell.tpa_id ?? ""}&faina=${remanejarCtx.faina.codigo}&funcao=${remanejarCtx.funcao.codigo}`}
-                className="rounded bg-[#d4a574] px-4 py-2 text-[12px] font-bold text-[#0a1929] hover:bg-[#e8c49a]"
-              >
-                Abrir formulário completo
-              </a>
-            </div>
-          </div>
-        </div>
+        <RemanejamentoModal
+          open={true}
+          porto={porto}
+          turno={turno}
+          catalogo={catalogo}
+          motivos={MOTIVOS}
+          basesLegais={[]}
+          prefill={{
+            tpa_id: remanejarCtx.cell.tpa_id ?? undefined,
+            faina_id: remanejarCtx.faina.id,
+            funcao_id: remanejarCtx.funcao.id,
+            data_referencia: remanejarCtx.cell.data_referencia,
+            cais_origem: remanejarCtx.cell.cais,
+          }}
+          onClose={handleCloseModal}
+          onCreated={handleCreated}
+        />
       )}
     </div>
   );

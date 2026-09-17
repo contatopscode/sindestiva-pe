@@ -102,8 +102,16 @@ ESCALANET_FUNCAO_PARA_CODIGO: dict[str, tuple[str, str]] = {
     "TRABALHADOR DE CONTAINER": ("TERNO_05", "PRODUCAO"),
     "SHIP LOADER": ("TERNO_06", "PRODUCAO"),
     "SINALEIRO": ("TECNICA_01", "PRODUCAO"),
+    # Rótulos abreviados / diversos no EscalaNet (FN = função nominal).
+    "CONTRAMESTRE DIVERSO": ("MANDO_01", "PRODUCAO"),
+    "SINALEIRO DIVERSOS": ("TECNICA_01", "PRODUCAO"),
     "OPERADOR DE GUINCHO TIPO A": ("TECNICA_02", "PRODUCAO"),
     "OPERADOR DE GUINCHO TIPO B": ("TECNICA_03", "PRODUCAO"),
+    # Sinônimos observados no EscalaNet (15-16/09/2026): "GB" = Guincho de Bordo,
+    # operador de guincho do próprio navio (vs o de terra). Mesma função,
+    # mesmo código de catálogo — só muda a procedência do equipamento.
+    "OPERADOR DE GB TIPO A": ("TECNICA_02", "PRODUCAO"),
+    "OPERADOR DE GB TIPO B": ("TECNICA_03", "PRODUCAO"),
     "OPERADOR DE EMPILHADEIRA GP": ("TECNICA_04", "PRODUCAO"),
     "OPERADOR DE EMPILHADEIRA PP": ("TECNICA_05", "PRODUCAO"),
     "OPERADOR DE VEÍCULO PESADO": ("TECNICA_06", "PRODUCAO"),
@@ -113,10 +121,18 @@ ESCALANET_FUNCAO_PARA_CODIGO: dict[str, tuple[str, str]] = {
     "PÁ CARREGADEIRA": ("TECNICA_10", "PRODUCAO"),
     "VIGIA PORTO": ("VIGIA_01", "PRODUCAO"),
     "VIGIA CAIS": ("VIGIA_02", "PRODUCAO"),
+    # Variante observada no EscalaNet (16/09/2026): rótulo no singular
+    # "VIGIA PORTUARIO" é a mesma função do "VIGIA PORTO". Mapeamos pra
+    # o mesmo código VIGIA_01 pra evitar criar entrada nova à toa no
+    # catálogo (lousa_funcao é compartilhado entre portos).
+    "VIGIA PORTUARIO": ("VIGIA_01", "PRODUCAO"),
 }
 
 # Regex que captura uma linha de TPA: <td>FUNÇÃO</td><td>NOME</td><td>MATRICULA</td><td>ORD</td><td>EXTRA</td>
 # Tolera espaços/quebras e atributos extras.
+# Sufixos entre parênteses no EscalaNet: (FN), (FN/BOMBA), (FN - EMB PEQ), etc.
+_RE_SUFIXO_PAREN = re.compile(r"\s*\([^)]*\)")
+
 REGEX_TPA_ROW = re.compile(
     r"<td[^>]*>\s*(?P<funcao>[^<]{3,80}?)\s*</td>\s*"
     r"<td[^>]*>\s*(?P<nome>[^<]{3,80}?)\s*</td>\s*"
@@ -132,16 +148,10 @@ REGEX_TPA_ROW = re.compile(
 # ---------------------------------------------------------------------------
 
 
-def _normalizar_funcao(texto: str) -> tuple[str, str]:
-    """Mapeia nome PT-BR do EscalaNet → (funcao_codigo, faina_codigo).
-
-    Fallback: mantém o texto original em maiúsculas como funcao_codigo e
-    assume PRODUCAO como faina. Sinaliza com sufixo '_RAW' pro chamador
-    saber que precisa cadastrar a função.
-    """
+def _sem_acentos(texto: str) -> str:
+    """Uppercase + remoção rápida de acentos PT-BR."""
     txt = texto.strip().upper()
-    # Tira acentos (rápido).
-    sem_acento = (
+    return (
         txt.replace("Ç", "C")
         .replace("Ã", "A")
         .replace("Õ", "O")
@@ -153,12 +163,42 @@ def _normalizar_funcao(texto: str) -> tuple[str, str]:
         .replace("Â", "A")
         .replace("Ê", "E")
     )
-    if sem_acento in ESCALANET_FUNCAO_PARA_CODIGO:
-        return ESCALANET_FUNCAO_PARA_CODIGO[sem_acento]
-    # Tenta match parcial (alguns nomes têm sufixos tipo "TIPO A" / "TIPO B").
+
+
+def _limpar_rotulo_funcao(sem_acento: str) -> str:
+    """Normaliza rótulos abreviados do EscalaNet antes do lookup no catálogo."""
+    txt = _RE_SUFIXO_PAREN.sub("", sem_acento).strip()
+    txt = re.sub(r"\bTRAB\.?\s+", "TRABALHADOR DE ", txt)
+    txt = re.sub(r"\s+", " ", txt).strip()
+    return txt
+
+
+def _lookup_funcao(rotulo: str) -> tuple[str, str] | None:
+    """Match exato ou parcial de `rotulo` já normalizado (sem acento)."""
     for chave, valor in ESCALANET_FUNCAO_PARA_CODIGO.items():
-        if chave in sem_acento or sem_acento in chave:
+        chave_norm = _sem_acentos(chave)
+        if rotulo == chave_norm:
             return valor
+    for chave, valor in ESCALANET_FUNCAO_PARA_CODIGO.items():
+        chave_norm = _sem_acentos(chave)
+        if chave_norm in rotulo or rotulo in chave_norm:
+            return valor
+    return None
+
+
+def _normalizar_funcao(texto: str) -> tuple[str, str]:
+    """Mapeia nome PT-BR do EscalaNet → (funcao_codigo, faina_codigo).
+
+    Fallback: mantém o texto original em maiúsculas como funcao_codigo e
+    assume PRODUCAO como faina. Sinaliza com sufixo '_RAW' pro chamador
+    saber que precisa cadastrar a função.
+    """
+    sem_acento = _sem_acentos(texto)
+    limpo = _limpar_rotulo_funcao(sem_acento)
+    for candidato in (limpo, sem_acento):
+        encontrado = _lookup_funcao(candidato)
+        if encontrado is not None:
+            return encontrado
     return (f"FUNCAO_RAW_{sem_acento[:20].replace(' ', '_')}", "PRODUCAO")
 
 

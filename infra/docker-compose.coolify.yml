@@ -91,7 +91,7 @@ services:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?NEXTAUTH_SECRET obrigatório}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-https://api.lousa.pscode.ia.br}
       # CORS (separado por vírgula)
-      CORS_ORIGINS: ${CORS_ORIGINS:-https://web.lousa.pscode.ia.br,https://pwa.lousa.pscode.ia.br}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://web.lousa.pscode.ia.br,https://pwa.lousa.pscode.ia.br,https://web.hom.lousa.pscode.ia.br,https://pwa.hom.lousa.pscode.ia.br}
       # E-mail OGMO
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       RESEND_FROM: ${RESEND_FROM:-SINDESTIVA-PE <noreply@pscode.ia.br>}
@@ -137,6 +137,8 @@ services:
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lousa.pscode.ia.br}
     restart: unless-stopped
     depends_on:
       - api
@@ -159,6 +161,8 @@ services:
     build:
       context: ..
       dockerfile: apps/pwa/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://api.lousa.pscode.ia.br}
     restart: unless-stopped
     depends_on:
       - api

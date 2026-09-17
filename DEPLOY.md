@@ -72,6 +72,20 @@ No projeto criado:
 
 Coolify lê o `.env` do resource. Crie `/data/coolify/proxy/sindestiva.env` (ou use UI Environment Variables):
 
+#### Build-time vs runtime (`NEXT_PUBLIC_*`)
+
+Variáveis `NEXT_PUBLIC_*` do Next.js são **inlined no JavaScript no `next build`**. Se ficarem só como runtime no container, o bundle continua com o fallback de código (ex.: `https://api.lousa.pscode.ia.br` em HOM).
+
+No Coolify, para os resources **web** e **pwa** (Docker Compose):
+
+1. Abra **Environment Variables** do resource.
+2. Em `NEXT_PUBLIC_API_URL`, marque **Available at Buildtime** (no Coolify 4.x: toggle *Build Variable* / `is_buildtime`).
+3. Valor em **produção**: `https://api.lousa.pscode.ia.br`
+4. Valor em **homolog** (`homolog`): `https://api.hom.lousa.pscode.ia.br`
+5. Após alterar ou mergear o Dockerfile com `ARG NEXT_PUBLIC_API_URL`, faça **Rebuild** (não só *Restart*) do serviço web (e pwa, se aplicável).
+
+O `infra/docker-compose.coolify.yml` repassa a variável via `build.args` → `ARG` no `apps/web/Dockerfile` e `apps/pwa/Dockerfile`. `NEXTAUTH_URL` costuma ser só runtime (server-side); não precisa de build-time salvo uso em código estático no build.
+
 ```bash
 # ----- Segurança -----
 NEXTAUTH_SECRET=$(openssl rand -base64 32)        # JWT do NextAuth
@@ -81,7 +95,13 @@ POSTGRES_PASSWORD=$(openssl rand -base64 24)       # senha forte do Postgres
 # ----- Domínios -----
 NEXTAUTH_URL=https://web.lousa.pscode.ia.br
 NEXT_PUBLIC_API_URL=https://api.lousa.pscode.ia.br
+# Opcional: origins extras (vírgula). A API já inclui prod + hom + localhost em código.
 CORS_ORIGINS=https://web.lousa.pscode.ia.br,https://pwa.lousa.pscode.ia.br
+
+# Homologação (branch homolog · Coolify HOM):
+# NEXTAUTH_URL=https://web.hom.lousa.pscode.ia.br
+# NEXT_PUBLIC_API_URL=https://api.hom.lousa.pscode.ia.br
+# CORS_ORIGINS pode repetir os de hom; a lista base já cobre web.hom / pwa.hom.
 
 # ----- Banco -----
 POSTGRES_USER=sindestiva
@@ -228,6 +248,8 @@ Vantagem: custo fixo, sem surpresa de "free tier expirou".
 
 | Sintoma | Causa provável | Fix |
 |---|---|---|
+| Build web: `apps/web/public: not found` no `COPY` final | Pasta `public/` ausente no repo (Next não cria no builder) | Manter `apps/web/public/` no git (`.gitkeep` ou assets); contexto Docker = raiz do monorepo |
+| Healthcheck da API no Coolify (curl/wget) falha | UI do Coolify não usa o `HEALTHCHECK` do Dockerfile | Desabilitar healthcheck no resource **ou** comando `wget -qO- http://127.0.0.1:8000/health`; a imagem já valida `/health` via Python no `HEALTHCHECK` embutido |
 | Build falha em `pnpm install` | Repo privado + sem PAT | Adicionar token GitHub no Coolify |
 | `api` unhealthy após deploy | Migrations falharam | Ver logs do `api`; `alembic upgrade head` manual via Shell |
 | 502 Bad Gateway | SSL não emitido ainda | Esperar 30-60s após primeiro deploy |

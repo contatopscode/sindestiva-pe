@@ -8,19 +8,84 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
-from app.core.security import get_current_user_id, oauth2_scheme
+from app.core.security import get_current_user_id, get_current_user_role, oauth2_scheme
 from app.core.logging import get_logger
 from app.models import OgmoNotificacao
-from app.schemas.ogmo import EnviarNotificacaoRequest
+from app.schemas.ogmo import EnviarNotificacaoRequest, OgmoNotificacaoRead
+from app.services.app_settings_service import evolution_configured, resolve_ogmo_whatsapp
 from app.services.ogmo_notifier import OgmoNotifierError, enviar_email
 
 router = APIRouter(prefix="/ogmo", tags=["ogmo"])
 log = get_logger(__name__)
+
+
+def _user_id_or_401(token: Annotated[str | None, Depends(oauth2_scheme)]) -> str:
+    user_id = get_current_user_id(token=token)
+    if user_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "AUTH_REQUIRED", "message": "Autenticação obrigatória."},
+        )
+    return user_id
+
+
+def _require_fiscal_ou_dirigente(
+    token: Annotated[str | None, Depends(oauth2_scheme)],
+) -> str:
+    user_id = _user_id_or_401(token)
+    role = get_current_user_role(token=token)
+    if role not in ("FISCAL", "DIRIGENTE"):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "ROLE_REQUIRED",
+                "message": f"Operação restrita a FISCAL ou DIRIGENTE (você é {role}).",
+            },
+        )
+    return user_id
+
+
+@router.get(
+    "/whatsapp-status",
+    summary="Indica se WhatsApp OGMO está configurado (sem expor credenciais Evolution)",
+)
+async def whatsapp_status(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[str, Depends(_require_fiscal_ou_dirigente)],
+) -> dict:
+    _, fonte = await resolve_ogmo_whatsapp(db)
+    return {
+        "ogmo_whatsapp_configurado": fonte != "none",
+        "ogmo_whatsapp_fonte": fonte,
+        "evolution_configured": evolution_configured(),
+    }
+
+
+@router.get(
+    "/notificacoes",
+    response_model=list[OgmoNotificacaoRead],
+    summary="Lista notificações OGMO (fila)",
+)
+async def list_notificacoes(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[str, Depends(_user_id_or_401)],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+) -> list[OgmoNotificacaoRead]:
+    """Fila do Centro de Comando — mais recentes primeiro."""
+    stmt = (
+        select(OgmoNotificacao)
+        .order_by(OgmoNotificacao.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    rows = list((await db.execute(stmt)).scalars().all())
+    return [OgmoNotificacaoRead.model_validate(r) for r in rows]
 
 
 @router.post(
@@ -56,7 +121,7 @@ async def enviar_notificacao(
         "remanejamento_id": str(notif.remanejamento_id),
         "status": notif.status.value,
         "canal": notif.canal.value,
-        "destinatario": notif.destinatario_email,
+        "destinatario": notif.destinatario_whatsapp or notif.destinatario_email,
         "payload_hash_sha256": notif.payload_hash_sha256,
         "enviado_at": notif.enviado_at.isoformat() if notif.enviado_at else None,
         "provider_message_id": notif.provider_message_id,

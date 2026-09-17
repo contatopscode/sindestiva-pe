@@ -17,6 +17,9 @@ import Link from "next/link";
 import type { Route } from "next";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
+import type { Role } from "@/lib/auth";
+import { fetchCurrentUser, getRoleFromStoredToken } from "@/lib/api";
 
 export interface SidebarItem {
   /** String para acomodar hrefs placeholder tipo "#". Cast para Route no Link. */
@@ -27,6 +30,8 @@ export interface SidebarItem {
   disabled?: boolean;
   /** Quando true, abre em nova aba (ex: OGMO read-only). */
   external?: boolean;
+  /** Quando definido (`roles?: Role[]`), item só aparece para usuários com role nesta lista. */
+  roles?: Role[];
 }
 
 export interface SidebarGroup {
@@ -53,7 +58,11 @@ const GROUPS: SidebarGroup[] = [
   {
     title: "Plataforma",
     items: [
-      { href: "/bi", label: "BI & Dashboards", icon: "📊" },
+      // Manter em sincronia com middleware.ts ROLE_RULES
+      { href: "/bi", label: "BI & Dashboards", icon: "📊", roles: ["DIRIGENTE"] },
+      { href: "/usuarios", label: "Usuários", icon: "👥", roles: ["DIRIGENTE"] },
+      { href: "/tpas", label: "TPAs", icon: "👷", roles: ["DIRIGENTE"] },
+      { href: "/configuracoes", label: "Configurações", icon: "⚙️", roles: ["DIRIGENTE"] },
     ],
   },
   {
@@ -66,6 +75,26 @@ const GROUPS: SidebarGroup[] = [
 
 export function Sidebar(): ReactNode {
   const pathname = usePathname();
+  const [userRole, setUserRole] = useState<Role | null>(() =>
+    typeof window !== "undefined" ? getRoleFromStoredToken() : null,
+  );
+
+  useEffect(() => {
+    // JWT em sessionStorage como fallback imediato (apiFetch); /api/auth/me
+    // confirma role quando o cookie httpOnly responde (subdomínios).
+    const fromJwt = getRoleFromStoredToken();
+    if (fromJwt) setUserRole(fromJwt);
+
+    fetchCurrentUser()
+      .then((session) => {
+        if (!session?.role) return;
+        const role = session.role;
+        if (role === "FISCAL" || role === "DIRIGENTE" || role === "TPA") {
+          setUserRole(role);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   return (
     <aside className="sidebar flex h-full w-[240px] flex-col border-r border-[#1e3a52] bg-[#0a1929] py-4 overflow-y-auto">
@@ -75,6 +104,13 @@ export function Sidebar(): ReactNode {
             {group.title}
           </div>
           {group.items.map((item) => {
+            // Filtro por role: ausente → visível para todos. userRole null
+            // (sessão ainda carregando/erro) → itens com roles ficam
+            // ocultos para evitar flash de "promessa" antes de sumir.
+            const visible =
+              !item.roles || (userRole !== null && item.roles.includes(userRole));
+            if (!visible) return null;
+
             const active = !item.disabled && pathname === item.href;
             const base =
               "mx-2 mb-1 flex items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium transition-colors";

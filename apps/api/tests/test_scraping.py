@@ -29,6 +29,7 @@ from app.core.database import session_scope
 from app.models.enums import FonteEscalaEnum, StatusScrapingEnum
 from app.scrapers import hash_conteudo, raspar_escalanet, raspar_tpa
 from app.scrapers.base import EscalaBruta
+from app.scrapers.escalanet import _parse_html
 from app.services.scraping_service import executar_scraping
 
 # ---------------------------------------------------------------------------
@@ -178,6 +179,50 @@ async def test_scraper_escalanet_happy_path(fake_http_factory, fakes_path) -> No
     assert bruto.layout_mudou is False
     assert "ogmo-recife.org.br" in (bruto.url_origem or "")
     assert len(client.calls) == 2
+
+
+def test_escalanet_normaliza_rotulos_fn_ambipar_440(fakes_path) -> None:
+    """Rótulos (FN) / TRAB. PORÃO → catálogo seed; 4 TPAs → 3 células agregadas."""
+    html = (fakes_path / "escalanet_ambipar_440.html").read_text(encoding="utf-8")
+    celulas = _parse_html(html)
+    assert len(celulas) == 3
+    por_funcao = {c.funcao_codigo: c for c in celulas}
+    assert por_funcao["MANDO_01"].trabalhador_matricula == "300378"
+    assert por_funcao["TECNICA_01"].trabalhador_matricula == "100316"
+    assert por_funcao["TERNO_01"].trabalhador_matricula == "100291,100357"
+    assert all(c.faina_codigo == "PRODUCAO" for c in celulas)
+    assert not any(c.funcao_codigo.startswith("FUNCAO_RAW_") for c in celulas)
+
+
+@pytest.mark.parametrize(
+    "rotulo_html,codigo_esperado",
+    [
+        # Sinônimos de Guincho (GB = Guincho de Bordo, do próprio navio).
+        ("OPERADOR DE GB TIPO A", "TECNICA_02"),
+        ("OPERADOR DE GB TIPO B", "TECNICA_03"),
+        # Variante singular de Vigia Porto.
+        ("VIGIA PORTUARIO", "VIGIA_01"),
+        # Forma abreviada com sufixo FN - EMB PEQ (deve cair em TERNO_01).
+        ("TRAB. PORÃO (FN - EMB PEQ)", "TERNO_01"),
+    ],
+)
+def test_escalanet_rotulos_observados_set_2026(
+    rotulo_html: str, codigo_esperado: str
+) -> None:
+    """Rótulos novos do EscalaNet (15-16/09/2026) caem no catálogo seed.
+
+    Cada rótulo representa uma string REAL que apareceu no HTML do OGMO
+    Recife mas que NÃO estava no `ESCALANET_FUNCAO_PARA_CODIGO` original.
+    Sem essas entradas, viravam `FUNCAO_RAW_*` e a célula ficava órfã.
+    """
+    from app.scrapers.escalanet import _normalizar_funcao
+
+    funcao_codigo, faina_codigo = _normalizar_funcao(rotulo_html)
+    assert funcao_codigo == codigo_esperado, (
+        f"Rótulo {rotulo_html!r} deveria virar {codigo_esperado!r}, "
+        f"veio {funcao_codigo!r}"
+    )
+    assert faina_codigo == "PRODUCAO"
 
 
 @pytest.mark.asyncio

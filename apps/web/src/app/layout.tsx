@@ -23,6 +23,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Sidebar } from "./_components/Sidebar";
 import { Header } from "./_components/Header";
+import { ToastProvider } from "./_components/Toast";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -38,11 +39,13 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body>
-        <div className="app">
-          <Header />
-          <Sidebar />
-          <main className="main">{children}</main>
-        </div>
+        <ToastProvider>
+          <div className="app">
+            <Header />
+            <Sidebar />
+            <main className="main">{children}</main>
+          </div>
+        </ToastProvider>
       </body>
     </html>
   );

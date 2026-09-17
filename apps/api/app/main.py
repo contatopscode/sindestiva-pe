@@ -17,11 +17,16 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import structlog
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1 import api_v1_router
 from app.core.config import settings
+from app.core.cors import CORS_ALLOW_ORIGIN_REGEX
 from app.core.database import Base, engine
 from app.core.logging import configure_logging, get_logger
 from app.jobs.scheduler import start_scheduler as start_s6_scheduler, stop_scheduler as stop_s6_scheduler
@@ -61,12 +66,18 @@ async def lifespan(app: FastAPI):
     # por permissão — então fazemos aqui no engine do app (que já tem o
     # event listener de search_path aplicado em cada connect).
     from sqlalchemy import text
+
+    from app.core.postgres_bootstrap import ensure_schema_and_extensions
+
     try:
-        async with engine.begin() as conn:
-            await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {settings.db_schema}"))
-        log.info("api.schema_ensured", schema=settings.db_schema)
+        boot = ensure_schema_and_extensions()
+        log.info(
+            "api.postgres_bootstrap",
+            schema=boot["schema"],
+            extensions=boot["extensions"],
+        )
     except Exception as exc:  # noqa: BLE001
-        log.warning("api.schema_create_failed", schema=settings.db_schema, erro=str(exc))
+        log.warning("api.postgres_bootstrap_failed", erro=str(exc))
 
     # Sprint 0+ deploy: cria tabelas via SQLAlchemy metadata (idempotente).
     # Alembic tem problema com DB compartilhado (alembic_version table
@@ -111,40 +122,12 @@ app = FastAPI(
 
 
 # ---------------------------------------------------------------------------
-# CORS
+# CORS — lista base + `CORS_ORIGINS` (ver `app.core.cors` e DEPLOY.md)
 # ---------------------------------------------------------------------------
-# Dev (Next.js local): `localhost:3000/3001/3010`
-# Staging/Preview (Vercel): `*.vercel.app` (regex pega todos os preview
-#   deploys — `sindestiva-web-xxx.vercel.app`, etc)
-# Prod (Vercel custom domain): `web.lousa.pscode.ia.br`, `pwa.lousa.pscode.ia.br`
-#   (Sprint 1+ quando ativar domínios custom; por ora só Vercel temporário)
-#
-# NOTA Sprint 0+ deploy: Vercel gera URLs aleatórios por preview
-# (`sindestiva-web-<hash>-<team>.vercel.app`), então é mais robusto usar
-# `allow_origin_regex` para o domínio Vercel inteiro, em vez de listar
-# cada URL.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
-        "http://localhost:3010",
-        "http://127.0.0.1:3010",
-        # Vercel temporário (Sprint 0+ até ativar domínio custom)
-        "https://sindestiva-web.vercel.app",
-        "https://sindestiva-pwa.vercel.app",
-        # Domínios custom (Sprint A+ — DNS provisionado em 07/09/2026)
-        "https://web.lousa.pscode.ia.br",
-        "https://pwa.lousa.pscode.ia.br",
-        "https://api.lousa.pscode.ia.br",  # p/ health-check cross-origin
-    ],
-    # CORS Middleware do Starlette/FastAPI aceita UMA string regex (não lista).
-    # Cobre previews temporários da Vercel.
-    allow_origin_regex=(
-        r"https://sindestiva-(web|pwa)[a-z0-9-]*\.vercel\.app"
-    ),
+    allow_origins=settings.resolved_cors_allow_origins(),
+    allow_origin_regex=CORS_ALLOW_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -155,6 +138,82 @@ app.add_middleware(
 # Middleware (Sprint 6 T6-09 — access_log Art. 37 LGPD)
 # ---------------------------------------------------------------------------
 app.add_middleware(AccessLogMiddleware)
+
+
+# ---------------------------------------------------------------------------
+# Exception handlers (Sprint FSW-2026-001 S1 — C1+C3)
+#
+#   Exception             → 500 com detail JSON {code, message}
+#                            + stack trace preservado no log
+#                            (NÃO engolir HTTPException legítimo, ver handler
+#                            dedicado abaixo).
+#   StarletteHTTPException → preserva status_code e detail originais;
+#                            necessário para que `HTTPException` levantado
+#                            manualmente pelos endpoints/routers continue
+#                            propagando o detail que eles já emitem.
+#   RequestValidationError → mantém o formato Pydantic v2 {detail: [...]}
+#                            que o frontend já consome via parseApiError.
+# ---------------------------------------------------------------------------
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(
+    request: Request, exc: Exception
+) -> JSONResponse:
+    """Captura qualquer exceção não tratada e devolve 500 com detail JSON.
+
+    O log preserva stack trace completo via processor `format_exc_info` do
+    structlog (ver `app.core.logging`). Contrato da resposta segue o
+    padrão dos demais erros da API: ``{"detail": {"code", "message"}}``.
+    """
+    log = structlog.get_logger("sindestiva.unhandled")
+    log.exception(
+        "api.unhandled_exception",
+        method=request.method,
+        path=request.url.path,
+        exc_type=type(exc).__name__,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": {
+                "code": "INTERNAL_ERROR",
+                "message": "Erro interno do servidor.",
+            }
+        },
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def _starlette_http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+) -> JSONResponse:
+    """Preserva ``status_code`` e ``detail`` originais.
+
+    Necessário porque o handler genérico de ``Exception`` rodaria antes
+    e engoliria ``HTTPException`` legítimo levantado pelos routers
+    (ex.: 401, 403, 404 com ``detail`` já no formato correto). Mantemos
+    o body tal como foi emitido pelo chamador.
+    """
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def _request_validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Mantém o formato default do Pydantic v2 (``{"detail": [...]}``).
+
+    O frontend já trata esse formato em ``parseApiError``; qualquer
+    mudança aqui exigiria atualizar ``apps/web/src/lib/parse-api-error.ts``.
+    """
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
 
 
 # ---------------------------------------------------------------------------

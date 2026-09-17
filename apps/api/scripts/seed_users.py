@@ -21,7 +21,7 @@ import asyncio
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import select  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
@@ -45,6 +45,9 @@ USERS: list[dict] = [
         "cpf": "11122233396",
         "cargo": "Diretor de Tecnologia e Operação + DPO",
         "is_dpo": True,
+        # Perfil fiscal adicional: DTO registra remanejamentos em HOM sem trocar role.
+        "also_fiscal": True,
+        "matricula_sindicato": "FISCAL-DTO-001",
     },
     {
         "email": "manoel@sindestiva-pe.com.br",
@@ -85,6 +88,17 @@ async def seed(dry_run: bool = False) -> dict[str, str]:
                 await _ensure_fiscal(db, user, u)
             elif u["perfil"] == "dirigente":
                 await _ensure_dirigente(db, user, u)
+                if u.get("also_fiscal"):
+                    await _ensure_fiscal(
+                        db,
+                        user,
+                        {
+                            **u,
+                            "matricula_sindicato": u.get(
+                                "matricula_sindicato", f"FISCAL-DIR-{u['cpf'][:6]}"
+                            ),
+                        },
+                    )
 
     return contadores
 
