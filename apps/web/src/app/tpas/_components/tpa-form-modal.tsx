@@ -10,6 +10,7 @@ export interface TpaFormValues {
   matricula_ogmo: string;
   telefone: string;
   email: string;
+  funcao_ids: string[];
   funcao_base_id: string;
   status_cadastro: AdminTpa["status_cadastro"];
 }
@@ -20,21 +21,27 @@ const EMPTY: TpaFormValues = {
   matricula_ogmo: "",
   telefone: "",
   email: "",
+  funcao_ids: [],
   funcao_base_id: "",
   status_cadastro: "ATIVO",
 };
 
 export function emptyTpaFormValues(): TpaFormValues {
-  return { ...EMPTY };
+  return { ...EMPTY, funcao_ids: [] };
 }
 
 export function valuesFromTpa(tpa: AdminTpa): TpaFormValues {
+  const ids =
+    tpa.funcoes && tpa.funcoes.length > 0
+      ? tpa.funcoes.map((f) => f.id)
+      : [tpa.funcao_base_id];
   return {
     cpf: tpa.cpf,
     nome_completo: tpa.nome_completo,
     matricula_ogmo: tpa.matricula_ogmo,
     telefone: tpa.telefone,
     email: tpa.email ?? "",
+    funcao_ids: ids,
     funcao_base_id: tpa.funcao_base_id,
     status_cadastro: tpa.status_cadastro,
   };
@@ -46,7 +53,8 @@ export function toCreatePayload(values: TpaFormValues): AdminTpaCreatePayload {
     nome_completo: values.nome_completo.trim(),
     matricula_ogmo: values.matricula_ogmo.trim(),
     telefone: values.telefone.trim(),
-    funcao_base_id: values.funcao_base_id,
+    funcao_ids: values.funcao_ids,
+    funcao_base_id: values.funcao_base_id || undefined,
     status_cadastro: values.status_cadastro,
   };
   if (values.email.trim()) {
@@ -60,13 +68,33 @@ export function toUpdatePayload(values: TpaFormValues): AdminTpaUpdatePayload {
     nome_completo: values.nome_completo.trim(),
     matricula_ogmo: values.matricula_ogmo.trim(),
     telefone: values.telefone.trim(),
-    funcao_base_id: values.funcao_base_id,
+    funcao_ids: values.funcao_ids,
+    funcao_base_id: values.funcao_base_id || undefined,
     status_cadastro: values.status_cadastro,
   };
   if (values.email.trim()) {
     payload.email = values.email.trim();
   }
   return payload;
+}
+
+function toggleFuncao(values: TpaFormValues, funcaoId: string, checked: boolean): TpaFormValues {
+  let nextIds = values.funcao_ids;
+  if (checked) {
+    if (!nextIds.includes(funcaoId)) {
+      nextIds = [...nextIds, funcaoId];
+    }
+  } else {
+    nextIds = nextIds.filter((id) => id !== funcaoId);
+  }
+  let base = values.funcao_base_id;
+  if (!nextIds.includes(base)) {
+    base = nextIds[0] ?? "";
+  }
+  if (nextIds.length === 1) {
+    base = nextIds[0];
+  }
+  return { ...values, funcao_ids: nextIds, funcao_base_id: base };
 }
 
 interface TpaFormModalProps {
@@ -177,20 +205,49 @@ export function TpaFormModal({
               <option value="DESLIGADO">Desligado</option>
             </select>
           </Field>
-          <Field label="Função base">
-            <select
-              className={`${inputCls} sm:col-span-2`}
-              value={values.funcao_base_id}
-              onChange={(e) => onChange({ ...values, funcao_base_id: e.target.value })}
-            >
-              <option value="">Selecione…</option>
-              {funcoes.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.nome} ({f.codigo})
-                </option>
-              ))}
-            </select>
-          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Funções (multiselect)">
+              <div className="max-h-40 overflow-y-auto rounded border border-[#1e3a52] bg-[#0d2137] p-2">
+                {funcoes.map((f) => {
+                  const checked = values.funcao_ids.includes(f.id);
+                  const isPrincipal = values.funcao_base_id === f.id;
+                  return (
+                    <div
+                      key={f.id}
+                      className="flex items-center justify-between gap-2 border-b border-[#1e3a52]/60 py-1.5 last:border-0"
+                    >
+                      <label className="flex flex-1 cursor-pointer items-center gap-2 text-[13px] text-[#e8eef4]">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) =>
+                            onChange(toggleFuncao(values, f.id, e.target.checked))
+                          }
+                        />
+                        <span>
+                          {f.nome} ({f.codigo})
+                          {isPrincipal && checked ? (
+                            <span className="ml-2 rounded bg-[#d4a574]/20 px-1.5 text-[10px] text-[#d4a574]">
+                              principal
+                            </span>
+                          ) : null}
+                        </span>
+                      </label>
+                      {checked && values.funcao_ids.length > 1 ? (
+                        <button
+                          type="button"
+                          className="shrink-0 text-[11px] text-[#94a8bd] underline hover:text-[#d4a574]"
+                          onClick={() => onChange({ ...values, funcao_base_id: f.id })}
+                        >
+                          tornar principal
+                        </button>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            </Field>
+          </div>
         </div>
 
         {error && (

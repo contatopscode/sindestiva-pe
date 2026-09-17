@@ -664,7 +664,7 @@ export async function updateAdminUser(
   });
 }
 
-// ---- Gestão de TPAs (DIRIGENTE) --------------------------------------------
+// ---- Gestão de TPAs (FISCAL + DIRIGENTE) -----------------------------------
 
 export type TpaCadastroStatus = "ATIVO" | "AFASTADO" | "DESLIGADO" | "SUSPENSO";
 
@@ -688,6 +688,7 @@ export interface AdminTpa {
   funcao_codigo: string;
   funcao_nome: string;
   categoria: string;
+  funcoes?: AdminTpaFuncaoMeta[];
   status_cadastro: TpaCadastroStatus;
   data_nascimento: string | null;
   data_admissao: string | null;
@@ -707,7 +708,8 @@ export interface AdminTpaCreatePayload {
   matricula_ogmo: string;
   telefone: string;
   email?: string;
-  funcao_base_id: string;
+  funcao_ids: string[];
+  funcao_base_id?: string;
   status_cadastro?: TpaCadastroStatus;
   data_nascimento?: string;
   data_admissao?: string;

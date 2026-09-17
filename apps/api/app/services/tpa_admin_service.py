@@ -5,13 +5,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.logging import get_logger
-from app.models import Funcao, Tpa, User
+from app.models import Funcao, Tpa, TpaFuncao, User
 from app.models.enums import RoleEnum, TpaStatusEnum, UserStatusEnum
 from app.schemas.tpa_admin import (
     AdminTpaCreate,
@@ -41,7 +41,21 @@ def _default_email(cpf: str) -> str:
     return f"tpa+{cpf}@sindestiva.local"
 
 
-def _serialize_tpa(tpa: Tpa, *, funcao: Funcao) -> AdminTpaRead:
+def _funcao_to_meta(funcao: Funcao) -> AdminTpaFuncaoMeta:
+    return AdminTpaFuncaoMeta(
+        id=funcao.id,
+        codigo=funcao.codigo,
+        nome=funcao.nome_exibicao,
+        categoria=funcao.categoria,
+    )
+
+
+def _serialize_tpa(
+    tpa: Tpa,
+    *,
+    funcao: Funcao,
+    funcoes: list[Funcao],
+) -> AdminTpaRead:
     user = tpa.user
     return AdminTpaRead(
         id=tpa.id,
@@ -56,6 +70,7 @@ def _serialize_tpa(tpa: Tpa, *, funcao: Funcao) -> AdminTpaRead:
         funcao_codigo=funcao.codigo,
         funcao_nome=funcao.nome_exibicao,
         categoria=tpa.categoria,
+        funcoes=[_funcao_to_meta(f) for f in funcoes],
         status_cadastro=tpa.status_cadastro,
         data_nascimento=tpa.data_nascimento,
         data_admissao=tpa.data_admissao,
@@ -78,9 +93,9 @@ def _map_integrity(exc: IntegrityError) -> TpaAdminError:
     return TpaAdminError(409, "CONFLICT", "Conflito de unicidade no cadastro.")
 
 
-async def _load_funcao(db: AsyncSession, funcao_base_id: UUID) -> Funcao:
+async def _load_funcao(db: AsyncSession, funcao_id: UUID) -> Funcao:
     funcao = (
-        await db.execute(select(Funcao).where(Funcao.id == funcao_base_id))
+        await db.execute(select(Funcao).where(Funcao.id == funcao_id))
     ).scalar_one_or_none()
     if funcao is None or not funcao.is_active:
         raise TpaAdminError(
@@ -89,6 +104,79 @@ async def _load_funcao(db: AsyncSession, funcao_base_id: UUID) -> Funcao:
             "Função base não encontrada ou inativa.",
         )
     return funcao
+
+
+async def _load_funcoes_by_ids(
+    db: AsyncSession, funcao_ids: list[UUID]
+) -> list[Funcao]:
+    if not funcao_ids:
+        raise TpaAdminError(
+            422,
+            "FUNCAO_IDS_EMPTY",
+            "Informe ao menos uma função (funcao_ids).",
+        )
+    unique_ids = list(dict.fromkeys(funcao_ids))
+    stmt = select(Funcao).where(Funcao.id.in_(unique_ids), Funcao.is_active.is_(True))
+    rows = list((await db.execute(stmt)).scalars().all())
+    if len(rows) != len(unique_ids):
+        raise TpaAdminError(
+            422,
+            "FUNCAO_INVALIDA",
+            "Uma ou mais funções não encontradas ou inativas.",
+        )
+    by_id = {row.id: row for row in rows}
+    return [by_id[fid] for fid in sorted(unique_ids, key=lambda i: by_id[i].ordem_lousa)]
+
+
+async def _resolve_funcao_write(
+    db: AsyncSession,
+    *,
+    funcao_ids: list[UUID] | None,
+    funcao_base_id: UUID | None,
+) -> tuple[list[UUID], UUID, Funcao]:
+    """Retorna (ids ordenados por ordem_lousa, funcao_base_id, função base ORM)."""
+    if funcao_ids is None and funcao_base_id is not None:
+        funcao_ids = [funcao_base_id]
+    if funcao_ids is None:
+        raise TpaAdminError(
+            422,
+            "FUNCAO_IDS_EMPTY",
+            "Informe ao menos uma função (funcao_ids).",
+        )
+
+    ordered_funcoes = await _load_funcoes_by_ids(db, funcao_ids)
+    ordered_ids = [f.id for f in ordered_funcoes]
+
+    base_id = funcao_base_id
+    if base_id is None:
+        base_id = ordered_ids[0]
+    elif base_id not in ordered_ids:
+        raise TpaAdminError(
+            422,
+            "FUNCAO_BASE_NOT_IN_SET",
+            "funcao_base_id deve estar incluída em funcao_ids.",
+        )
+
+    base_funcao = next(f for f in ordered_funcoes if f.id == base_id)
+    return ordered_ids, base_id, base_funcao
+
+
+async def _sync_tpa_funcoes(
+    db: AsyncSession, tpa_id: UUID, funcao_ids: list[UUID]
+) -> None:
+    await db.execute(delete(TpaFuncao).where(TpaFuncao.tpa_id == tpa_id))
+    for fid in funcao_ids:
+        db.add(TpaFuncao(tpa_id=tpa_id, funcao_id=fid))
+
+
+async def _load_tpa_funcoes_for_tpa(db: AsyncSession, tpa_id: UUID) -> list[Funcao]:
+    stmt = (
+        select(Funcao)
+        .join(TpaFuncao, TpaFuncao.funcao_id == Funcao.id)
+        .where(TpaFuncao.tpa_id == tpa_id)
+        .order_by(Funcao.ordem_lousa)
+    )
+    return list((await db.execute(stmt)).scalars().all())
 
 
 async def _load_tpa(db: AsyncSession, tpa_id: UUID) -> Tpa | None:
@@ -103,15 +191,7 @@ async def _load_tpa(db: AsyncSession, tpa_id: UUID) -> Tpa | None:
 async def list_tpa_funcoes(db: AsyncSession) -> list[AdminTpaFuncaoMeta]:
     stmt = select(Funcao).where(Funcao.is_active.is_(True)).order_by(Funcao.ordem_lousa)
     rows = list((await db.execute(stmt)).scalars().all())
-    return [
-        AdminTpaFuncaoMeta(
-            id=row.id,
-            codigo=row.codigo,
-            nome=row.nome_exibicao,
-            categoria=row.categoria,
-        )
-        for row in rows
-    ]
+    return [_funcao_to_meta(row) for row in rows]
 
 
 async def list_admin_tpas(
@@ -161,7 +241,12 @@ async def list_admin_tpas(
         .limit(page_size)
     )
     rows = list((await db.execute(stmt)).all())
-    items = [_serialize_tpa(tpa, funcao=funcao) for tpa, funcao in rows]
+    items: list[AdminTpaRead] = []
+    for tpa, funcao in rows:
+        funcoes = await _load_tpa_funcoes_for_tpa(db, tpa.id)
+        if not funcoes:
+            funcoes = [funcao]
+        items.append(_serialize_tpa(tpa, funcao=funcao, funcoes=funcoes))
     return items, total
 
 
@@ -181,11 +266,18 @@ async def get_admin_tpa(db: AsyncSession, tpa_id: UUID) -> AdminTpaRead:
     if row is None:
         raise TpaAdminError(404, "NOT_FOUND", "TPA não encontrado.")
     tpa, funcao = row
-    return _serialize_tpa(tpa, funcao=funcao)
+    funcoes = await _load_tpa_funcoes_for_tpa(db, tpa.id)
+    if not funcoes:
+        funcoes = [funcao]
+    return _serialize_tpa(tpa, funcao=funcao, funcoes=funcoes)
 
 
 async def create_admin_tpa(db: AsyncSession, data: AdminTpaCreate) -> AdminTpaRead:
-    funcao = await _load_funcao(db, data.funcao_base_id)
+    ordered_ids, base_id, funcao = await _resolve_funcao_write(
+        db,
+        funcao_ids=data.funcao_ids,
+        funcao_base_id=data.funcao_base_id,
+    )
 
     cpf_taken = (
         await db.execute(
@@ -229,13 +321,21 @@ async def create_admin_tpa(db: AsyncSession, data: AdminTpaCreate) -> AdminTpaRe
         nome_completo=data.nome_completo,
         matricula_ogmo=data.matricula_ogmo,
         telefone=data.telefone,
-        funcao_base_id=funcao.id,
+        funcao_base_id=base_id,
         categoria=funcao.categoria,
         status_cadastro=data.status_cadastro,
         data_nascimento=data.data_nascimento,
         data_admissao=data.data_admissao,
     )
     db.add(tpa)
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise _map_integrity(exc) from exc
+
+    await _sync_tpa_funcoes(db, tpa.id, ordered_ids)
+
     try:
         await db.commit()
     except IntegrityError as exc:
@@ -258,7 +358,6 @@ async def update_admin_tpa(
         raise TpaAdminError(404, "NOT_FOUND", "TPA não encontrado.")
 
     user = tpa.user
-    funcao: Funcao | None = None
 
     if data.nome_completo is not None:
         tpa.nome_completo = data.nome_completo
@@ -276,10 +375,26 @@ async def update_admin_tpa(
     if data.data_desligamento is not None:
         tpa.data_desligamento = data.data_desligamento
 
-    if data.funcao_base_id is not None:
-        funcao = await _load_funcao(db, data.funcao_base_id)
-        tpa.funcao_base_id = funcao.id
+    if data.funcao_ids is not None or data.funcao_base_id is not None:
+        current = await _load_tpa_funcoes_for_tpa(db, tpa.id)
+        current_ids = [f.id for f in current] if current else [tpa.funcao_base_id]
+        ids_for_resolve = data.funcao_ids if data.funcao_ids is not None else current_ids
+
+        if data.funcao_base_id is not None:
+            base_for_resolve = data.funcao_base_id
+        elif data.funcao_ids is not None and tpa.funcao_base_id in data.funcao_ids:
+            base_for_resolve = tpa.funcao_base_id
+        else:
+            base_for_resolve = None
+
+        ordered_ids, base_id, funcao = await _resolve_funcao_write(
+            db,
+            funcao_ids=ids_for_resolve,
+            funcao_base_id=base_for_resolve,
+        )
+        tpa.funcao_base_id = base_id
         tpa.categoria = funcao.categoria
+        await _sync_tpa_funcoes(db, tpa.id, ordered_ids)
 
     if data.status_cadastro is not None:
         tpa.status_cadastro = data.status_cadastro

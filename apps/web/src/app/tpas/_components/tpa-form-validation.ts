@@ -10,7 +10,17 @@ export function tpaFormMissingFields(values: TpaFormValues): string[] {
     missing.push("Matrícula OGMO (1–10 caracteres)");
   }
   if (!values.telefone.trim()) missing.push("Telefone");
-  if (!values.funcao_base_id) missing.push("Função base");
+  if (values.funcao_ids.length < 1) missing.push("Ao menos uma função");
+  if (values.funcao_ids.length > 0 && !values.funcao_base_id) {
+    missing.push("Função principal");
+  }
+  if (
+    values.funcao_base_id &&
+    values.funcao_ids.length > 0 &&
+    !values.funcao_ids.includes(values.funcao_base_id)
+  ) {
+    missing.push("Função principal deve estar entre as selecionadas");
+  }
   return missing;
 }
 

@@ -59,16 +59,21 @@ export default function TpasPage(): ReactNode {
 
   useEffect(() => {
     if (!modalOpen || modalMode !== "create") return;
-    if (!form.funcao_base_id && funcoes[0]) {
-      setForm((prev) => ({ ...prev, funcao_base_id: funcoes[0].id }));
+    if (form.funcao_ids.length === 0 && funcoes[0]) {
+      setForm((prev) => ({
+        ...prev,
+        funcao_ids: [funcoes[0].id],
+        funcao_base_id: funcoes[0].id,
+      }));
     }
-  }, [modalOpen, modalMode, funcoes, form.funcao_base_id]);
+  }, [modalOpen, modalMode, funcoes, form.funcao_ids.length]);
 
   function openCreate(): void {
     setModalMode("create");
     setEditing(null);
     const next = emptyTpaFormValues();
     if (funcoes[0]) {
+      next.funcao_ids = [funcoes[0].id];
       next.funcao_base_id = funcoes[0].id;
     }
     setForm(next);
@@ -108,7 +113,7 @@ export default function TpasPage(): ReactNode {
         <div>
           <h1 className="text-xl font-semibold text-[#e8eef4]">Cadastro de TPAs</h1>
           <p className="mt-1 text-[13px] text-[#94a8bd]">
-            Trabalhadores portuários avulsos — perfil User(TPA) + cadastro sindical (somente DIRIGENTE).
+            Trabalhadores portuários avulsos — perfil User(TPA) + cadastro sindical (Fiscal e Dirigente).
           </p>
           {total > 0 && (
             <p className="mt-1 text-[12px] text-[#5f7a92]">{total} registro(s)</p>
