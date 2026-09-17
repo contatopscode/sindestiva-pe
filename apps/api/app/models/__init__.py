@@ -23,6 +23,7 @@ DD v1 §3 lista 25 tabelas (o `roles` é ENUM, não tabela — DD §3.2
 explicita esta decisão). Migration 0001 cria as 25 + 13 enums + 13
 triggers.
 """
+from app.models.app_settings import AppSetting
 from app.models.auditoria import AccessLog, AuditEvent, HashChainCheckpoint
 from app.models.base import Base, SoftDeleteMixin, TimestampMixin
 from app.models.catalogos import (
@@ -108,6 +109,7 @@ __all__ = [
     # ogmo
     "OgmoNotificacao",
     "OgmoWebhookEndpoint",
+    "AppSetting",
     # tpa
     "TpaConfirmacaoPresenca",
     # auditoria

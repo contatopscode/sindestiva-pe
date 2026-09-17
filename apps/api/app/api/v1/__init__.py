@@ -25,6 +25,7 @@ from app.api.v1 import (
     auditoria,
     auth,
     bi,
+    configuracoes,
     dpo,
     health,
     lgpd,
@@ -51,6 +52,7 @@ api_v1_router.include_router(auditoria.router)
 api_v1_router.include_router(lgpd.router)
 api_v1_router.include_router(dpo.router)
 api_v1_router.include_router(bi.router)  # Sprint 7
+api_v1_router.include_router(configuracoes.router)
 api_v1_router.include_router(admin.router)  # Sprint A — one-shot ops
 
 __all__ = ["api_v1_router"]

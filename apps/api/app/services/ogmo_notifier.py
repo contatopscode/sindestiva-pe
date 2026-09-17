@@ -46,6 +46,7 @@ from app.models.enums import (
     StatusNotificacaoEnum,
     StatusRemanejamentoEnum,
 )
+from app.services.app_settings_service import resolve_ogmo_whatsapp
 from app.services.evolution import send_text as evolution_send_text
 
 log = get_logger(__name__)
@@ -119,19 +120,17 @@ async def _enviar_whatsapp(
     rem = await _get_rem(db, remanejamento_id)
     payload, payload_hash = await _build_payload(db, rem)
 
-    if not settings.ogmo_whatsapp:
-        return await _persist_failure(
-            db,
-            rem,
-            CanalNotificacaoEnum.WHATSAPP,
-            payload,
-            payload_hash,
-            "OGMO_WHATSAPP não configurado.",
+    numero, _fonte = await resolve_ogmo_whatsapp(db)
+    if not numero:
+        raise OgmoNotifierError(
+            409,
+            "OGMO_WHATSAPP_NAO_CONFIGURADO",
+            "Número WhatsApp do OGMO não configurado. Cadastre em Configurações.",
         )
 
     texto = _render_whatsapp(payload, payload_hash)
 
-    result = await evolution_send_text(settings.ogmo_whatsapp, texto)
+    result = await evolution_send_text(numero, texto)
     status = (
         StatusNotificacaoEnum.ENVIADO
         if result["success"]
@@ -149,7 +148,7 @@ async def _enviar_whatsapp(
         provider_id=provider_id,
         status=status,
         erro_detalhes=erro,
-        destinatario_whatsapp=settings.ogmo_whatsapp,
+        destinatario_whatsapp=numero,
     )
 
 
@@ -563,8 +562,32 @@ async def _enviar_smtp(
     return f"{codigo_se}@{int(datetime.now(tz=UTC).timestamp())}"
 
 
+async def preview_notificacao_whatsapp(
+    db: AsyncSession,
+    *,
+    remanejamento_id: str,
+) -> dict[str, object]:
+    """Gera preview da mensagem WhatsApp (mesmo renderer do envio)."""
+    rem = await _get_rem(db, remanejamento_id)
+    payload, payload_hash = await _build_payload(db, rem)
+    texto = _render_whatsapp(payload, payload_hash)
+    assunto = f"[Lousa] {rem.codigo_se}"
+    return {
+        "canal": CanalNotificacaoEnum.WHATSAPP.value,
+        "texto_whatsapp": texto,
+        "assunto_email": assunto,
+        "payload_resumo": {
+            "codigo_se": payload.get("codigo_se"),
+            "data_referencia": payload.get("data_referencia"),
+            "porto_codigo": payload.get("porto_codigo"),
+            "payload_hash_sha256": payload_hash,
+        },
+    }
+
+
 __all__ = [
     "OgmoNotifierError",
     "enviar_email",
     "enviar_notificacao",
+    "preview_notificacao_whatsapp",
 ]

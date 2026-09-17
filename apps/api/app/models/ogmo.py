@@ -65,6 +65,7 @@ class OgmoNotificacao(Base, TimestampMixin):
     payload_hash_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
 
     destinatario_email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    destinatario_whatsapp: Mapped[str | None] = mapped_column(Text, nullable=True)
     destinatario_webhook_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("lousa_main.ogmo_webhook_endpoints.id", ondelete="SET NULL"),
         nullable=True,

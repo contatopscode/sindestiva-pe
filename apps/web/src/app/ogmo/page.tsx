@@ -15,7 +15,7 @@ export default function OgmoPage(): ReactNode {
           <h1 className="section-title">Fila de Notificação OGMO</h1>
           <p className="section-subtitle">
             Acompanhe o status de cada remanejamento enviado ao OGMO/PE ·
-            canal primário: e-mail · webhook HMAC-SHA256 preparado
+            canal primário: WhatsApp (Evolution) · e-mail como fallback legado
           </p>
         </div>
       </div>

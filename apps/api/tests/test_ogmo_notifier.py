@@ -40,6 +40,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from sqlalchemy import select
 
+from app.core.config import settings
 from app.core.security import hash_password
 from app.models import (
     CanalNotificacaoEnum,
@@ -62,6 +63,12 @@ from app.services.ogmo_notifier import (
     enviar_notificacao,
 )
 from app.services.remanejamento_service import aprovar, criar
+
+
+@pytest.fixture(autouse=True)
+def ogmo_whatsapp_configured(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Número OGMO via env para testes de envio WhatsApp."""
+    monkeypatch.setattr(settings, "ogmo_whatsapp", "5581999990001")
 
 
 # ---------------------------------------------------------------------------

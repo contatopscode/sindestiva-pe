@@ -62,6 +62,7 @@ const GROUPS: SidebarGroup[] = [
       { href: "/bi", label: "BI & Dashboards", icon: "📊", roles: ["DIRIGENTE"] },
       { href: "/usuarios", label: "Usuários", icon: "👥", roles: ["DIRIGENTE"] },
       { href: "/tpas", label: "TPAs", icon: "👷", roles: ["DIRIGENTE"] },
+      { href: "/configuracoes", label: "Configurações", icon: "⚙️", roles: ["DIRIGENTE"] },
     ],
   },
   {
