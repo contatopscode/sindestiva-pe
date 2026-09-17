@@ -4,6 +4,12 @@
 - Coluna `destinatario_whatsapp` em `ogmo_notificacoes`.
 - Enum `canal_notificacao_enum` + CHECK destinatário alinhados ao canal WHATSAPP.
 
+O valor de enum ``WHATSAPP`` é adicionado em ``autocommit_block()`` (commit próprio);
+Postgres não permite usar um valor novo no mesmo transaction do ``ADD VALUE``.
+
+Downgrade: não remove ``WHATSAPP`` de ``canal_notificacao_enum`` — Postgres não suporta
+``DROP VALUE`` em tipos enum.
+
 Revision ID: 0005_app_settings_ogmo_whatsapp
 Revises: 0004_purge_after_server_default
 """
@@ -24,10 +30,12 @@ SCHEMA = "lousa_main"
 
 
 def upgrade() -> None:
-    op.execute(
-        "ALTER TYPE lousa_main.canal_notificacao_enum "
-        "ADD VALUE IF NOT EXISTS 'WHATSAPP'"
-    )
+    # Postgres: ADD VALUE must commit before WHATSAPP appears in CHECK (UnsafeNewEnumValueUsage).
+    with op.get_context().autocommit_block():
+        op.execute(
+            "ALTER TYPE lousa_main.canal_notificacao_enum "
+            "ADD VALUE IF NOT EXISTS 'WHATSAPP'"
+        )
 
     op.add_column(
         "ogmo_notificacoes",
