@@ -125,7 +125,7 @@ async def _load_funcoes_by_ids(
             "Uma ou mais funções não encontradas ou inativas.",
         )
     by_id = {row.id: row for row in rows}
-    return sorted(unique_ids, key=lambda fid: by_id[fid].ordem_lousa)
+    return [by_id[fid] for fid in sorted(unique_ids, key=lambda i: by_id[i].ordem_lousa)]
 
 
 async def _resolve_funcao_write(
