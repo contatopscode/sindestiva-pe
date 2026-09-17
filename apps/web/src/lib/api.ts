@@ -469,6 +469,46 @@ export async function resendOgmoNotificacao(remanejamentoId: string): Promise<No
   );
 }
 
+export async function getOgmoWhatsappStatus(): Promise<{
+  ogmo_whatsapp_configurado: boolean;
+  ogmo_whatsapp_fonte: "db" | "env" | "none";
+  evolution_configured: boolean;
+}> {
+  return apiFetch("/api/v1/ogmo/whatsapp-status");
+}
+
+export interface ConfiguracoesResponse {
+  ogmo_whatsapp: string | null;
+  ogmo_whatsapp_fonte: "db" | "env" | "none";
+  evolution_configured: boolean;
+}
+
+export async function getConfiguracoes(): Promise<ConfiguracoesResponse> {
+  return apiFetch<ConfiguracoesResponse>("/api/v1/configuracoes");
+}
+
+export async function updateConfiguracoes(ogmoWhatsapp: string): Promise<ConfiguracoesResponse> {
+  return apiFetch<ConfiguracoesResponse>("/api/v1/configuracoes", {
+    method: "PUT",
+    body: { ogmo_whatsapp: ogmoWhatsapp },
+  });
+}
+
+export interface NotificacaoPreviewResponse {
+  canal: string;
+  texto_whatsapp: string;
+  assunto_email?: string | null;
+  payload_resumo: Record<string, unknown>;
+}
+
+export async function getNotificacaoPreview(
+  remanejamentoId: string,
+): Promise<NotificacaoPreviewResponse> {
+  return apiFetch<NotificacaoPreviewResponse>(
+    `/api/v1/remanejamentos/${encodeURIComponent(remanejamentoId)}/notificacao-preview`,
+  );
+}
+
 // ---- Auditoria ------------------------------------------------------------
 
 export async function getAuditEvents(

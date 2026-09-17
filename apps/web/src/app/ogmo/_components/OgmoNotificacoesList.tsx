@@ -24,9 +24,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import Link from "next/link";
 import {
+  getNotificacaoPreview,
   getOgmoNotificacoes,
-  resendOgmoNotificacao,
+  getOgmoWhatsappStatus,
+  notifyOgmo,
   ApiError,
 } from "@/lib/api";
 import type { OgmoNotificacao, StatusNotificacaoUi } from "@/lib/tipos";
@@ -90,8 +93,14 @@ export function OgmoNotificacoesList(): ReactNode {
   const [skip, setSkip] = useState(0);
   /** IDs com ação "Reenviar" em curso — usado para desabilitar + debounce. */
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+  const [ogmoWhatsappOk, setOgmoWhatsappOk] = useState<boolean | null>(null);
+  const [selectedRemId, setSelectedRemId] = useState<string | null>(null);
+  const [previewText, setPreviewText] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
   const busyTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const toast = useToast();
+
+  const whatsappConfigured = ogmoWhatsappOk === true;
 
   // ---- Carregamento inicial -----------------------------------------------
   const fetchData = useCallback(async () => {
@@ -123,6 +132,28 @@ export function OgmoNotificacoesList(): ReactNode {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+    getOgmoWhatsappStatus()
+      .then((s) => setOgmoWhatsappOk(s.ogmo_whatsapp_configurado))
+      .catch(() => setOgmoWhatsappOk(false));
+  }, []);
+
+  const loadPreview = useCallback(async (remanejamentoId: string) => {
+    setSelectedRemId(remanejamentoId);
+    setPreviewLoading(true);
+    setPreviewText(null);
+    try {
+      const data = await getNotificacaoPreview(remanejamentoId);
+      setPreviewText(data.texto_whatsapp);
+    } catch (e) {
+      const msg =
+        e instanceof ApiError ? e.detail : e instanceof Error ? e.message : "Erro";
+      setPreviewText(`Não foi possível carregar o preview: ${msg}`);
+    } finally {
+      setPreviewLoading(false);
+    }
+  }, []);
 
   // Cleanup dos timers de debounce ao desmontar.
   useEffect(() => {
@@ -159,61 +190,48 @@ export function OgmoNotificacoesList(): ReactNode {
     [filtered, pageStart, pageEnd],
   );
 
-  // ---- Ação "Reenviar" (HU005) --------------------------------------------
-  const handleResend = useCallback(
-    async (remanejamentoId: string, currentId: string) => {
-      if (busyIds.has(currentId)) return;
-      setBusyIds((prev) => {
-        const next = new Set(prev);
-        next.add(currentId);
-        return next;
-      });
+  const handleSendWhatsapp = useCallback(
+    async (remanejamentoId: string, rowId: string) => {
+      if (busyIds.has(rowId) || !whatsappConfigured) return;
+      setBusyIds((prev) => new Set(prev).add(rowId));
       try {
-        await resendOgmoNotificacao(remanejamentoId);
-        toast.showSuccess("Notificação reenviada ao OGMO.");
+        await notifyOgmo(remanejamentoId);
+        toast.showSuccess("Mensagem WhatsApp enviada ao OGMO.");
         fetchData();
+        if (selectedRemId === remanejamentoId) {
+          void loadPreview(remanejamentoId);
+        }
       } catch (err) {
-        // 409 INVALID_STATE: mantém linha como PENDENTE (D13).
         if (err instanceof ApiError && err.status === 409) {
-          setItems((prev) =>
-            prev.map((it) =>
-              it.id === currentId ? { ...it, status: "PENDENTE" } : it,
-            ),
-          );
-          toast.showError("Status mudou. Atualize a fila.");
+          toast.showError(err.detail || "Não foi possível enviar — verifique o status.");
           fetchData();
           return;
         }
-        // 5xx: mantém linha como FALHOU (E22 — backend persiste via
-        // _persist_failure; UI só dá feedback sem mudar o estado).
         if (err instanceof ApiError && err.status >= 500) {
-          toast.showError("Falha ao reenviar. Tente novamente em instantes.");
-          // linha permanece FALHOU — nada a fazer
+          toast.showError("Falha ao enviar. Tente novamente em instantes.");
           return;
         }
-        // Outros erros: mostra mensagem genérica.
         const detail =
           err instanceof ApiError
             ? err.detail
             : err instanceof Error
               ? err.message
               : "Erro";
-        toast.showError(`Falha ao reenviar: ${detail}`);
+        toast.showError(`Falha ao enviar WhatsApp: ${detail}`);
+        fetchData();
       } finally {
-        // Debounce 5s (D22/E11): mantém busy durante esse intervalo
-        // mesmo se a mutate resolver instantaneamente.
         const timer = setTimeout(() => {
           setBusyIds((prev) => {
             const next = new Set(prev);
-            next.delete(currentId);
+            next.delete(rowId);
             return next;
           });
-          busyTimers.current.delete(currentId);
+          busyTimers.current.delete(rowId);
         }, RESEND_DEBOUNCE_MS);
-        busyTimers.current.set(currentId, timer);
+        busyTimers.current.set(rowId, timer);
       }
     },
-    [busyIds, fetchData, toast],
+    [busyIds, fetchData, loadPreview, selectedRemId, toast, whatsappConfigured],
   );
 
   // ---- Estados de carregamento --------------------------------------------
@@ -243,6 +261,33 @@ export function OgmoNotificacoesList(): ReactNode {
 
   return (
     <div className="space-y-4">
+      {!whatsappConfigured && (
+        <div className="rounded-md border border-[#e04a4a]/50 bg-[#e04a4a]/10 p-3 text-[12px] text-[#f0a0a0]">
+          Configure o WhatsApp do OGMO em{" "}
+          <Link href="/configuracoes" className="font-bold text-[#d4a574] underline">
+            Configurações
+          </Link>{" "}
+          antes de enviar notificações.
+        </div>
+      )}
+
+      <div className="rounded-lg border border-[#1e3a52] bg-[#0a1929] p-4">
+        <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-[#94a8bd]">
+          Preview mensagem formal (WhatsApp)
+        </div>
+        {previewLoading ? (
+          <p className="text-[12px] text-[#94a8bd]">Carregando preview…</p>
+        ) : previewText ? (
+          <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded border border-[#1e3a52] bg-[#0f2438] p-3 text-[11px] text-[#e8eef4] font-sans">
+            {previewText}
+          </pre>
+        ) : (
+          <p className="text-[12px] text-[#5f7a92]">
+            Selecione uma linha na fila para ver o texto que será enviado ao OGMO.
+          </p>
+        )}
+      </div>
+
       <div className="kpi-row">
         <button
           type="button"
@@ -336,11 +381,16 @@ export function OgmoNotificacoesList(): ReactNode {
                 pageItems.map((i) => {
                   const tooltip = tooltipFinal(i);
                   const busy = busyIds.has(i.id);
-                  const canResend = i.status === "FALHOU";
+                  const canSendWhatsapp =
+                    whatsappConfigured &&
+                    i.status !== "ENVIADO" &&
+                    i.status !== "ENTREGUE";
+                  const selected = selectedRemId === i.remanejamento_id;
                   return (
                     <tr
                       key={i.id}
-                      className="border-b border-[#1e3a52] hover:bg-[#163554]/40"
+                      className={`border-b border-[#1e3a52] hover:bg-[#163554]/40 cursor-pointer ${selected ? "bg-[#163554]/60" : ""}`}
+                      onClick={() => void loadPreview(i.remanejamento_id)}
                     >
                       <td className="px-3 py-2 font-mono text-[#d4a574]">
                         {new Date(i.data_hora).toLocaleString("pt-BR")}
@@ -367,16 +417,16 @@ export function OgmoNotificacoesList(): ReactNode {
                       <td className="px-3 py-2 text-[11px] text-[#e04a4a]">
                         {i.ultimo_erro ?? <span className="text-[#5f7a92]">—</span>}
                       </td>
-                      <td className="px-3 py-2">
-                        {canResend ? (
+                      <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                        {canSendWhatsapp ? (
                           <button
                             type="button"
-                            aria-label={`Reenviar notificação ${i.id}`}
+                            aria-label={`Enviar WhatsApp ${i.id}`}
                             disabled={busy}
-                            onClick={() => handleResend(i.remanejamento_id, i.id)}
-                            className="rounded bg-[#d4a574] px-3 py-1 text-[11px] font-bold text-[#0a1929] hover:bg-[#e8c49a] disabled:cursor-not-allowed disabled:opacity-50"
+                            onClick={() => handleSendWhatsapp(i.remanejamento_id, i.id)}
+                            className="rounded bg-[#25D366] px-3 py-1 text-[11px] font-bold text-[#0a1929] hover:bg-[#2ee06f] disabled:cursor-not-allowed disabled:opacity-50"
                           >
-                            {busy ? "Enviando…" : "Reenviar"}
+                            {busy ? "Enviando…" : "Enviar WhatsApp"}
                           </button>
                         ) : (
                           <span className="text-[11px] text-[#5f7a92]">—</span>
@@ -422,9 +472,8 @@ export function OgmoNotificacoesList(): ReactNode {
 
       <div className="rounded-md border border-[#9b7ec4]/40 bg-[#9b7ec4]/10 p-3 text-[11px] text-[#9b7ec4]">
         💡 Status exibidos: {STATUSES.filter((s) => s !== "TODOS").join(" · ")}.
-        O webhook HMAC-SHA256 (Sprint 5 T5-07) está preparado mas inativo: o
-        OGMO/PE ainda não topou expor endpoint (Risco R1 do plano v1.0).
-        Mitigação ativa: notificação por e-mail funciona unilateralmente.
+        O envio formal ao OGMO usa WhatsApp (Evolution instância Vigilia). E-mail e webhook
+        HMAC permanecem como fallback/preparação Fase 3.
       </div>
     </div>
   );

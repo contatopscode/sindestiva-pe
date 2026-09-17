@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
-from app.core.security import get_current_user_id, oauth2_scheme
+from app.core.security import get_current_user_id, get_current_user_role, oauth2_scheme
 from app.core.logging import get_logger
 from app.models.enums import StatusRemanejamentoEnum
 from app.schemas.remanejamento import (
@@ -17,7 +17,8 @@ from app.schemas.remanejamento import (
     RemanejamentoListResponse,
     RemanejamentoRead,
 )
-from app.services.ogmo_notifier import OgmoNotifierError, enviar_email
+from app.schemas.configuracoes import NotificacaoPreviewRead
+from app.services.ogmo_notifier import OgmoNotifierError, enviar_email, preview_notificacao_whatsapp
 from app.services.remanejamento_service import RemanejamentoError, aprovar, criar, listar
 
 router = APIRouter(prefix="/remanejamentos", tags=["remanejamentos"])
@@ -52,6 +53,39 @@ def _user_id_or_401(token: Annotated[str | None, Depends(oauth2_scheme)]) -> str
             detail={"code": "AUTH_REQUIRED", "message": "Autenticação obrigatória."},
         )
     return user_id
+
+
+def _require_fiscal_ou_dirigente(
+    token: Annotated[str | None, Depends(oauth2_scheme)],
+) -> str:
+    user_id = _user_id_or_401(token)
+    role = get_current_user_role(token=token)
+    if role not in ("FISCAL", "DIRIGENTE"):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "ROLE_REQUIRED",
+                "message": f"Operação restrita a FISCAL ou DIRIGENTE (você é {role}).",
+            },
+        )
+    return user_id
+
+
+def _notificacao_to_dict(notif) -> dict:
+    dest = notif.destinatario_whatsapp or notif.destinatario_email
+    return {
+        "id": str(notif.id),
+        "remanejamento_id": str(notif.remanejamento_id),
+        "status": notif.status.value,
+        "canal": notif.canal.value,
+        "destinatario": dest,
+        "payload_hash_sha256": notif.payload_hash_sha256,
+        "enviado_at": notif.enviado_at.isoformat() if notif.enviado_at else None,
+        "provider_message_id": notif.provider_message_id,
+        "erro_detalhes": notif.erro_detalhes,
+        "pdf_anexo_url": notif.pdf_anexo_url,
+        "tentativas": notif.tentativas,
+    }
 
 
 @router.get("", response_model=RemanejamentoListResponse, summary="Lista remanejamentos (paginado)")
@@ -154,6 +188,26 @@ async def aprovar_remanejamento(
     return RemanejamentoRead.model_validate(rem)
 
 
+@router.get(
+    "/{remanejamento_id}/notificacao-preview",
+    response_model=NotificacaoPreviewRead,
+    summary="Preview da mensagem WhatsApp ao OGMO",
+)
+async def notificacao_preview(
+    remanejamento_id: UUID,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    _: Annotated[str, Depends(_require_fiscal_ou_dirigente)],
+) -> NotificacaoPreviewRead:
+    try:
+        data = await preview_notificacao_whatsapp(
+            db,
+            remanejamento_id=str(remanejamento_id),
+        )
+    except OgmoNotifierError as e:
+        raise HTTPException(status_code=e.status, detail={"code": e.code, "message": e.message})
+    return NotificacaoPreviewRead.model_validate(data)
+
+
 @router.post(
     "/{remanejamento_id}/notificar-ogmo",
     response_model=dict,
@@ -162,26 +216,12 @@ async def aprovar_remanejamento(
 async def notificar_ogmo(
     remanejamento_id: UUID,
     db: Annotated[AsyncSession, Depends(get_db)],
-    _: Annotated[str, Depends(_user_id_or_401)],
+    _: Annotated[str, Depends(_require_fiscal_ou_dirigente)],
 ) -> dict:
-    """Sprint 5: dispara envio de e-mail ao OGMO com PDF + hash.
-
-    Funciona mesmo sem resposta do OGMO (R1 do plano).
-    """
+    """Dispara notificação formal ao OGMO via WhatsApp (Evolution API)."""
     try:
         notif = await enviar_email(db, remanejamento_id=str(remanejamento_id))
     except OgmoNotifierError as e:
         raise HTTPException(status_code=e.status, detail={"code": e.code, "message": e.message})
 
-    return {
-        "id": str(notif.id),
-        "remanejamento_id": str(notif.remanejamento_id),
-        "status": notif.status.value,
-        "canal": notif.canal.value,
-        "destinatario": notif.destinatario_email,
-        "payload_hash_sha256": notif.payload_hash_sha256,
-        "enviado_at": notif.enviado_at.isoformat() if notif.enviado_at else None,
-        "provider_message_id": notif.provider_message_id,
-        "erro_detalhes": notif.erro_detalhes,
-        "pdf_anexo_url": notif.pdf_anexo_url,
-    }
+    return _notificacao_to_dict(notif)
