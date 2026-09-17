@@ -6,9 +6,9 @@ ATENÇÃO — pega-dica cross-projeto (MEMORY do coder agent):
 
 ATENÇÃO — Coolify HOM (2026-09):
     1) NÃO usar `async_engine` + `run_sync` sem `await connection.commit()`.
-    2) NÃO usar só `engine.connect()` — no SQLAlchemy 2 o `__exit__` dá
-       ROLLBACK na transação externa; use `engine.begin()` para COMMIT.
-    Migrations online: sync `create_engine` + `with connectable.begin()`.
+    2) Online: `connect()` + `context.begin_transaction()` em `do_run_migrations`
+       (padrão Alembic). NÃO envolver em `connectable.begin()` — quebra
+       `op.get_context().autocommit_block()` (ex.: migration 0005 ADD VALUE enum).
 
 Convenção: target_metadata = `app.models.base.Base.metadata`.
 Schema target = `lousa_main` (default do init.sql do container).
@@ -90,13 +90,12 @@ def do_run_migrations(connection: Connection) -> None:
 
 
 def run_migrations_online() -> None:
-    """Modo online — sync engine; `begin()` faz COMMIT ao sair com sucesso."""
+    """Modo online — sync engine; commit via `context.begin_transaction()`."""
     connectable = create_engine(
         settings.database_url_sync,
         poolclass=pool.NullPool,
     )
-    # SA 2: `connect().__exit__` rollback — `begin().__exit__` commit.
-    with connectable.begin() as connection:
+    with connectable.connect() as connection:
         do_run_migrations(connection)
     connectable.dispose()
 
