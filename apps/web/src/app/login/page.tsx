@@ -1,8 +1,9 @@
 "use client";
 
 import { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { login } from "@/lib/api";
+import { sanitizeNextPath } from "@/lib/safe-next-path";
 
 export default function LoginPage() {
   return (
@@ -13,9 +14,7 @@ export default function LoginPage() {
 }
 
 function LoginInner() {
-  const router = useRouter();
   const search = useSearchParams();
-  const next = search.get("next") || "/centro-comando";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,16 +26,21 @@ function LoginInner() {
     setLoading(true);
     setError(null);
 
-    const result = await login(email, password);
+    try {
+      const result = await login(email, password);
 
-    if (!result.ok) {
-      setError(result.error || "Falha ao autenticar");
+      if (!result.ok) {
+        setError(result.error || "Falha ao autenticar");
+        return;
+      }
+
+      const safeNext = sanitizeNextPath(search.get("next"));
+      // Hard navigation garante que o cookie Set-Cookie da resposta de login
+      // viaja na requisição document do destino (evita race com router.push).
+      window.location.assign(safeNext);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    router.push(next);
-    router.refresh();
   }
 
   return (
