@@ -1,4 +1,4 @@
-"""SINDESTIVA-PE · /tpas (CRUD admin DIRIGENTE)."""
+"""SINDESTIVA-PE · /tpas (CRUD admin FISCAL + DIRIGENTE)."""
 
 from __future__ import annotations
 
@@ -22,8 +22,10 @@ from app.services import tpa_admin_service as svc
 
 router = APIRouter(prefix="/tpas", tags=["tpas"])
 
+_TPAS_ADMIN_ROLES = frozenset({"FISCAL", "DIRIGENTE"})
 
-def _require_dirigente(
+
+def _require_fiscal_or_dirigente(
     token: Annotated[str | None, Depends(oauth2_scheme)],
 ) -> str:
     user_id = get_current_user_id(token=token)
@@ -33,12 +35,14 @@ def _require_dirigente(
             detail={"code": "AUTH_REQUIRED", "message": "Autenticação obrigatória."},
         )
     role = get_current_user_role(token=token)
-    if role != "DIRIGENTE":
+    if role not in _TPAS_ADMIN_ROLES:
         raise HTTPException(
             status_code=403,
             detail={
                 "code": "ROLE_REQUIRED",
-                "message": f"Cadastro de TPAs restrito a DIRIGENTE (você é {role}).",
+                "message": (
+                    f"Cadastro de TPAs restrito a FISCAL ou DIRIGENTE (você é {role})."
+                ),
             },
         )
     return user_id
@@ -54,7 +58,7 @@ def _http_from_admin_error(exc: svc.TpaAdminError) -> HTTPException:
 @router.get("/meta/funcoes", summary="Catálogo de funções (dropdown admin)")
 async def list_funcoes_meta(
     db: AsyncSession = Depends(get_db),
-    _: str = Depends(_require_dirigente),
+    _: str = Depends(_require_fiscal_or_dirigente),
 ) -> list[AdminTpaFuncaoMeta]:
     return await svc.list_tpa_funcoes(db)
 
@@ -62,7 +66,7 @@ async def list_funcoes_meta(
 @router.get("", summary="Lista TPAs (admin)")
 async def list_tpas(
     db: AsyncSession = Depends(get_db),
-    _: str = Depends(_require_dirigente),
+    _: str = Depends(_require_fiscal_or_dirigente),
     q: str | None = Query(default=None, max_length=120),
     status_cadastro: TpaStatusEnum | None = None,
     page: int = Query(default=1, ge=1),
@@ -82,7 +86,7 @@ async def list_tpas(
 async def get_tpa(
     tpa_id: UUID,
     db: AsyncSession = Depends(get_db),
-    _: str = Depends(_require_dirigente),
+    _: str = Depends(_require_fiscal_or_dirigente),
 ) -> AdminTpaRead:
     try:
         return await svc.get_admin_tpa(db, tpa_id)
@@ -94,7 +98,7 @@ async def get_tpa(
 async def create_tpa(
     body: AdminTpaCreate,
     db: AsyncSession = Depends(get_db),
-    _: str = Depends(_require_dirigente),
+    _: str = Depends(_require_fiscal_or_dirigente),
 ) -> AdminTpaRead:
     try:
         return await svc.create_admin_tpa(db, body)
@@ -107,7 +111,7 @@ async def update_tpa(
     tpa_id: UUID,
     body: AdminTpaUpdate,
     db: AsyncSession = Depends(get_db),
-    _: str = Depends(_require_dirigente),
+    _: str = Depends(_require_fiscal_or_dirigente),
 ) -> AdminTpaRead:
     try:
         return await svc.update_admin_tpa(db, tpa_id, body)

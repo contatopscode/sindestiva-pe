@@ -11,6 +11,24 @@ function statusTone(status: AdminTpa["status_cadastro"]): "green" | "amber" | "r
   return "muted";
 }
 
+function funcoesLabel(tpa: AdminTpa): ReactNode {
+  const count = tpa.funcoes?.length ?? 0;
+  const extra = count > 1 ? count - 1 : 0;
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span>{tpa.funcao_nome}</span>
+      {extra > 0 ? (
+        <span
+          className="rounded bg-[#163554] px-1.5 py-0.5 text-[10px] font-medium text-[#d4a574]"
+          title={tpa.funcoes?.map((f) => f.nome).join(", ")}
+        >
+          +{extra}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 interface TpasTableProps {
   items: AdminTpa[];
   onEdit: (tpa: AdminTpa) => void;
@@ -33,7 +51,7 @@ export function TpasTable({ items, onEdit }: TpasTableProps): ReactNode {
             <th className="px-3 py-2">Nome</th>
             <th className="px-3 py-2">CPF</th>
             <th className="px-3 py-2">Matrícula OGMO</th>
-            <th className="px-3 py-2">Função</th>
+            <th className="px-3 py-2">Funções</th>
             <th className="px-3 py-2">Status</th>
             <th className="px-3 py-2 text-right">Ações</th>
           </tr>
@@ -44,7 +62,7 @@ export function TpasTable({ items, onEdit }: TpasTableProps): ReactNode {
               <td className="px-3 py-2 text-[#e8eef4]">{tpa.nome_completo}</td>
               <td className="px-3 py-2 text-[#94a8bd]">{tpa.cpf}</td>
               <td className="px-3 py-2 text-[#94a8bd]">{tpa.matricula_ogmo}</td>
-              <td className="px-3 py-2 text-[#94a8bd]">{tpa.funcao_nome}</td>
+              <td className="px-3 py-2 text-[#94a8bd]">{funcoesLabel(tpa)}</td>
               <td className="px-3 py-2">
                 <StatusBadge tone={statusTone(tpa.status_cadastro)}>
                   {tpa.status_cadastro}

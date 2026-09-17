@@ -179,6 +179,12 @@ class Tpa(Base, TimestampMixin, SoftDeleteMixin):
     consentimento_versao: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped[User] = relationship("User", back_populates="tpa", lazy="joined")
+    tpa_funcoes_links: Mapped[list["TpaFuncao"]] = relationship(
+        "TpaFuncao",
+        back_populates="tpa",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
 
 __all__ = ["User", "Tpa"]

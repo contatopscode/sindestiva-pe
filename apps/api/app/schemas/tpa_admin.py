@@ -1,4 +1,4 @@
-"""SINDESTIVA-PE · Schemas admin — cadastro TPA (DIRIGENTE)."""
+"""SINDESTIVA-PE · Schemas admin — cadastro TPA (FISCAL + DIRIGENTE)."""
 
 from __future__ import annotations
 
@@ -57,6 +57,7 @@ class AdminTpaRead(BaseModel):
     funcao_codigo: str
     funcao_nome: str
     categoria: str
+    funcoes: list[AdminTpaFuncaoMeta] = Field(default_factory=list)
     status_cadastro: TpaStatusEnum
     data_nascimento: date | None = None
     data_admissao: date | None = None
@@ -76,7 +77,8 @@ class AdminTpaCreate(BaseModel):
     matricula_ogmo: str = Field(min_length=1, max_length=10)
     telefone: str = Field(min_length=8, max_length=32)
     email: EmailStr | None = None
-    funcao_base_id: UUID
+    funcao_base_id: UUID | None = None
+    funcao_ids: list[UUID] | None = Field(default=None, min_length=1)
     status_cadastro: TpaStatusEnum = TpaStatusEnum.ATIVO
     data_nascimento: date | None = None
     data_admissao: date | None = None
@@ -94,6 +96,14 @@ class AdminTpaCreate(BaseModel):
     def _matricula(cls, value: str) -> str:
         return _validate_matricula_ogmo(value)
 
+    @model_validator(mode="after")
+    def _require_funcoes(self) -> AdminTpaCreate:
+        if not self.funcao_ids and self.funcao_base_id is None:
+            raise ValueError("Informe funcao_ids (min 1) ou funcao_base_id.")
+        if self.funcao_ids is not None and len(self.funcao_ids) < 1:
+            raise ValueError("funcao_ids deve ter ao menos um item.")
+        return self
+
 
 class AdminTpaUpdate(BaseModel):
     nome_completo: str | None = Field(default=None, min_length=2, max_length=200)
@@ -101,6 +111,7 @@ class AdminTpaUpdate(BaseModel):
     telefone: str | None = Field(default=None, min_length=8, max_length=32)
     email: EmailStr | None = None
     funcao_base_id: UUID | None = None
+    funcao_ids: list[UUID] | None = Field(default=None, min_length=1)
     status_cadastro: TpaStatusEnum | None = None
     data_nascimento: date | None = None
     data_admissao: date | None = None
@@ -123,6 +134,7 @@ class AdminTpaUpdate(BaseModel):
                 "telefone",
                 "email",
                 "funcao_base_id",
+                "funcao_ids",
                 "status_cadastro",
                 "data_nascimento",
                 "data_admissao",
@@ -130,6 +142,8 @@ class AdminTpaUpdate(BaseModel):
             )
         ):
             raise ValueError("Informe ao menos um campo para atualizar.")
+        if self.funcao_ids is not None and len(self.funcao_ids) < 1:
+            raise ValueError("funcao_ids deve ter ao menos um item.")
         return self
 
 

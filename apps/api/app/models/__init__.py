@@ -59,6 +59,7 @@ from app.models.ogmo import OgmoNotificacao, OgmoWebhookEndpoint
 from app.models.perfis_internos import Dirigente, Fiscal
 from app.models.remanejamento import Remanejamento, RemanejamentoHistorico
 from app.models.tpa_operacao import TpaConfirmacaoPresenca
+from app.models.tpa_funcoes import TpaFuncao
 from app.models.users import Tpa, User
 
 __all__ = [
@@ -85,6 +86,7 @@ __all__ = [
     # users
     "User",
     "Tpa",
+    "TpaFuncao",
     # perfis internos
     "Fiscal",
     "Dirigente",

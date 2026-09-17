@@ -21,7 +21,7 @@ const PUBLIC_ROUTES = new Set(["/login"]);
 const ROLE_RULES: Array<{ prefix: string; allowed: string[] }> = [
   { prefix: "/bi", allowed: ["DIRIGENTE"] },
   { prefix: "/usuarios", allowed: ["DIRIGENTE"] },
-  { prefix: "/tpas", allowed: ["DIRIGENTE"] },
+  { prefix: "/tpas", allowed: ["FISCAL", "DIRIGENTE"] },
   { prefix: "/configuracoes", allowed: ["DIRIGENTE"] },
   { prefix: "/centro-comando", allowed: ["FISCAL", "DIRIGENTE", "TPA"] },
   { prefix: "/remanejamentos", allowed: ["FISCAL", "DIRIGENTE"] },
