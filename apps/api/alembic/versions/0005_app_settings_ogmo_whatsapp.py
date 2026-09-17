@@ -4,7 +4,7 @@
 - Coluna `destinatario_whatsapp` em `ogmo_notificacoes`.
 - Enum `canal_notificacao_enum` + CHECK destinatário alinhados ao canal WHATSAPP.
 
-O valor de enum ``WHATSAPP`` é adicionado em ``autocommit_block()`` (commit próprio);
+O valor de enum ``WHATSAPP`` é adicionado em conexão AUTOCOMMIT (commit próprio);
 Postgres não permite usar um valor novo no mesmo transaction do ``ADD VALUE``.
 
 Downgrade: não remove ``WHATSAPP`` de ``canal_notificacao_enum`` — Postgres não suporta
@@ -19,6 +19,7 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import text
 from sqlalchemy.dialects import postgresql
 
 revision: str = "0005_app_settings_ogmo_whatsapp"
@@ -28,14 +29,23 @@ depends_on: str | Sequence[str] | None = None
 
 SCHEMA = "lousa_main"
 
+_ADD_WHATSAPP_ENUM = (
+    "ALTER TYPE lousa_main.canal_notificacao_enum "
+    "ADD VALUE IF NOT EXISTS 'WHATSAPP'"
+)
+
+
+def _add_canal_notificacao_whatsapp_enum_value() -> None:
+    """ADD VALUE fora da transação Alembic (Coolify/HOM: sem autocommit_block)."""
+    bind = op.get_bind()
+    engine = bind.engine
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        conn.execute(text(_ADD_WHATSAPP_ENUM))
+
 
 def upgrade() -> None:
     # Postgres: ADD VALUE must commit before WHATSAPP appears in CHECK (UnsafeNewEnumValueUsage).
-    with op.get_context().autocommit_block():
-        op.execute(
-            "ALTER TYPE lousa_main.canal_notificacao_enum "
-            "ADD VALUE IF NOT EXISTS 'WHATSAPP'"
-        )
+    _add_canal_notificacao_whatsapp_enum_value()
 
     op.add_column(
         "ogmo_notificacoes",

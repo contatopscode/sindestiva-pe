@@ -7,8 +7,7 @@ ATENÇÃO — pega-dica cross-projeto (MEMORY do coder agent):
 ATENÇÃO — Coolify HOM (2026-09):
     1) NÃO usar `async_engine` + `run_sync` sem `await connection.commit()`.
     2) Online: `connect()` + `context.begin_transaction()` em `do_run_migrations`
-       (padrão Alembic). NÃO envolver em `connectable.begin()` — quebra
-       `op.get_context().autocommit_block()` (ex.: migration 0005 ADD VALUE enum).
+       (padrão Alembic). Enum ADD VALUE (0005) usa conexão AUTOCOMMIT separada.
 
 Convenção: target_metadata = `app.models.base.Base.metadata`.
 Schema target = `lousa_main` (default do init.sql do container).
