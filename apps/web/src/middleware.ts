@@ -25,6 +25,7 @@ const ROLE_RULES: Array<{ prefix: string; allowed: string[] }> = [
   { prefix: "/configuracoes", allowed: ["DIRIGENTE"] },
   { prefix: "/centro-comando", allowed: ["FISCAL", "DIRIGENTE", "TPA"] },
   { prefix: "/remanejamentos", allowed: ["FISCAL", "DIRIGENTE"] },
+  { prefix: "/ogmo-recife", allowed: ["FISCAL", "DIRIGENTE"] },
   { prefix: "/ogmo", allowed: ["FISCAL", "DIRIGENTE"] },
   { prefix: "/auditoria", allowed: ["FISCAL", "DIRIGENTE"] },
   { prefix: "/tpa", allowed: ["FISCAL", "DIRIGENTE", "TPA"] },

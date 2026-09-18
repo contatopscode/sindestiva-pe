@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { PwaBottomNav } from "@/components/pwa-bottom-nav";
 
 // =============================================================================
 // SINDESTIVA-PE · PWA do TPA (Sprint 0)
@@ -168,12 +169,7 @@ export default function HomePage() {
         </div>
 
         {/* BOTTOM NAV */}
-        <div className="phone-nav">
-          <button className="phone-nav-item active">Início</button>
-          <button className="phone-nav-item">Escala</button>
-          <button className="phone-nav-item">Histórico</button>
-          <button className="phone-nav-item">Perfil</button>
-        </div>
+        <PwaBottomNav active="inicio" />
       </div>
     </div>
   );
