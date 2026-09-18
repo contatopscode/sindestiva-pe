@@ -27,8 +27,8 @@
 ### 1. Clone e instale
 
 ```bash
-git clone git@github.com:contatopscode/lousa-sindestiva.git
-cd lousa-sindestiva
+git clone git@github.com:contatopscode/sindestiva-pe.git
+cd sindestiva-pe
 cp .env.example .env
 # Edite .env: gere NEXTAUTH_SECRET com `openssl rand -base64 32`
 pnpm install
