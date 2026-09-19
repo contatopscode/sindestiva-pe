@@ -19,6 +19,7 @@ const TITLES: Record<string, string> = {
   "/tpa/historico": "PWA · Histórico",
   "/tpa/perfil": "PWA · Perfil",
   "/ogmo": "Fila de Notificação OGMO",
+  "/ogmo-recife": "OGMO Recife",
   "/auditoria": "Auditoria & Integridade",
   "/bi": "BI & Dashboards",
   "/usuarios": "Gestão de Usuários",

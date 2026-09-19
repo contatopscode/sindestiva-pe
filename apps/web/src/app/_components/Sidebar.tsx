@@ -46,6 +46,7 @@ const GROUPS: SidebarGroup[] = [
       { href: "/centro-comando", label: "Lousa Espelhada", icon: "📋" },
       { href: "/remanejamentos", label: "Remanejamentos", icon: "🔄" },
       { href: "/ogmo", label: "Fila OGMO", icon: "📡" },
+      { href: "/ogmo-recife", label: "OGMO Recife", icon: "🌐" },
       { href: "/auditoria", label: "Auditoria", icon: "🔍" },
     ],
   },

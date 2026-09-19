@@ -33,3 +33,10 @@ export const STATUS_NOTIFICACAO_OGMO = [
   "REJEITADO",
 ] as const;
 export type StatusNotificacaoOgmo = (typeof STATUS_NOTIFICACAO_OGMO)[number];
+
+export {
+  OGMO_RECIFE_DEFAULT_URL,
+  OGMO_RECIFE_IFRAME_SANDBOX,
+  ogmoRecifeEmbedTargets,
+  resolveOgmoRecifeUrl,
+} from "./ogmo-recife";
